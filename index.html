@@ -595,7 +595,7 @@ const DEFAULT = () => ({
     invTerms: INV_TERMS, quoTerms: QUO_TERMS, docLayout: 'classic',
     stockCats: STOCK_CATS.slice(), expCats: EXP_CATS.slice(), jobTypes: JOB_TYPES.slice()
   },
-  customers: [], items: [], moves: [], docs: [], expenses: [], suppliers: [], purchases: []
+  customers: [], items: [], moves: [], docs: [], expenses: [], suppliers: [], purchases: [], accounts: [], journals: [], recons: []
 });
 let db;
 function load() {
@@ -612,7 +612,7 @@ function load() {
   st.stockCats = uniq([...(st.stockCats || STOCK_CATS), ...db.items.map(i => i.category)]);
   st.expCats = uniq([...(st.expCats || EXP_CATS), ...db.expenses.map(x => x.category)]);
   st.jobTypes = uniq([...(st.jobTypes || JOB_TYPES), ...db.docs.map(d => d.jobType)]);
-  ['suppliers', 'purchases', 'moves', 'items', 'docs', 'expenses', 'customers'].forEach(k => { if (!Array.isArray(db[k])) db[k] = []; });
+  ['suppliers', 'purchases', 'moves', 'items', 'docs', 'expenses', 'customers', 'accounts', 'journals', 'recons'].forEach(k => { if (!Array.isArray(db[k])) db[k] = []; });
   // older invoices: fix each line's type and cost once, so later price changes don't rewrite past profit
   db.docs.forEach(d => (d.lines || []).forEach(l => {
     if (l.kind) return;
@@ -799,7 +799,7 @@ function setTop(title, actLabel, fn) {
 function render() {
   $$('#tabs button[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === NAV_GROUP[state.tab]));
   $$('#side button[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === state.tab));
-  ({home: viewHome, sales: viewSales, customers: viewCustomers, stock: viewStock, expenses: viewExpensesTab, suppliers: viewSuppliersTab, reports: viewReportsTab, more: viewMore})[state.tab]();
+  ({home: viewHome, sales: viewSales, customers: viewCustomers, stock: viewStock, expenses: viewExpensesTab, suppliers: viewSuppliersTab, reports: viewReportsTab, more: viewMore, banking: () => viewBanking(), ledger: () => viewLedger()})[state.tab]();
   bindSubnav();
   const lb = lastBackup();
   $('#sideFoot').innerHTML = `${esc(S().name)}<br>${lb ? 'Last backup ' + dfmt(lb) : 'No backup yet'}`;
@@ -1073,6 +1073,7 @@ function allocPayment(kind, partyId, focusId) {
       <div class="row">
         <label class="f"><span>Payment date</span><input class="in" type="date" name="date" value="${today()}" required></label>
         <label class="f"><span>Payment method</span><select class="in" name="method">${methods.map(m => `<option>${m}</option>`).join('')}</select></label>
+        <label class="f"><span>Bank / cash account</span><select class="in" name="acc">${window.bankAccOptions ? bankAccOptions('') : '<option value="">Automatic</option>'}</select></label>
       </div>
       <label class="f"><span>Reference no.</span><input class="in" name="note" placeholder="Fawran ref, cheque no., bank ref…"></label>
       <label class="f"><span>Amount ${C ? 'received' : 'paid'} (QAR)</span><input class="in" type="number" step="0.01" min="0" inputmode="decimal" id="apAmt" style="font-size:20px;font-weight:800"></label>
@@ -1125,7 +1126,7 @@ function allocPayment(kind, partyId, focusId) {
       const pay = rows.filter(r => r.amt > 0.004);
       if (!sel) { toast('Choose a ' + (C ? 'customer' : 'supplier')); return; }
       if (!pay.length) { toast('Enter an amount'); return; }
-      pay.forEach(r => { r.d.payments = r.d.payments || []; r.d.payments.push({amount: r2(r.amt), date: f.date, method: f.method, note: f.note.trim()}); });
+      pay.forEach(r => { r.d.payments = r.d.payments || []; r.d.payments.push({amount: r2(r.amt), date: f.date, method: f.method, acc: f.acc || '', note: f.note.trim()}); });
       const tot = applied(); save();
       closeSheet(() => { render(); toast(`${C ? 'Payment received' : 'Bill payment saved'} · ${money(tot)}`); });
     };
@@ -1744,12 +1745,13 @@ function recordPayment(d, done) {
       <label class="f"><span>Amount (QAR)</span><input class="in" type="number" step="0.01" min="0.01" inputmode="decimal" name="amount" value="${docBal(d)}" required></label>
       <label class="f"><span>Date</span><input class="in" type="date" name="date" value="${today()}" required></label>
       <label class="f"><span>Method</span><select class="in" name="method">${['Fawran', 'Cash', 'Bank transfer', 'Card', 'Cheque'].map(m => `<option>${m}</option>`).join('')}</select></label>
+      <label class="f"><span>Deposit to</span><select class="in" name="acc">${window.bankAccOptions ? bankAccOptions('') : '<option value="">Automatic</option>'}</select></label>
       <label class="f"><span>Reference / note</span><input class="in" name="note" placeholder="Optional"></label>
       <button class="btn pri full" type="submit">Save payment</button>
     </form>`, el => {
     el.querySelector('#payForm').onsubmit = e => {
       e.preventDefault(); const f = formData(e.target);
-      d.payments = d.payments || []; d.payments.push({amount: r2(f.amount), date: f.date, method: f.method, note: f.note.trim()});
+      d.payments = d.payments || []; d.payments.push({amount: r2(f.amount), date: f.date, method: f.method, acc: f.acc || '', note: f.note.trim()});
       save(); closeSheet(() => { done(); toast('Payment saved'); });
     };
   });
@@ -2317,13 +2319,14 @@ function editExpense(id, after) {
       <p class="hint" style="margin-top:-6px">Buying spare parts for stock? Use More → Purchases instead, so stock and parts cost update and it isn’t counted twice.</p>
       <label class="f"><span>Description</span><input class="in" name="desc" value="${esc(x.desc)}" placeholder="e.g. Petrol – Lusail visit"></label>
       <label class="f"><span>Paid by</span><select class="in" name="method">${['Cash', 'Card', 'Bank transfer', 'Fawran', 'Cheque'].map(m => `<option ${x.method === m ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
+      <label class="f"><span>Paid from</span><select class="in" name="acc">${window.bankAccOptions ? bankAccOptions(x.acc || '') : '<option value="">Automatic</option>'}</select></label>
       <button class="btn pri full" type="submit">Save expense</button>
       ${id ? `<button type="button" class="btn danger full" id="xDel" style="margin-top:8px">${ICON.trash}Delete</button>` : ''}
     </form>`, el => {
     bindCatSelect(el.querySelector('#xCat'), 'expCats');
     el.querySelector('#xForm').onsubmit = e => {
       e.preventDefault(); const f = formData(e.target);
-      const data = {date: f.date, amount: r2(f.amount), category: f.category || 'Other', desc: f.desc.trim(), method: f.method};
+      const data = {date: f.date, amount: r2(f.amount), category: f.category || 'Other', desc: f.desc.trim(), method: f.method, acc: f.acc || ''};
       if (id) Object.assign(x, data); else db.expenses.push(Object.assign({id: uid()}, data));
       save(); closeSheet(() => { after ? after() : render(); toast('Expense saved'); });
     };
@@ -2571,12 +2574,13 @@ function viewPurchase(id) {
         <label class="f"><span>Amount (QAR)</span><input class="in" type="number" step="0.01" min="0.01" inputmode="decimal" name="amount" value="${purBal(p)}" required></label>
         <label class="f"><span>Date</span><input class="in" type="date" name="date" value="${today()}" required></label>
         <label class="f"><span>Method</span><select class="in" name="method">${['Bank transfer', 'Cash', 'Fawran', 'Card', 'Cheque'].map(m => `<option>${m}</option>`).join('')}</select></label>
+        <label class="f"><span>Paid from</span><select class="in" name="acc">${window.bankAccOptions ? bankAccOptions('') : '<option value="">Automatic</option>'}</select></label>
         <label class="f"><span>Reference / note</span><input class="in" name="note" placeholder="Optional"></label>
         <button class="btn pri full" type="submit">Save payment</button>
       </form>`, e2 => {
       e2.querySelector('#spayForm').onsubmit = e => {
         e.preventDefault(); const f = formData(e.target);
-        p.payments = p.payments || []; p.payments.push({amount: r2(f.amount), date: f.date, method: f.method, note: f.note.trim()});
+        p.payments = p.payments || []; p.payments.push({amount: r2(f.amount), date: f.date, method: f.method, acc: f.acc || '', note: f.note.trim()});
         save(); closeSheet(() => { reopen(); toast('Payment saved'); });
       };
     });
@@ -2933,6 +2937,7 @@ const REPORTS = {
 const REPORT_GROUPS = [['Favourites', ['full', 'pl', 'ar']], ['Business overview', ['pl', 'full', 'cash']], ['Who owes you', ['ar', 'stmt']], ['Sales and customers', ['rev', 'sales']],
   ['What you owe', ['ap', 'sstmt']], ['Expenses and suppliers', ['exp']], ['Products and inventory', ['parts', 'stock']], ['For my accountant', ['xls', 'full']]];
 function openReportByKey(k) {
+  if (window.ledgerReport && ledgerReport(k)) return;
   ({full: reportFull, pl: reportPL, rev: reportRevenue, parts: reportParts, stock: reportStock, ar: reportAR, stmt: () => reportCustStatement(), sstmt: () => reportSupplierStatement(), ap: reportAP, cash: reportCash, exp: reportExpenses, sales: reportSales, xls: reportExport})[k]();
 }
 function viewReportsTab() {
@@ -3256,6 +3261,7 @@ function autoTreadmill() {
 autoTreadmill();
 render();
 </script>
+<script src="ledger.js"></script>
 <script src="cloud.js"></script>
 </body>
 </html>
