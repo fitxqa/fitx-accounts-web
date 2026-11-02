@@ -733,6 +733,14 @@ window.addEventListener('popstate', () => {
   if (sheets.length) { closeTopSheet(); const top = sheets[sheets.length - 1]; if (top && top._refresh) top._refresh(); render(); }
   runAfter();
 });
+// keyboard (web): Esc closes the top screen, one at a time
+document.addEventListener('keydown', e => {
+  if ((e.key !== 'Escape' && e.key !== 'Esc') || e.defaultPrevented || e.isComposing) return;
+  if (document.querySelector('.cl-wrap') || !sheets.length) return; // sign-in screen stays; nothing open
+  e.preventDefault();
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  closeSheet();
+});
 function download(name, text, mime) {
   const blob = new Blob([text], {type: mime || 'application/octet-stream'});
   const a = document.createElement('a');
