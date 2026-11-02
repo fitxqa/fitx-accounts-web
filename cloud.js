@@ -408,10 +408,7 @@
     on('clSignIn', () => { closeSheet(() => loginScreen('in')); });
     on('clSetup', () => { closeSheet(() => companyScreen()); });
     on('clSyncNow', async () => { await push(); toast(C.status === 'err' ? 'Sync problem: ' + C.error : 'Up to date'); refreshCloudSheet(); });
-    on('clSignOut', () => {
-      if (!confirm('Sign out? The data stays on this phone, but will not sync until you sign in again.')) return;
-      lsSet(LS_LINK, null); detach(); auth.signOut(); closeSheet(render);
-    });
+    on('clSignOut', () => C.signOut());
     on('clInvite', () => {
       openSheet('Invite staff', `
         <form id="clInvForm">
@@ -437,6 +434,31 @@
   };
 
   // Menu row
+  /* sign out: upload anything pending, then remove this device's copy (data stays in the cloud) */
+  C.signOut = async function () {
+    if (!auth || !C.user) return;
+    if (!confirm('Sign out of ' + C.user.email + '?\n\nYour accounts stay safe in the cloud. This device\'s copy is removed — sign in again to see it.')) return;
+    toast('Signing out…');
+    try { if (C.cid && C.ready) { clearTimeout(pushTimer); await push(); } } catch (e) {}
+    if (C.status === 'err' && !confirm('Some changes could not be uploaded (' + (C.error || 'no connection') + ').\nSign out anyway and lose them?')) return;
+    try { stopListeners(); } catch (e) {}
+    try { await auth.signOut(); } catch (e) {}
+    try { await fs.terminate(); await fs.clearPersistence(); } catch (e) {}
+    try { [KEY, LS_LINK, KEY + '_beforeCloud', KEY + '_lastBackup'].forEach(k => localStorage.removeItem(k)); localStorage.removeItem(LS_OFFLINE); } catch (e) {}
+    location.reload();
+  };
+  // side bar (computer / tablet): who is signed in + sign out
+  function sideAccount() {
+    const sf = document.getElementById('sideFoot'); if (!sf) return;
+    let box = sf.querySelector('.cl-acct');
+    if (!C.enabled) { if (box) box.remove(); return; }
+    if (!box) { sf.insertAdjacentHTML('beforeend', '<div class="cl-acct" style="margin-top:10px"></div>'); box = sf.querySelector('.cl-acct'); }
+    box.innerHTML = C.user
+      ? `<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(C.user.email)}">${esc(C.user.email)}</div><button type="button" class="btn" id="sideOut" style="margin-top:6px;min-height:36px;width:100%;font-size:13px">Sign out</button>`
+      : `<button type="button" class="btn pri" id="sideIn" style="margin-top:6px;min-height:36px;width:100%;font-size:13px">Sign in</button>`;
+    const o = box.querySelector('#sideOut'); if (o) o.onclick = () => C.signOut();
+    const i = box.querySelector('#sideIn'); if (i) i.onclick = () => loginScreen('in');
+  }
   const origMore = window.viewMore;
   window.viewMore = function () {
     origMore();
@@ -452,9 +474,17 @@
     });
     const foot = Array.from(document.querySelectorAll('#main > p.hint')).pop();
     if (foot && C.cid) foot.textContent = 'Data is saved on this device and synced to the cloud.';
+    if (C.enabled) {
+      const where = foot || document.querySelector('#main').lastElementChild;
+      where.insertAdjacentHTML('beforebegin', C.user
+        ? `<div class="list" style="margin-top:16px"><button type="button" class="item rcard" id="mSignOut"><span class="ic" style="color:var(--red)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l-5-5 5-5M5 12h11"/></svg></span><div class="main"><div class="t" style="color:var(--red)">Sign out</div><div class="s">${esc(C.user.email)}</div></div></button></div>`
+        : `<div class="list" style="margin-top:16px"><button type="button" class="item rcard" id="mSignIn"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4M14 17l5-5-5-5M19 12H8"/></svg></span><div class="main"><div class="t">Sign in</div><div class="s">Use the cloud: phones, computer and staff</div></div></button></div>`);
+      const so = document.getElementById('mSignOut'); if (so) so.onclick = () => C.signOut();
+      const si = document.getElementById('mSignIn'); if (si) si.onclick = () => loginScreen('in');
+    }
   };
   const origRender = window.render;
-  window.render = function () { if (!can(state.tab)) state.tab = 'home'; origRender(); if (C.cid) setStatus(C.status); };
+  window.render = function () { if (!can(state.tab)) state.tab = 'home'; origRender(); if (C.cid) setStatus(C.status); sideAccount(); };
 
   /* ---------- start ---------- */
   if (!C.enabled) return;
