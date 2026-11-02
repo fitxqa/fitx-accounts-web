@@ -38,14 +38,39 @@
     });
     // one expense account per expense category
     const cats = Array.from(new Set([...(S().expCats || []), ...db.expenses.map(x => x.category)].filter(Boolean)));
-    cats.forEach(c => {
+    const SEP = ' › ';
+    const tops = Array.from(new Set(cats.map(c => String(c).split(SEP)[0])));
+    const byCat = c => db.accounts.find(a => a.sub === 'cat' && a.cat === c);
+    tops.forEach(c => {
       const id = 'acc_exp_' + slug(c);
-      if (!db.accounts.some(a => a.id === id)) { db.accounts.push({id, code: nextCode('6'), name: c, type: 'expense', sub: 'cat', cat: c, system: true}); changed = true; }
+      if (!byCat(c) && !db.accounts.some(a => a.id === id)) { db.accounts.push({id, code: nextCode('6'), name: c, type: 'expense', sub: 'cat', cat: c, system: true}); changed = true; }
+    });
+    cats.filter(c => String(c).includes(SEP)).forEach(c => {
+      const pAcc = byCat(String(c).split(SEP)[0]);
+      const id = 'acc_exp_' + slug(c), pid = pAcc ? pAcc.id : 'acc_exp_' + slug(String(c).split(SEP)[0]);
+      const ex = byCat(c) || db.accounts.find(a => a.id === id);
+      if (!ex) { db.accounts.push({id, code: childCode(pid), name: String(c).split(SEP).pop(), type: 'expense', sub: 'cat', cat: c, parent: pid, system: true}); changed = true; }
+      else if (!ex.parent) { ex.parent = pid; changed = true; }
     });
     const st = S();
     if (!st.methodAcc) { st.methodAcc = {Cash: A(1000), Fawran: A(1100), 'Bank transfer': A(1100), Card: A(1100), Cheque: A(1100)}; changed = true; }
     return changed;
   }
+  // first free code after the parent's code (6000 -> 6001, 6002 …)
+  function childCode(pid) {
+    const p = db.accounts.find(a => a.id === pid); if (!p) return nextCode('6');
+    const used = new Set(db.accounts.map(a => String(a.code)));
+    let n = Number(p.code) + 1; while (used.has(String(n)) && n % 10 !== 0) n++;
+    return used.has(String(n)) ? nextCode(String(p.code)[0]) : String(n);
+  }
+  // accounts as a tree: each top-level account followed by its sub-accounts
+  function accTree(list) {
+    const byCode = (a, b) => String(a.code).localeCompare(String(b.code));
+    const ids = new Set(list.map(a => a.id));
+    const tops = list.filter(a => !a.parent || !ids.has(a.parent)).sort(byCode);
+    return tops.flatMap(t => [Object.assign({_lvl: 0}, t), ...list.filter(a => a.parent === t.id).sort(byCode).map(c => Object.assign({_lvl: 1}, c))]);
+  }
+  const kidsOf = id => db.accounts.filter(a => a.parent === id);
   function nextCode(prefix) {
     const used = db.accounts.map(a => String(a.code)).filter(c => c.startsWith(prefix)).map(Number).filter(n => !isNaN(n));
     let n = prefix === '6' ? 6000 : Number(prefix + '000');
@@ -56,7 +81,16 @@
   const accName = id => { const a = accById(id); return a ? `${a.code} · ${a.name}` : '(deleted account)'; };
   const bankAccounts = () => db.accounts.filter(a => a.type === 'asset' && (a.sub === 'bank' || a.sub === 'cash') && !a.hidden).sort((a, b) => String(a.code).localeCompare(String(b.code)));
   const moneyAcc = (acc, method) => (acc && accById(acc)) ? acc : ((S().methodAcc || {})[method] || A(method === 'Cash' ? 1000 : 1100));
-  const expAcc = cat => { const id = 'acc_exp_' + slug(cat || 'Other'); return accById(id) ? id : (accById('acc_exp_other') ? 'acc_exp_other' : A(5010)); };
+  const expAcc = cat => {
+    const c = cat || 'Other';
+    const hit = db.accounts.find(a => a.sub === 'cat' && a.cat === c); if (hit) return hit.id;
+    const id = 'acc_exp_' + slug(c); return accById(id) ? id : (accById('acc_exp_other') ? 'acc_exp_other' : A(5010));
+  };
+  // renaming an expense category renames its account (history stays on the same account)
+  window.onCatRename = function (key, swap) {
+    if (key !== 'expCats') return;
+    db.accounts.forEach(a => { if (a.sub === 'cat' && a.cat) { const n = swap(a.cat); if (n !== a.cat) { a.cat = n; a.name = n.split(' › ').pop(); } } });
+  };
   window.FitxLedger = {accById, bankAccounts, moneyAcc};
 
   // options for "Deposit to / Paid from" selects in payment & expense forms
@@ -357,10 +391,13 @@
     const bal = balances('9999-12-31');
     const q = (state.coaQ || '').toLowerCase();
     box.innerHTML = `<input class="search" id="coaQ" placeholder="Search accounts" value="${esc(state.coaQ || '')}" aria-label="Search accounts">` + TYPES.map(([t, label]) => {
-      const list = db.accounts.filter(a => a.type === t && !a.hidden && (!q || (a.code + ' ' + a.name).toLowerCase().includes(q))).sort((a, b) => String(a.code).localeCompare(String(b.code)));
+      const all = db.accounts.filter(a => a.type === t && !a.hidden);
+      const match = a => !q || (a.code + ' ' + a.name).toLowerCase().includes(q);
+      const list = accTree(all).filter(a => match(a) || kidsOf(a.id).some(match) || (a.parent && match(accById(a.parent) || {code: '', name: ''})));
       if (!list.length) return '';
-      const tot = list.reduce((s, a) => s + bal[a.id], 0);
-      return `<div class="acctype"><span>${label}</span><span>${fmt(tot)}</span></div><div class="list">${list.map(a => `<button type="button" class="item" data-acc="${a.id}"><div class="main"><div class="t">${esc(a.code)} · ${esc(a.name)}</div><div class="s">${esc(subLabel(a))}</div></div><div class="r"><div class="amt" style="color:${bal[a.id] < 0 ? 'var(--red)' : 'inherit'}">${fmt(bal[a.id])}</div></div></button>`).join('')}</div>`;
+      const tot = all.reduce((s, a) => s + bal[a.id], 0);
+      const roll = a => r2(bal[a.id] + kidsOf(a.id).reduce((s, k) => s + bal[k.id], 0));
+      return `<div class="acctype"><span>${label}</span><span>${fmt(tot)}</span></div><div class="list">${list.map(a => { const v = a._lvl ? bal[a.id] : roll(a); const hasKids = !a._lvl && kidsOf(a.id).length; return `<button type="button" class="item" data-acc="${a.id}"${a._lvl ? ' style="padding-left:30px"' : ''}><div class="main"><div class="t"${hasKids ? ' style="font-weight:800"' : ''}>${a._lvl ? '\u21b3 ' : ''}${esc(a.code)} · ${esc(a.name)}</div><div class="s">${esc(hasKids ? kidsOf(a.id).length + ' sub-accounts · total incl. sub-accounts' : subLabel(a))}</div></div><div class="r"><div class="amt" style="color:${v < 0 ? 'var(--red)' : 'inherit'}">${fmt(v)}</div></div></button>`; }).join('')}</div>`;
     }).join('');
     const qi = box.querySelector('#coaQ'); qi.oninput = () => { state.coaQ = qi.value; const pos = qi.selectionStart; drawCOA(box); const n = box.querySelector('#coaQ'); n.focus(); n.setSelectionRange(pos, pos); };
     box.querySelectorAll('[data-acc]').forEach(b => b.onclick = () => viewAccountLedger(b.dataset.acc));
@@ -380,6 +417,10 @@
       el.querySelectorAll('[data-i]').forEach(b => b.onclick = () => { const r = rows[+b.dataset.i]; if (r && r.open) r.open(); });
     });
   }
+  function parentOpts(a) {
+    const list = db.accounts.filter(x => x.type === (a.type || 'expense') && !x.parent && x.id !== a.id && !x.hidden).sort((x, y) => String(x.code).localeCompare(String(y.code)));
+    return `<option value="">— None (main account) —</option>` + list.map(x => `<option value="${x.id}" ${x.id === a.parent ? 'selected' : ''}>${esc(x.code + ' · ' + x.name)}</option>`).join('');
+  }
   function editAccount(id, preset) {
     ensureAccounts();
     const a = id ? accById(id) : Object.assign({type: 'expense'}, preset || {});
@@ -391,6 +432,7 @@
           <label class="f"><span>Type</span><select class="in" name="type" ${a.system ? 'disabled' : ''}>${TYPES.map(([t, l]) => `<option value="${t}" ${a.type === t ? 'selected' : ''}>${l.replace(/s$/, '').replace('Liabilitie', 'Liability').replace('Expense', 'Expense')}</option>`).join('')}</select></label>
         </div>
         <label class="f"><span>Name</span><input class="in" name="name" value="${esc(a.name || '')}" required placeholder="${isBank ? 'e.g. QNB current account' : 'e.g. Equipment rental income'}"></label>
+        <label class="f"><span>Sub-account of</span><select class="in" name="parent" id="acPar">${parentOpts(a)}</select></label>
         ${!a.system || isBank ? `<label class="f"><span>Kind</span><select class="in" name="sub" ${a.system && !isBank ? 'disabled' : ''}><option value="">Normal</option><option value="bank" ${a.sub === 'bank' ? 'selected' : ''}>Bank account</option><option value="cash" ${a.sub === 'cash' ? 'selected' : ''}>Cash account</option><option value="fixed" ${a.sub === 'fixed' ? 'selected' : ''}>Fixed asset</option></select></label>` : ''}
         <div id="acBank" class="${isBank ? '' : 'hidden'}">
           <div class="row">
@@ -411,14 +453,20 @@
       </form>`, el => {
       const sub = el.querySelector('[name=sub]');
       if (sub) sub.onchange = () => el.querySelector('#acBank').classList.toggle('hidden', !['bank', 'cash'].includes(sub.value));
+      const ty = el.querySelector('[name=type]');
+      if (ty && !a.system) ty.onchange = () => { el.querySelector('#acPar').innerHTML = parentOpts(Object.assign({}, a, {type: ty.value})); };
       el.querySelector('#acForm').onsubmit = e => {
         e.preventDefault(); const f = formData(e.target);
         const type = a.system ? a.type : (f.type || 'expense');
         const s2 = f.sub !== undefined ? f.sub : a.sub;
         if ((s2 === 'bank' || s2 === 'cash') && type !== 'asset') { toast('Bank and cash accounts must be Assets'); return; }
-        const code = (f.code || '').trim() || nextCode({asset: '1', liability: '2', equity: '3', income: '4', expense: '6'}[type]);
+        const parent = f.parent || '';
+        if (parent && (accById(parent) || {}).type !== type) { toast('A sub-account must be the same type as its main account'); return; }
+        if (parent && id && kidsOf(id).length) { toast('This account has its own sub-accounts, so it can’t be a sub-account'); return; }
+        const code = (f.code || '').trim() || (parent ? childCode(parent) : nextCode({asset: '1', liability: '2', equity: '3', income: '4', expense: '6'}[type]));
         if (db.accounts.some(x => x.code === code && x.id !== id)) { toast('Code ' + code + ' is already used'); return; }
-        const data = {code, name: f.name.trim(), type, sub: s2 || '', bank: (f.bank || '').trim(), accNo: (f.accNo || '').trim(), iban: (f.iban || '').trim()};
+        const data = {code, name: f.name.trim(), type, sub: s2 || '', parent, bank: (f.bank || '').trim(), accNo: (f.accNo || '').trim(), iban: (f.iban || '').trim()};
+        if (!parent) delete data.parent;
         if (f.opening !== undefined) { data.opening = f.opening === '' ? 0 : r2(f.opening); data.openingDate = f.openingDate || ''; }
         if (id) Object.assign(a, data); else db.accounts.push(Object.assign({id: 'acc_' + uid()}, data));
         save(); closeSheet(() => { render(); toast('Account saved'); });
@@ -427,6 +475,7 @@
       if (del) del.onclick = () => {
         const used = postings().some(p => p.acc === id && !p.key.startsWith('ob:'));
         if (used) { toast('This account has entries — it can’t be deleted'); return; }
+        if (kidsOf(id).length) { toast('Move or delete its sub-accounts first'); return; }
         if (!confirm('Delete ' + a.name + '?')) return;
         db.accounts = db.accounts.filter(x => x.id !== id); save(); closeSheet(() => closeSheet(render));
       };
@@ -443,7 +492,7 @@
     ensureAccounts();
     const j = id ? db.journals.find(x => x.id === id) : null;
     const draft = j ? JSON.parse(JSON.stringify(j)) : {date: today(), memo: '', lines: [{acc: '', dr: '', cr: ''}, {acc: '', dr: '', cr: ''}]};
-    const accOpts = sel => '<option value="">— Account —</option>' + TYPES.map(([t, l]) => `<optgroup label="${l}">${db.accounts.filter(a => a.type === t && !a.hidden).sort((a, b) => String(a.code).localeCompare(String(b.code))).map(a => `<option value="${a.id}" ${a.id === sel ? 'selected' : ''}>${esc(a.code + ' · ' + a.name)}</option>`).join('')}</optgroup>`).join('');
+    const accOpts = sel => '<option value="">— Account —</option>' + TYPES.map(([t, l]) => `<optgroup label="${l}">${accTree(db.accounts.filter(a => a.type === t && !a.hidden)).map(a => `<option value="${a.id}" ${a.id === sel ? 'selected' : ''}>${a._lvl ? '\u00a0\u00a0\u21b3 ' : ''}${esc(a.code + ' · ' + a.name)}</option>`).join('')}</optgroup>`).join('');
     openSheet(j ? 'Journal ' + (j.no || '') : 'New journal entry', `
       <form id="jrForm">
         <div class="row">
@@ -507,7 +556,7 @@
   function tbHTML(asOf, P) {
     const rows = tbData(asOf);
     const d = r2(rows.reduce((s, r) => s + r.dr, 0)), c = r2(rows.reduce((s, r) => s + r.cr, 0));
-    return TB([['Code'], ['Account'], ['Type'], ['Debit', 1], ['Credit', 1]], rows.map(r => [esc(r.a.code), esc(r.a.name), esc(r.a.type), r.dr ? fmt(r.dr) : '', r.cr ? fmt(r.cr) : '']), ['', 'Total', '', fmt(d), fmt(c)], P, 'No entries yet.') +
+    return TB([['Code'], ['Account'], ['Type'], ['Debit', 1], ['Credit', 1]], rows.map(r => [esc(r.a.code), (r.a.parent ? '\u00a0\u00a0\u21b3 ' : '') + esc(r.a.name), esc(r.a.type), r.dr ? fmt(r.dr) : '', r.cr ? fmt(r.cr) : '']), ['', 'Total', '', fmt(d), fmt(c)], P, 'No entries yet.') +
       (P ? '' : `<div class="tbal ${d === c ? 'ok' : 'bad'}"><span>Debits ${fmt(d)} · Credits ${fmt(c)}</span><span>${d === c ? 'In balance' : 'Out by ' + fmt(d - c)}</span></div>`);
   }
   function drawTB(box) {
@@ -524,7 +573,20 @@
     const profit = r2(inc - exp);
     const assets = grp('asset'), liab = grp('liability'), eq = grp('equity');
     const tA = sum(assets), tL = sum(liab), tE = r2(sum(eq) + profit);
-    const sec = (title, list, extra, total) => `<h3>${title}</h3>` + TB([['Account'], ['Amount', 1]], list.map(a => [esc(a.code + ' · ' + a.name), fmt(bal[a.id])]).concat(extra || []), ['Total ' + title.toLowerCase(), fmt(total)], P, 'None');
+    const sec = (title, list, extra, total) => {
+      const ids = new Set(list.map(a => a.id));
+      // include main accounts whose sub-accounts have balances
+      list.forEach(a => { if (a.parent && !ids.has(a.parent) && accById(a.parent)) { ids.add(a.parent); list = list.concat([accById(a.parent)]); } });
+      const rows = accTree(list).map(a => {
+        const kids = a._lvl ? [] : list.filter(k => k.parent === a.id);
+        if (a._lvl) return [`<span style="padding-left:16px;color:#555">\u21b3 ${esc(a.code + ' · ' + a.name)}</span>`, fmt(bal[a.id])];
+        if (!kids.length) return [esc(a.code + ' · ' + a.name), fmt(bal[a.id])];
+        const sub = r2(bal[a.id] + kids.reduce((s, k) => s + bal[k.id], 0));
+        const head = [`<b>${esc(a.code + ' · ' + a.name)}</b>`, `<b>${fmt(sub)}</b>`];
+        return Math.abs(bal[a.id]) >= 0.005 ? [head, [`<span style="padding-left:16px;color:#555">\u21b3 ${esc(a.code + ' · ' + a.name)} (main)</span>`, fmt(bal[a.id])]] : head;
+      }).flatMap(r => Array.isArray(r[0]) ? r : [r]);
+      return `<h3>${title}</h3>` + TB([['Account'], ['Amount', 1]], rows.concat(extra || []), ['Total ' + title.toLowerCase(), fmt(total)], P, 'None');
+    };
     const ok = Math.abs(tA - tL - tE) < 0.01;
     return (P ? '' : KP([['Total assets', fmt(tA), '', true], ['Total liabilities', fmt(tL)], ['Equity', fmt(tE)], ['Profit to date', fmt(profit), profit >= 0 ? 'var(--green)' : 'var(--red)']])) +
       sec('Assets', assets, null, tA) + sec('Liabilities', liab, null, tL) + sec('Equity', eq, [['Profit / (loss) to date', fmt(profit)]], tE) +

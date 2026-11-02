@@ -323,6 +323,9 @@ textarea.in{min-height:80px;resize:vertical}
 .lrep{display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-top:8px;padding-top:8px;border-top:1px dashed #ffb27a}
 /* layout chooser */
 .btn.rbtn{border-color:#ff6a00;color:#c2410c}
+.catact{display:flex;gap:6px;flex-shrink:0}
+.catact .btn{min-height:40px;min-width:40px;padding:6px 10px;font-size:13px}
+.catact .btn svg{width:16px;height:16px}
 .pdfhost{position:fixed;left:-10000px;top:0;width:794px;background:#fff;z-index:-1}
 .pdfhost .paper{border:0!important;box-shadow:none!important;border-radius:0!important;margin:0;overflow:visible;padding:36px 38px}
 .btns.sharebar{grid-template-columns:repeat(4,1fr)}
@@ -758,24 +761,78 @@ function askText(title, label, cb) {
   });
 }
 const NEWCAT = '__new__';
+/* ---------- categories with sub-categories: a sub-category is stored as "Parent › Child" ---------- */
+const CSEP = ' › ';
+const NEWSUB = '__newsub__';
+const catParent = c => String(c || '').split(CSEP)[0];
+const catLeaf = c => { const p = String(c || '').split(CSEP); return p[p.length - 1]; };
+const isSubCat = c => String(c || '').includes(CSEP);
+const inCat = (val, cat) => val === cat || String(val || '').startsWith(cat + CSEP);
+// ordered tree: each parent followed by its sub-categories (parents implied by children are added)
+function catTree(list) {
+  const parents = [], kids = {};
+  (list || []).filter(Boolean).forEach(c => {
+    const p = catParent(c);
+    if (!parents.includes(p)) parents.push(p);
+    if (isSubCat(c)) (kids[p] = kids[p] || []).includes(c) || kids[p].push(c);
+  });
+  return parents.map(p => ({name: p, subs: kids[p] || []}));
+}
+const catFlat = list => catTree(list).flatMap(t => [t.name, ...t.subs]);
 function catOptions(list, sel) {
-  const all = sel && !list.includes(sel) ? [...list, sel] : list;
-  return `<option value="">— None —</option>` + all.map(c => `<option ${c === sel ? 'selected' : ''}>${esc(c)}</option>`).join('') + `<option value="${NEWCAT}">+ Add new category…</option>`;
+  const all = sel && !catFlat(list).includes(sel) ? [...list, sel] : list;
+  return `<option value="">— None —</option>` + catTree(all).map(t => `<option value="${esc(t.name)}" ${t.name === sel ? 'selected' : ''}>${esc(t.name)}</option>` +
+    t.subs.map(c => `<option value="${esc(c)}" ${c === sel ? 'selected' : ''}>\u00a0\u00a0\u00a0\u21b3 ${esc(catLeaf(c))}</option>`).join('')).join('') +
+    `<option value="${NEWCAT}">+ Add new category…</option><option value="${NEWSUB}">+ Add sub-category…</option>`;
+}
+// dialog: name + optional parent
+function askCategory(key, parent, cb, title) {
+  const tops = catTree(S()[key]).map(t => t.name);
+  openSheet(title || (parent === undefined ? 'New category' : 'New sub-category'), `<form id="acatForm">
+    <label class="f"><span>Under (main category)</span><select class="in" name="parent"><option value="">— None (main category) —</option>${tops.map(t => `<option ${t === parent ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+    <label class="f"><span>Name</span><input class="in" name="v" required autofocus placeholder="e.g. Fuel"></label>
+    <button class="btn pri full" type="submit">Add</button></form>`, el => {
+    const inp = el.querySelector('[name=v]'); setTimeout(() => inp.focus(), 150);
+    el.querySelector('#acatForm').onsubmit = e => {
+      e.preventDefault(); const f = formData(e.target);
+      const name = f.v.trim().replace(/›/g, '-'); if (!name) return;
+      const path = f.parent ? f.parent + CSEP + name : name;
+      const list = S()[key];
+      const hit = list.find(c => c.toLowerCase() === path.toLowerCase());
+      if (!hit) { if (f.parent && !list.includes(f.parent)) list.push(f.parent); list.push(path); save(); }
+      closeSheet(() => { cb(hit || path, !!hit); });
+    };
+  });
 }
 function bindCatSelect(sel, key) {
   let prev = sel.value;
   sel.addEventListener('change', () => {
-    if (sel.value !== NEWCAT) { prev = sel.value; return; }
+    if (sel.value !== NEWCAT && sel.value !== NEWSUB) { prev = sel.value; return; }
+    const sub = sel.value === NEWSUB;
     sel.value = prev;
-    askText('New category', 'Category name', v => {
-      const list = S()[key];
-      const hit = list.find(c => c.toLowerCase() === v.toLowerCase());
-      if (!hit) { list.push(v); save(); }
-      sel.innerHTML = catOptions(list, hit || v); prev = sel.value;
-      toast(hit ? 'Category already exists' : 'Category added');
+    askCategory(key, sub ? (catParent(prev) || '') : undefined, (v, existed) => {
+      sel.innerHTML = catOptions(S()[key], v); prev = sel.value;
+      toast(existed ? 'Category already exists' : 'Category added');
     });
   });
 }
+// report rows grouped by main category with subtotals: entries [[cat, value...]] -> [{cat, label, vals, level}]
+function groupByCat(entries, sumIdx) {
+  const idx = sumIdx || [1];
+  const g = {};
+  entries.forEach(e => { const p = catParent(e[0]); (g[p] = g[p] || []).push(e); });
+  const tot = list => idx.map(i => list.reduce((s, e) => s + num(e[i]), 0));
+  return Object.keys(g).sort((a, b) => tot(g[b])[0] - tot(g[a])[0]).flatMap(p => {
+    const list = g[p];
+    if (list.length === 1 && !isSubCat(list[0][0])) return [{label: p, vals: idx.map(i => list[0][i]), level: 0, single: true}];
+    const own = list.filter(e => !isSubCat(e[0]));
+    const subs = list.filter(e => isSubCat(e[0])).sort((a, b) => num(b[idx[0]]) - num(a[idx[0]]));
+    return [{label: p, vals: tot(list), level: 0},
+      ...own.map(e => ({label: p + ' (general)', vals: idx.map(i => e[i]), level: 1})),
+      ...subs.map(e => ({label: catLeaf(e[0]), vals: idx.map(i => e[i]), level: 1}))];
+  });
+}
+const catCell = r => r.level ? `<span style="padding-left:16px;color:#555">\u21b3 ${esc(r.label)}</span>` : (r.single ? esc(r.label) : `<b>${esc(r.label)}</b>`);
 
 /* ---------- NAVIGATION SHELL (sidebar on tablets, bottom bar on phones) ---------- */
 const NAV_GROUP = {home: 'home', sales: 'sales', customers: 'sales', stock: 'sales', expenses: 'expenses', suppliers: 'expenses', reports: 'more', more: 'more'};
@@ -1812,8 +1869,10 @@ function viewExpensesTab() {
   setTop('Expenses', '+ Expense', () => editExpense());
   const [mf, mt] = monthRange(0), [lf, lt] = monthRange(-1), y = new Date().getFullYear() + '';
   const sumR = (f, t) => db.expenses.filter(x => x.date >= f && x.date <= t).reduce((s, x) => s + num(x.amount), 0);
-  const cats = Array.from(new Set(db.expenses.map(x => x.category))).sort();
-  state.expCat = cats.includes(state.expCat) ? state.expCat : 'All';
+  const allCats = Array.from(new Set(db.expenses.map(x => x.category).filter(Boolean))).sort();
+  const cats = catTree(allCats).map(t => t.name);
+  state.expCat = cats.includes(catParent(state.expCat)) ? state.expCat : 'All';
+  const subCats = allCats.filter(c => isSubCat(c) && catParent(c) === catParent(state.expCat));
   $('#main').innerHTML = subnav('expenses') + `
     <div class="grid2 k4" style="margin-bottom:12px">
       <div class="stat hl"><div class="k">This month</div><div class="v">${fmt(sumR(mf, mt))}</div></div>
@@ -1822,12 +1881,13 @@ function viewExpensesTab() {
       <div class="stat"><div class="k">Bills to pay</div><div class="v" style="color:var(--yellow)">${fmt(payables())}</div></div>
     </div>
     <div class="toolbar"><input class="search" id="q" placeholder="Search expenses" value="${esc(state.q)}" aria-label="Search expenses"></div>
-    <div class="chips">${['All', ...cats].map(c => `<button type="button" data-c="${esc(c)}" class="${state.expCat === c ? 'on' : ''}">${esc(c)}</button>`).join('')}</div>
+    <div class="chips">${['All', ...cats].map(c => `<button type="button" data-c="${esc(c)}" class="${state.expCat === c || (c !== 'All' && catParent(state.expCat) === c) ? 'on' : ''}">${esc(c)}</button>`).join('')}</div>
+    ${subCats.length && state.expCat !== 'All' ? `<div class="chips" style="margin-top:-6px"><button type="button" data-c="${esc(catParent(state.expCat))}" class="${!isSubCat(state.expCat) ? 'on' : ''}">All ${esc(catParent(state.expCat))}</button>${subCats.map(c => `<button type="button" data-c="${esc(c)}" class="${state.expCat === c ? 'on' : ''}">\u21b3 ${esc(catLeaf(c))}</button>`).join('')}</div>` : ''}
     <div id="eList"></div>`;
   $$('.chips button').forEach(b => b.onclick = () => { state.expCat = b.dataset.c; render(); });
   const draw = () => {
     const q = state.q.toLowerCase();
-    const list = db.expenses.filter(x => (state.expCat === 'All' || x.category === state.expCat) && (!q || [x.desc, x.category, x.method].join(' ').toLowerCase().includes(q))).sort((a, b) => b.date.localeCompare(a.date));
+    const list = db.expenses.filter(x => (state.expCat === 'All' || inCat(x.category, state.expCat)) && (!q || [x.desc, x.category, x.method].join(' ').toLowerCase().includes(q))).sort((a, b) => b.date.localeCompare(a.date));
     const groups = {}; list.forEach(x => { const k = x.date.slice(0, 7); (groups[k] = groups[k] || []).push(x); });
     $('#eList').innerHTML = list.length ? Object.keys(groups).map(k => {
       const [yy, m] = k.split('-'); const tot = groups[k].reduce((s, x) => s + num(x.amount), 0);
@@ -2164,17 +2224,18 @@ function itemRow(i) {
   const q = stockQty(i.id); const low = isLow(i);
   return `<button type="button" class="item" data-item="${i.id}"><div class="main"><div class="t">${esc(i.name)}</div><div class="s">${esc([i.sku, i.category].filter(Boolean).join(' · ') || '—')} · ${fmt(i.price)}${(i.fits || []).length ? ` · fits ${i.fits.length} model${i.fits.length > 1 ? 's' : ''}` : ''}</div></div><div class="r"><div class="amt" style="color:${q <= 0 && (num(i.minQty) > 0 || stockIn(i.id) > 0) ? 'var(--red)' : low ? 'var(--yellow)' : 'var(--text)'}">${q}</div><div class="s">${esc(i.unit || 'pcs')}</div></div></button>`;
 }
-const categories = () => Array.from(new Set(db.items.map(i => i.category).filter(Boolean))).sort();
+const categories = () => catTree(Array.from(new Set(db.items.map(i => i.category).filter(Boolean))).sort()).map(t => t.name);
 function viewStock() {
   setTop('Products & services', '+ New', () => editItem());
   const cats = ['All', 'Low stock', ...(db.items.some(i => i.service) ? ['Services'] : []), ...categories()];
-  if (!cats.includes(state.stockCat)) state.stockCat = 'All';
+  if (!cats.includes(catParent(state.stockCat))) state.stockCat = 'All';
   const value = db.items.filter(i => !i.service).reduce((s, i) => s + Math.max(0, stockQty(i.id)) * num(i.cost), 0);
   $('#main').innerHTML = subnav('sales') + `
     <div class="grid2" style="margin-bottom:12px"><div class="stat"><div class="k">Items</div><div class="v">${db.items.length}</div></div><div class="stat"><div class="k">Stock value (cost)</div><div class="v">${fmt(value)}</div></div></div>
     <div class="btns" style="margin-bottom:12px"><button type="button" class="btn" id="tmFind">${ICON.wrench}Find by treadmill</button><button type="button" class="btn" id="tmImp">${ICON.dl}Import treadmill parts</button></div>
     <input class="search" id="q" placeholder="Search part, code or treadmill model" value="${esc(state.q)}" aria-label="Search stock">
-    <div class="chips">${cats.map(c => `<button type="button" data-c="${esc(c)}" class="${state.stockCat === c ? 'on' : ''}">${esc(c)}</button>`).join('')}</div>
+    <div class="chips">${cats.map(c => `<button type="button" data-c="${esc(c)}" class="${state.stockCat === c || catParent(state.stockCat) === c && isSubCat(state.stockCat) ? 'on' : ''}">${esc(c)}</button>`).join('')}</div>
+    ${(() => { const p = catParent(state.stockCat); const subs = Array.from(new Set(db.items.map(i => i.category).filter(c => isSubCat(c) && catParent(c) === p))).sort(); return subs.length && !['All', 'Low stock', 'Services'].includes(p) ? `<div class="chips" style="margin-top:-6px"><button type="button" data-c="${esc(p)}" class="${state.stockCat === p ? 'on' : ''}">All ${esc(p)}</button>${subs.map(c => `<button type="button" data-c="${esc(c)}" class="${state.stockCat === c ? 'on' : ''}">\u21b3 ${esc(catLeaf(c))}</button>`).join('')}</div>` : ''; })()}
     <div class="list" id="iList"></div>`;
   $$('.chips button').forEach(b => b.onclick = () => { state.stockCat = b.dataset.c; render(); });
   const draw = () => {
@@ -2183,7 +2244,7 @@ function viewStock() {
     let list = db.items.filter(i => { const s = [i.name, i.sku, i.category, ...(i.fits || [])].join(' ').toLowerCase(); return qw.every(w => s.includes(w)); });
     if (cat === 'Low stock') list = list.filter(i => !i.service && isLow(i));
     else if (cat === 'Services') list = list.filter(i => i.service);
-    else if (cat !== 'All') list = list.filter(i => i.category === cat);
+    else if (cat !== 'All') list = list.filter(i => inCat(i.category, cat));
     list.sort((a, b) => a.name.localeCompare(b.name));
     $('#iList').innerHTML = list.length ? list.map(itemRow).join('') : `<div class="empty">${db.items.length ? 'No match.' : 'No items yet. Tap “+ New” to add spare parts or services.'}</div>`;
     $$('#iList [data-item]').forEach(b => b.onclick = () => viewItem(b.dataset.item));
@@ -2770,7 +2831,7 @@ function secPL(a, P) {
     ['t', 'Total cost of sales', a.cogs],
     ['g', 'Gross profit · margin ' + pct(a.gross, a.revenue), a.gross],
     ['h', 'Operating expenses'],
-    ...cats.map(([k, v]) => ['s', k, v]),
+    ...groupByCat(cats).map(r => ['s', r.level ? '\u00a0\u00a0\u00a0\u21b3 ' + r.label : r.label, r.vals[0]]),
     ['t', 'Total operating expenses', a.expTot],
     ['g', 'Net profit · margin ' + pct(a.net, a.revenue), a.net]
   ];
@@ -2792,7 +2853,7 @@ function secRevenue(a, P) {
   const tot = a.revenue;
   return H('Revenue by type', P) + TB([['Type'], ['Revenue', 1], ['Share', 1]], [
       ['Maintenance, repair & labour', fmt(a.servRev), pct(a.servRev, tot)], ['Spare parts sales', fmt(a.partsRev), pct(a.partsRev, tot)]], ['Total', fmt(tot), tot ? '100%' : '—'], P) +
-    H('Revenue by job type', P) + TB([['Job type'], ['Jobs', 1], ['Invoiced', 1], ['Avg / job', 1]], jobs.map(([k, v]) => [esc(k), v.count, fmt(v.total), fmt(v.total / v.count)]),
+    H('Revenue by job type', P) + TB([['Job type'], ['Jobs', 1], ['Invoiced', 1], ['Avg / job', 1]], groupByCat(jobs.map(([k, v]) => [k, v.total, v.count]), [1, 2]).map(r => [catCell(r), r.vals[1], r.level ? fmt(r.vals[0]) : `<b>${fmt(r.vals[0])}</b>`, fmt(r.vals[1] ? r.vals[0] / r.vals[1] : 0)]),
       jobs.length ? ['Total', jobs.reduce((s, j) => s + j[1].count, 0), fmt(jobs.reduce((s, j) => s + j[1].total, 0)), ''] : null, P) +
     H('Maintenance & labour services', P) + TB([['Service'], ['Qty', 1], ['Revenue', 1]], servs.slice(0, P ? 25 : 40).map(s => [esc(s.name), r2(s.qty), fmt(s.rev)]), servs.length ? ['Total', '', fmt(a.servRev)] : null, P);
 }
@@ -2830,8 +2891,8 @@ function secCash(a, P, full) {
   return html;
 }
 function secExpenses(a, P, full) {
-  const cats = Object.entries(a.byCat).sort((x, y) => y[1] - x[1]);
-  let html = H('Expenses by category', P) + TB([['Category'], ['Amount', 1], ['Share', 1]], cats.map(([k, v]) => [esc(k), fmt(v), pct(v, a.expTot)]), cats.length ? ['Total', fmt(a.expTot), '100%'] : null, P, 'No expenses in this period.');
+  const cats = groupByCat(Object.entries(a.byCat));
+  let html = H('Expenses by category', P) + TB([['Category'], ['Amount', 1], ['Share', 1]], cats.map(r => [catCell(r), r.level ? fmt(r.vals[0]) : `<b>${fmt(r.vals[0])}</b>`, pct(r.vals[0], a.expTot)]), cats.length ? ['Total', fmt(a.expTot), '100%'] : null, P, 'No expenses in this period.');
   if (full) {
     const ex = db.expenses.filter(x => x.date >= a.f && x.date <= a.t).sort((x, y) => x.date.localeCompare(y.date));
     html += H('Expense register', P) + TB([['Date'], ['Category'], ['Description'], ['Paid by'], ['Amount', 1]], ex.map(x => [dfmt(x.date), esc(x.category), esc(x.desc || ''), esc(x.method || ''), fmt(x.amount)]), ex.length ? ['Total', '', '', '', fmt(a.expTot)] : null, P);
@@ -3166,18 +3227,45 @@ function viewSettings() {
   });
 }
 
-function manageCats(key, title, used) {
-  openSheet(title, `<button type="button" class="btn pri full" id="cAdd" style="margin-bottom:12px">+ Add category</button><div class="list" id="cl"></div><p class="hint" style="margin-top:10px">Removing a category doesn’t change items or expenses already using it.</p>`, el => {
+// records that use each kind of category (for "in use" counts and renaming)
+const CAT_USE = {
+  stockCats: {get: () => db.items, f: 'category'},
+  expCats: {get: () => db.expenses, f: 'category'},
+  jobTypes: {get: () => db.docs, f: 'jobType'}
+};
+function manageCats(key, title) {
+  openSheet(title, `<div class="btns" style="margin-bottom:12px"><button type="button" class="btn pri" id="cAdd">+ Main category</button><button type="button" class="btn" id="cAddSub">+ Sub-category</button></div><div id="cl"></div>
+    <p class="hint" style="margin-top:10px">Renaming updates every record that uses the category. Removing a category doesn’t change records already using it.</p>`, el => {
+    const U = CAT_USE[key];
+    const count = c => U ? U.get().filter(r => inCat(r[U.f], c)).length : 0;
     const draw = () => {
-      const list = S()[key];
-      el.querySelector('#cl').innerHTML = list.length ? list.map((c, k) => `<div class="item"><div class="main"><div class="t">${esc(c)}</div>${used(c) ? '<div class="s">In use</div>' : ''}</div><button type="button" class="btn danger" data-k="${k}" aria-label="Remove ${esc(c)}">${ICON.trash}</button></div>`).join('') : '<div class="empty">No categories.</div>';
-      el.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { if (!confirm('Remove “' + list[+b.dataset.k] + '”?')) return; list.splice(+b.dataset.k, 1); save(); draw(); });
+      const tree = catTree(S()[key]);
+      el.querySelector('#cl').innerHTML = tree.length ? tree.map(t => `<div class="list" style="margin-bottom:10px">
+        <div class="item"><div class="main"><div class="t" style="font-weight:800">${esc(t.name)}</div><div class="s">${t.subs.length ? t.subs.length + ' sub-categor' + (t.subs.length > 1 ? 'ies' : 'y') + ' · ' : ''}${count(t.name)} in use</div></div>
+          <div class="catact"><button type="button" class="btn" data-sub="${esc(t.name)}" aria-label="Add sub-category to ${esc(t.name)}">+ Sub</button><button type="button" class="btn" data-ren="${esc(t.name)}" aria-label="Rename ${esc(t.name)}">${ICON.edit}</button><button type="button" class="btn danger" data-del="${esc(t.name)}" aria-label="Remove ${esc(t.name)}">${ICON.trash}</button></div></div>
+        ${t.subs.map(c => `<div class="item" style="padding-left:28px"><div class="main"><div class="t">\u21b3 ${esc(catLeaf(c))}</div><div class="s">${count(c)} in use</div></div><div class="catact"><button type="button" class="btn" data-ren="${esc(c)}" aria-label="Rename ${esc(c)}">${ICON.edit}</button><button type="button" class="btn danger" data-del="${esc(c)}" aria-label="Remove ${esc(c)}">${ICON.trash}</button></div></div>`).join('')}
+      </div>`).join('') : '<div class="list"><div class="empty">No categories.</div></div>';
+      el.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => askCategory(key, b.dataset.sub, (v, ex) => { draw(); toast(ex ? 'Already exists' : 'Sub-category added'); }));
+      el.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+        const c = b.dataset.del; const kids = S()[key].filter(x => isSubCat(x) && catParent(x) === c && x !== c);
+        if (!confirm('Remove “' + c + '”' + (kids.length && !isSubCat(c) ? ' and its ' + kids.length + ' sub-categories' : '') + '?')) return;
+        S()[key] = S()[key].filter(x => isSubCat(c) ? x !== c : !inCat(x, c)); save(); draw();
+      });
+      el.querySelectorAll('[data-ren]').forEach(b => b.onclick = () => {
+        const old = b.dataset.ren;
+        const nv = (prompt('New name for “' + catLeaf(old) + '”', catLeaf(old)) || '').trim().replace(/›/g, '-');
+        if (!nv || nv === catLeaf(old)) return;
+        const newPath = isSubCat(old) ? catParent(old) + CSEP + nv : nv;
+        if (S()[key].some(x => x.toLowerCase() === newPath.toLowerCase())) { toast('That name already exists'); return; }
+        const swap = v => v === old ? newPath : (inCat(v, old) ? newPath + String(v).slice(old.length) : v);
+        S()[key] = S()[key].map(swap);
+        let n = 0; if (U) U.get().forEach(r => { if (inCat(r[U.f], old)) { r[U.f] = swap(r[U.f]); n++; } });
+        if (window.onCatRename) onCatRename(key, swap);
+        save(); draw(); toast('Renamed' + (n ? ' · ' + n + ' records updated' : ''));
+      });
     };
-    el.querySelector('#cAdd').onclick = () => askText('New category', 'Category name', v => {
-      const list = S()[key];
-      if (list.some(c => c.toLowerCase() === v.toLowerCase())) toast('Category already exists'); else { list.push(v); save(); toast('Category added'); }
-      draw();
-    });
+    el.querySelector('#cAdd').onclick = () => askCategory(key, undefined, (v, ex) => { draw(); toast(ex ? 'Already exists' : 'Category added'); }, 'New main category');
+    el.querySelector('#cAddSub').onclick = () => askCategory(key, catTree(S()[key])[0] ? catTree(S()[key])[0].name : '', (v, ex) => { draw(); toast(ex ? 'Already exists' : 'Sub-category added'); });
     draw();
   });
 }
