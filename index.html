@@ -309,7 +309,20 @@ textarea.in{min-height:80px;resize:vertical}
 .paper .kp small{display:block;color:#777;font-size:10px}
 .paper .kp b{font-size:14px}
 .paper tr{page-break-inside:avoid}
+.paper.rpt h3{color:#111;border-bottom:2px solid #ff6a00;padding-bottom:4px}
+.paper .rblk{border:1px solid #e3e3e3;border-left:4px solid #ff6a00;border-radius:6px;padding:10px 12px;margin:0 0 14px;line-height:1.55}
+.paper .rblk div{white-space:pre-wrap;margin-top:3px}
+.paper .rsig{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px;page-break-inside:avoid}
+.paper .rsig>div{border:1px solid #ccc;border-radius:8px;padding:10px 12px;line-height:1.7}
+.paper .rsig b.l{display:block;font-size:10px;letter-spacing:.08em;color:#ff6a00}
+.paper .rsig .sl{margin-top:34px;border-top:1px solid #333;padding-top:3px;font-size:10.5px;color:#666}
+.rpanel{background:var(--card,#fff);border:1.5px solid #ff6a00;border-radius:14px;padding:12px 14px;margin:6px 0 4px}
+.rtog{display:flex;gap:12px;align-items:center;cursor:pointer;min-height:44px}
+.rtog input{width:22px;height:22px;accent-color:#ff6a00;flex-shrink:0}
+.rtog small{display:block;color:var(--muted,#6b7280);font-size:12px;font-weight:400}
+.lrep{display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-top:8px;padding-top:8px;border-top:1px dashed #ffb27a}
 /* layout chooser */
+.btn.rbtn{border-color:#ff6a00;color:#c2410c}
 .layseg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
 @media (min-width:700px){.layseg{grid-template-columns:repeat(6,1fr)}}
 .layseg button{background:var(--card,#fff);border:1.5px solid var(--line,#ddd);border-radius:12px;padding:8px 6px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;font-weight:600;font-size:12.5px;min-height:44px;color:inherit}
@@ -1163,6 +1176,14 @@ function editDoc(type, id, fromDoc) {
     });
   }
   delete draft.equipment;
+  const isConv = !existing && fromDoc && fromDoc.type === 'QUO' && type === 'INV';
+  if (type === 'QUO') draft.insp = Object.assign({on: true, date: draft.date || today(), by: defTech(), summary: '', recommend: ''}, draft.insp || {});
+  if (type === 'INV') {
+    const prev = (existing && existing.wcr) || (fromDoc && fromDoc.type === 'INV' && fromDoc.wcr) || null;
+    draft.wcr = Object.assign({on: !!isConv, date: today(), by: (draft.insp && draft.insp.by) || defTech(), summary: '', nextDue: ''}, prev || {});
+    if (isConv) draft.wcr.on = true;
+  }
+  const R = type === 'QUO' ? draft.insp : draft.wcr;
   const label = type === 'INV' ? 'Invoice' : 'Quotation';
   const html = `
     <form id="docForm" autocomplete="off">
@@ -1174,6 +1195,20 @@ function editDoc(type, id, fromDoc) {
       <label class="f"><span>Job type (for reports)</span><select class="in" name="jobType" id="dJob">${catOptions(S().jobTypes, draft.jobType || '')}</select></label>
       <label class="f"><span>Subject (optional)</span><input class="in" name="subject" value="${esc(draft.subject)}" placeholder="e.g. Treadmill not starting – repair"></label>
       <datalist id="brandList">${brandList().map(b => `<option value="${esc(b)}">`).join('')}</datalist>
+      <div class="rpanel">
+        <label class="rtog"><input type="checkbox" id="rOn" ${R.on ? 'checked' : ''}><span><b>${type === 'QUO' ? 'Inspection report' : 'Work completion report'}</b><small>${type === 'QUO' ? 'Create an inspection report with this quotation' : 'Create a work completion report with this invoice'}</small></span></label>
+        <div id="rBox" class="${R.on ? '' : 'hidden'}" style="margin-top:12px">
+          <div class="row">
+            <label class="f"><span>${type === 'QUO' ? 'Inspection date' : 'Completion date'}</span><input class="in" type="date" name="rDate" value="${esc(R.date || today())}"></label>
+            <label class="f"><span>${type === 'QUO' ? 'Inspected by' : 'Technician'}</span><input class="in" name="rBy" value="${esc(R.by || '')}" placeholder="Technician name"></label>
+          </div>
+          <label class="f"><span>${type === 'QUO' ? 'Overall findings' : 'Work summary'}</span><textarea class="in" name="rSummary" rows="3" placeholder="${type === 'QUO' ? 'e.g. Treadmill belt worn and slipping, motor brushes low, deck dry' : 'e.g. Replaced running belt and drive belt, lubricated deck, tested at all speeds'}">${esc(R.summary || '')}</textarea></label>
+          ${type === 'QUO'
+            ? `<label class="f"><span>Recommendation</span><textarea class="in" name="rRec" rows="2" placeholder="e.g. Replace belt and service motor as per attached quotation">${esc(R.recommend || '')}</textarea></label>`
+            : `<label class="f"><span>Next service due (optional)</span><input class="in" type="date" name="rNext" value="${esc(R.nextDue || '')}"></label>`}
+          <p class="hint" style="margin:-4px 2px 0">${type === 'QUO' ? 'For each line below, set the machine condition and what you found.' : 'For each line below, mark the work as completed, partly done or pending.'}</p>
+        </div>
+      </div>
       <div class="sec"><h2>Items</h2></div>
       <div id="lines"></div>
       <button type="button" class="btn full" id="addLine">+ Add line</button>
@@ -1215,9 +1250,18 @@ function editDoc(type, id, fromDoc) {
             <div><span class="hint">Amount</span><div class="amt lamt">${fmt(num(l.qty) * num(l.price))}</div></div>
           </div>
           <div class="lwarn">${lineWarn(l)}</div>
+          ${R.on ? (type === 'QUO' ? `<div class="lrep">
+            <label><span class="hint">Condition</span><select class="in lcond">${COND.map(c => `<option ${(l.cond || '') === c ? 'selected' : ''} value="${c}">${c || '— Not inspected —'}</option>`).join('')}</select></label>
+            <label><span class="hint">Findings</span><input class="in lfind" value="${esc(l.find || '')}" placeholder="What you found"></label>
+          </div>` : `<div class="lrep">
+            ${l.find || l.cond ? `<div class="hint" style="grid-column:1/-1">Found: ${esc([l.cond, l.find].filter(Boolean).join(' – '))}</div>` : ''}
+            <label><span class="hint">Work status</span><select class="in ldone">${DONE.map(c => `<option ${(l.done || 'Completed') === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
+            <label><span class="hint">Remarks</span><input class="in lrem" value="${esc(l.rem || '')}" placeholder="e.g. Tested OK"></label>
+          </div>`) : ''}
         </div>`).join('');
       drawTot();
     };
+    el.querySelector('#rOn').onchange = e => { R.on = e.target.checked; el.querySelector('#rBox').classList.toggle('hidden', !R.on); drawLines(); };
     linesEl.addEventListener('input', e => {
       const row = e.target.closest('.line'); if (!row) return;
       const l = draft.lines[+row.dataset.i];
@@ -1225,6 +1269,8 @@ function editDoc(type, id, fromDoc) {
       if (e.target.classList.contains('lbrand')) { l.brand = e.target.value; return; }
       if (e.target.classList.contains('lmodel')) { l.model = e.target.value; return; }
       if (e.target.classList.contains('lsn')) { l.sn = e.target.value.toUpperCase(); return; }
+      if (e.target.classList.contains('lfind')) { l.find = e.target.value; return; }
+      if (e.target.classList.contains('lrem')) { l.rem = e.target.value; return; }
       if (e.target.classList.contains('lqty')) l.qty = e.target.value;
       if (e.target.classList.contains('lprice')) l.price = e.target.value;
       row.querySelector('.lamt').textContent = fmt(num(l.qty) * num(l.price));
@@ -1232,6 +1278,8 @@ function editDoc(type, id, fromDoc) {
       drawTot();
     });
     linesEl.addEventListener('change', e => {
+      if (e.target.classList.contains('lcond')) { draft.lines[+e.target.closest('.line').dataset.i].cond = e.target.value; return; }
+      if (e.target.classList.contains('ldone')) { draft.lines[+e.target.closest('.line').dataset.i].done = e.target.value; return; }
       if (!e.target.classList.contains('litem')) return;
       const row = e.target.closest('.line'); const l = draft.lines[+row.dataset.i];
       if (e.target.value === NEWITEM) { e.target.value = l.itemId || ''; quickItem(l); return; }
@@ -1271,12 +1319,18 @@ function editDoc(type, id, fromDoc) {
       draft.customerId = f.customerId; draft.date = f.date; draft.due = f.due; draft.subject = f.subject.trim();
       draft.notes = f.notes; draft.discount = num(f.discount); draft.terms = f.terms.trim();
       draft.jobType = f.jobType === NEWCAT ? '' : (f.jobType || '');
+      if (R.on) {
+        Object.assign(R, {date: f.rDate || today(), by: (f.rBy || '').trim(), summary: (f.rSummary || '').trim()});
+        if (type === 'QUO') R.recommend = (f.rRec || '').trim(); else R.nextDue = f.rNext || '';
+        if (R.by) S().lastTech = R.by;
+      }
       draft.lines = draft.lines.filter(l => (l.desc || '').trim() || num(l.price) || lineEq(l)).map(l => {
         const kind = lineKind(l); const it = l.itemId && itemById(l.itemId);
         const cost = kind !== 'part' ? 0 : (l.cost !== undefined && l.cost !== '' ? r2(l.cost) : (it ? r2(it.cost) : 0));
         const out = {itemId: l.itemId || '', desc: (l.desc || '').trim(), qty: num(l.qty), price: r2(l.price), kind, cost};
         const b = (l.brand || '').trim(), m = (l.model || '').trim(), sn = (l.sn || '').trim().toUpperCase();
         if (b) out.brand = b; if (m) out.model = m; if (sn) out.sn = sn;
+        ['cond', 'find', 'done', 'rem'].forEach(k => { const v = (l[k] || '').trim(); if (v) out[k] = v; });
         return out;
       });
       if (!draft.customerId) { toast('Please select a customer'); return; }
@@ -1291,8 +1345,84 @@ function editDoc(type, id, fromDoc) {
         db.docs.push(saved);
       }
       save();
-      closeSheet(() => { if (fromDoc && fromDoc.type === 'QUO' && type === 'INV') { const q = docById(fromDoc.id); if (q) { q.status = 'Converted'; q.convertedTo = saved.number; save(); } } viewDoc(saved.id); toast(`${label} ${saved.number} saved`); });
+      closeSheet(() => { if (fromDoc && fromDoc.type === 'QUO' && type === 'INV') { const q = docById(fromDoc.id); if (q) { q.status = 'Converted'; q.convertedTo = saved.number; save(); } } viewDoc(saved.id); toast(`${label} ${saved.number} saved` + (R.on ? (type === 'QUO' ? ' · inspection report ready' : ' · work completion report ready') : '')); });
     };
+  });
+}
+
+/* ---------- inspection & work completion reports ---------- */
+const COND = ['', 'Good', 'Needs service', 'Worn – replace soon', 'Faulty', 'Not working', 'Unsafe – stop use'];
+const DONE = ['Completed', 'Partly done', 'Pending', 'Not required'];
+function defTech() { const u = window.FitxCloud && FitxCloud.user; return (u && (u.displayName || '')) || S().lastTech || ''; }
+const repNo = (d, kind) => String(d.number || '').replace(/^[A-Za-z]+/, kind === 'insp' ? 'INS' : 'WCR');
+const condColor = c => /^Good/.test(c) ? '#1a9e5f' : /Needs|Worn/.test(c) ? '#e07000' : c ? '#d62828' : '#888';
+const doneColor = c => c === 'Completed' ? '#1a9e5f' : c === 'Partly done' ? '#e07000' : c === 'Pending' ? '#d62828' : '#888';
+function reportHTML(d, kind) {
+  const s = S(); const c = custById(d.customerId) || {};
+  const ins = kind === 'insp'; const R = (ins ? d.insp : d.wcr) || {};
+  const title = ins ? 'INSPECTION REPORT' : 'WORK COMPLETION REPORT', ar = ins ? 'تقرير الفحص' : 'تقرير إنجاز العمل';
+  const brand = `<div class="pbrand">${s.logo ? `<img class="logoimg" src="${s.logo}" alt="${esc(s.name)}">` : '<div class="plogo">Fit<span>X</span></div>'}<div class="pname">${esc(s.name)}</div></div>`;
+  const coLines = `${esc(s.address)}<br>Tel: ${esc(s.phone)} · ${esc(s.email)}<br>${esc(s.web)}${s.cr ? '<br>CR No. ' + esc(s.cr) : ''}`;
+  const custLines = `<b>${esc(c.name || '')}</b>${c.contact ? '<br>Attn: ' + esc(c.contact) : ''}${addrText(c) ? '<br>' + esc(addrText(c)) : ''}${c.phone ? '<br>Tel: ' + esc(c.phone) : ''}`;
+  const lines = d.lines || [];
+  const eqLines = lines.filter(l => lineEq(l) || l.cond || l.find);
+  const eqCell = l => [l.brand, l.model].filter(Boolean).map(esc).join(' ') + (l.sn ? `<div style="white-space:nowrap"><b>SN: ${esc(l.sn)}</b></div>` : '');
+  let table;
+  if (ins) {
+    const rows = (eqLines.length ? eqLines : lines).map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.desc)}</td><td>${eqCell(l) || '—'}</td><td><b style="color:${condColor(l.cond)}">${esc(l.cond || '—')}</b>${l.find ? `<div class="leq" style="color:#333">${esc(l.find)}</div>` : ''}</td></tr>`).join('');
+    table = `<h3>Equipment inspected</h3><table><thead><tr><th>#</th><th>Equipment / item</th><th>Brand · Model · SN</th><th>Condition &amp; findings</th></tr></thead><tbody>${rows}</tbody></table>
+      <h3>Recommended work</h3><table><thead><tr><th>#</th><th>Work / part</th><th class="n">Qty</th></tr></thead><tbody>${lines.map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.desc)}</td><td class="n">${l.qty}</td></tr>`).join('')}</tbody></table>
+      <p class="hint" style="color:#555;margin:-6px 0 10px">Prices: see Quotation <b>${esc(d.number)}</b>.</p>`;
+  } else {
+    const rows = lines.map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.desc)}${l.find || l.cond ? `<div class="leq">Found: ${esc([l.cond, l.find].filter(Boolean).join(' – '))}</div>` : ''}</td><td>${eqCell(l) || '—'}</td><td><b style="color:${doneColor(l.done || 'Completed')}">${esc(l.done || 'Completed')}</b>${l.rem ? `<div class="leq" style="color:#333">${esc(l.rem)}</div>` : ''}</td></tr>`).join('');
+    table = `<h3>Work carried out</h3><table><thead><tr><th>#</th><th>Work done / part fitted</th><th>Brand · Model · SN</th><th>Status &amp; remarks</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+  const all = lines.length, done = lines.filter(l => (l.done || 'Completed') === 'Completed').length;
+  return `<div class="paper lay-classic rpt">
+    <div class="ph">${brand}<div class="pco">${coLines}</div></div>
+    <div class="ptitle"><div><h2>${title}</h2><div class="ar" dir="rtl" lang="ar">${ar}</div></div>${ins ? '' : `<div style="text-align:right"><span class="stamp" style="color:${done === all ? '#1a9e5f' : '#e07000'};border-color:${done === all ? '#1a9e5f' : '#e07000'}">${done === all ? 'COMPLETED' : done + ' / ' + all + ' DONE'}</span></div>`}</div>
+    <div class="meta">
+      <div class="box"><b class="l">CUSTOMER</b>${custLines}</div>
+      <div class="box"><b class="l">DETAILS</b>Report No: <b>${esc(repNo(d, kind))}</b><br>${ins ? 'Inspection' : 'Completion'} date: ${dfmt(R.date || d.date)}<br>${ins ? 'Quotation' : 'Invoice'} No: ${esc(d.number)}${!ins && d.fromQuote ? '<br>Ref quotation: ' + esc(d.fromQuote) : ''}${d.jobType ? '<br>Service: ' + esc(d.jobType) : ''}${d.subject ? '<br>Re: ' + esc(d.subject) : ''}${R.by ? `<br>${ins ? 'Inspected by' : 'Technician'}: <b>${esc(R.by)}</b>` : ''}</div>
+    </div>
+    ${R.summary ? `<div class="rblk"><b>${ins ? 'Overall findings' : 'Work summary'}</b><div>${esc(R.summary)}</div></div>` : ''}
+    ${table}
+    ${ins && R.recommend ? `<div class="rblk"><b>Recommendation</b><div>${esc(R.recommend)}</div></div>` : ''}
+    ${!ins && R.nextDue ? `<div class="rblk"><b>Next service due</b><div>${dfmt(R.nextDue)}</div></div>` : ''}
+    ${!ins ? '<p style="margin:14px 0 0;font-size:11px;color:#444">The customer confirms that the work listed above has been carried out and the equipment was handed over in working condition.</p>' : ''}
+    <div class="rsig">
+      <div><b class="l">${ins ? 'INSPECTED BY' : 'TECHNICIAN'}</b><div>Name: ${esc(R.by || '')}</div><div class="sl">Signature</div></div>
+      <div><b class="l">CUSTOMER ${ins ? 'ACKNOWLEDGEMENT' : 'SIGN-OFF'}</b><div>Name:</div><div class="sl">Signature &amp; date</div></div>
+    </div>
+    <div class="pf">${esc(s.name)} · ${esc(s.phone)} · ${esc(s.email)} · ${esc(s.web)}</div>
+  </div>`;
+}
+function printReport(d, kind) {
+  $('#printArea').innerHTML = reportHTML(d, kind);
+  const old = document.title; document.title = repNo(d, kind) + ' - ' + ((custById(d.customerId) || {}).name || '');
+  setTimeout(() => { window.print(); document.title = old; }, 100);
+}
+function waReport(d, kind) {
+  const c = custById(d.customerId) || {}; const s = S(); const ins = kind === 'insp'; const R = (ins ? d.insp : d.wcr) || {};
+  let m = `Dear ${c.name || 'Customer'},\n\n*${ins ? 'Inspection Report' : 'Work Completion Report'}* ${repNo(d, kind)}\nDate: ${dfmt(R.date || d.date)}${R.by ? '\n' + (ins ? 'Inspected by' : 'Technician') + ': ' + R.by : ''}\n`;
+  if (R.summary) m += `\n${R.summary}\n`;
+  m += '\n' + (d.lines || []).map(l => {
+    const eq = [l.brand, l.model].filter(Boolean).join(' ') + (l.sn ? ' SN ' + l.sn : '');
+    return `• ${l.desc}${eq ? ' (' + eq + ')' : ''} — ${ins ? (l.cond || 'not inspected') + (l.find ? ': ' + l.find : '') : (l.done || 'Completed') + (l.rem ? ': ' + l.rem : '')}`;
+  }).join('\n');
+  if (ins && R.recommend) m += `\n\n*Recommendation:* ${R.recommend}\nQuotation: ${d.number} (${money(docTotal(d))})`;
+  if (!ins && R.nextDue) m += `\n\nNext service due: ${dfmt(R.nextDue)}`;
+  m += `\n\nThank you,\n${s.name}\n📞 ${s.phone} | ${s.web}`;
+  const n = waNumber(c.phone);
+  openLink((n ? `https://wa.me/${n}` : 'https://wa.me/') + '?text=' + encodeURIComponent(m));
+}
+function viewReport(d, kind) {
+  const ins = kind === 'insp';
+  openSheet((ins ? 'Inspection report ' : 'Work completion ') + repNo(d, kind), `
+    <div class="btns" style="margin-bottom:14px"><button type="button" class="btn pri" id="rPrint">${ICON.print}Print / PDF</button><button type="button" class="btn" id="rWa">${ICON.wa}WhatsApp</button></div>
+    ${reportHTML(d, kind)}`, el => {
+    el.querySelector('#rPrint').onclick = () => printReport(d, kind);
+    el.querySelector('#rWa').onclick = () => waReport(d, kind);
   });
 }
 
@@ -1444,6 +1574,7 @@ function viewDoc(id) {
   actions.push(`<button type="button" class="btn" id="aWa">${ICON.wa}WhatsApp</button>`);
   if (isInv && !d.cancelled && docBal(d) > 0) actions.push(`<button type="button" class="btn pri" id="aPay">${ICON.pay}Record payment</button>`);
   if (!isInv && d.status !== 'Converted') actions.push(`<button type="button" class="btn pri" id="aConv">${ICON.conv}Convert to invoice</button>`);
+  actions.push(`<button type="button" class="btn rbtn" id="aRep">${ICON.inv}${isInv ? 'Work completion report' : 'Inspection report'}</button>`);
   actions.push(`<button type="button" class="btn" id="aEdit">${ICON.edit}Edit</button>`);
   actions.push(`<button type="button" class="btn" id="aDup">${ICON.copy}Duplicate</button>`);
   if (!isInv) actions.push(`<button type="button" class="btn" id="aQst">Set status…</button>`);
@@ -1462,6 +1593,11 @@ function viewDoc(id) {
     el.querySelector('#aPrint').onclick = () => printDoc(d);
     el.querySelector('#aWa').onclick = () => waDoc(d);
     el.querySelector('#aEdit').onclick = () => { closeSheet(() => editDoc(d.type, d.id)); };
+    el.querySelector('#aRep').onclick = () => {
+      const R = isInv ? d.wcr : d.insp;
+      if (R && R.on) viewReport(d, isInv ? 'wcr' : 'insp');
+      else closeSheet(() => { editDoc(d.type, d.id); setTimeout(() => { const all = document.querySelectorAll('.sheet #rOn'); const t = all[all.length - 1]; if (t && !t.checked) t.click(); toast('Fill in the report, then save'); }, 120); });
+    };
     el.querySelector('#aDup').onclick = () => { closeSheet(() => editDoc(d.type, null, Object.assign({}, d, {payments: [], status: 'Open', convertedTo: '', fromQuote: ''}))); };
     const pay = el.querySelector('#aPay'); if (pay) pay.onclick = () => recordPayment(d, reopen);
     const conv = el.querySelector('#aConv'); if (conv) conv.onclick = () => { closeSheet(() => editDoc('INV', null, d)); };
