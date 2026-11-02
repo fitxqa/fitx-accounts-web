@@ -144,10 +144,12 @@
       const who = sn(p.supplierId);
       let stock = 0, job = 0;
       (p.lines || []).forEach(l => { const amt = num(l.qty) * num(l.cost); const it = l.itemId && itemById(l.itemId); if (it && !it.service) stock += amt; else job += amt; });
-      const disc = num(p.discount);
+      // supplier discount spread over stock and non-stock lines in proportion
+      const g = stock + job, kf = g > 0 ? purTotal(p) / g : 0;
       const k = 'pu:' + p.id + ':';
-      add(k + 'inv', p.date, A(1300), stock - (stock ? disc : 0), 'Bill · ' + who, p.number, open);
-      add(k + 'job', p.date, A(5010), job - (stock ? 0 : disc), 'Bill · ' + who, p.number, open);
+      const stockNet = r2(stock * kf);
+      add(k + 'inv', p.date, A(1300), stockNet, 'Bill · ' + who, p.number, open);
+      add(k + 'job', p.date, A(5010), r2(purTotal(p) - stockNet), 'Bill · ' + who, p.number, open);
       add(k + 'ap', p.date, A(2000), -purTotal(p), 'Bill · ' + who, p.number, open);
       (p.payments || []).forEach((x, i) => {
         add('pp:' + p.id + ':' + i + ':ap', x.date, A(2000), num(x.amount), `Paid · ${who}`, p.number, open);
@@ -157,7 +159,7 @@
     // manual stock movements (opening stock, adjustments) at item cost
     db.moves.forEach(m => {
       const it = itemById(m.itemId); if (!it || it.service) return;
-      const val = num(m.qty) * num(it.cost); if (!val) return;
+      const val = num(m.qty) * (m.cost !== undefined ? num(m.cost) : num(it.cost)); if (!val) return;
       const openStock = /opening/i.test(m.note || '');
       const open = () => viewItem(it.id);
       add('mv:' + m.id + ':i', m.date, A(1300), val, (m.note || 'Stock adjustment') + ' · ' + it.name, 'Stock', open);

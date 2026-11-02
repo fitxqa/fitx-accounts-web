@@ -2299,7 +2299,7 @@ function editItem(id, after, prefill) {
       if (id) { Object.assign(i, data); saved = i; }
       else {
         saved = Object.assign({id: uid()}, data); db.items.push(saved);
-        if (!service && num(f.openQty)) db.moves.push({id: uid(), itemId: saved.id, qty: num(f.openQty), date: today(), note: 'Opening stock'});
+        if (!service && num(f.openQty)) db.moves.push({id: uid(), itemId: saved.id, qty: num(f.openQty), date: today(), note: 'Opening stock', cost: num(saved.cost)});
       }
       save(); closeSheet(() => { if (after) after(saved); else { render(); toast('Item saved'); } });
     };
@@ -2336,8 +2336,9 @@ function viewItem(id) {
       </form>`, e2 => {
       e2.querySelector('#mForm').onsubmit = e => {
         e.preventDefault(); const f = formData(e.target);
-        db.moves.push({id: uid(), itemId: id, qty: sign * num(f.qty), date: f.date, note: f.note.trim() || (sign > 0 ? 'Stock in' : 'Adjustment')});
-        if (sign > 0 && f.cost !== '') i.cost = r2(f.cost);
+        const mc = sign > 0 && f.cost !== '' ? num(f.cost) : num(i.cost);
+        if (sign > 0 && f.cost !== '') { const oh = Math.max(0, stockQty(id)); i.cost = Math.round(((oh * num(i.cost) + num(f.qty) * mc) / (oh + num(f.qty))) * 1000) / 1000; }
+        db.moves.push({id: uid(), itemId: id, qty: sign * num(f.qty), date: f.date, note: f.note.trim() || (sign > 0 ? 'Stock in' : 'Adjustment'), cost: mc});
         save(); closeSheet(reopen);
       };
     });
@@ -2518,6 +2519,24 @@ function partOptions(sel) {
   const list = db.items.filter(i => !i.service).sort((a, b) => a.name.localeCompare(b.name));
   return `<option value="">No stock item (direct job cost)</option><option value="${NEWITEM}">+ Add new spare part…</option>` + list.map(i => `<option value="${i.id}" ${i.id === sel ? 'selected' : ''}>${esc(i.name)}${i.sku ? ' · ' + esc(i.sku) : ''}</option>`).join('');
 }
+/* weighted average cost: new cost = (stock on hand × old cost + bought qty × net unit cost) ÷ total qty.
+   Supplier discount is spread over the bill lines, so the cost is what was really paid. */
+function applyAvgCost(pur, existing) {
+  const g = (pur.lines || []).reduce((s, l) => s + num(l.qty) * num(l.cost), 0);
+  const k = g > 0 ? Math.max(0, g - num(pur.discount)) / g : 1;
+  const prevQ = {};
+  if (existing) (existing.lines || []).forEach(l => { if (l.itemId) prevQ[l.itemId] = (prevQ[l.itemId] || 0) + num(l.qty); });
+  const add = {};
+  (pur.lines || []).forEach(l => {
+    const it = l.itemId && itemById(l.itemId); if (!it || it.service || num(l.qty) <= 0) return;
+    const a = add[it.id] || (add[it.id] = {q: 0, v: 0}); a.q += num(l.qty); a.v += num(l.qty) * num(l.cost) * k;
+  });
+  Object.keys(add).forEach(id => {
+    const it = itemById(id), a = add[id];
+    const onHand = Math.max(0, stockQty(id) - (prevQ[id] || 0));
+    it.cost = Math.round(((onHand * num(it.cost) + a.v) / (onHand + a.q)) * 1000) / 1000;
+  });
+}
 function editPurchase(id, prefill) {
   const existing = id ? purById(id) : null;
   const draft = existing ? JSON.parse(JSON.stringify(existing)) : Object.assign({supplierId: '', date: today(), due: addDays(today(), 30), ref: '', lines: [{itemId: '', desc: '', qty: 1, cost: ''}], discount: 0, notes: '', updateCost: true}, prefill || {});
@@ -2600,7 +2619,7 @@ function editPurchase(id, prefill) {
       draft.lines = draft.lines.filter(l => (l.desc || '').trim() || l.itemId || num(l.cost)).map(l => ({itemId: l.itemId || '', desc: (l.desc || '').trim() || ((itemById(l.itemId) || {}).name || ''), qty: num(l.qty), cost: r2(l.cost)}));
       if (!draft.supplierId) { toast('Please select a supplier'); return; }
       if (!draft.lines.length) { toast('Add at least one line'); draft.lines.push({itemId: '', desc: '', qty: 1, cost: ''}); drawLines(); return; }
-      if (draft.updateCost) draft.lines.forEach(l => { const it = l.itemId && itemById(l.itemId); if (it && num(l.qty) > 0) it.cost = r2(l.cost); });
+      if (draft.updateCost) applyAvgCost(draft, existing);
       let saved;
       if (existing) { Object.assign(existing, draft, {updated: Date.now()}); saved = existing; }
       else {
@@ -2698,18 +2717,24 @@ function acct(f, t) {
     if (p.date >= f && p.date <= t) {
       const tot = purTotal(p); a.purTot += tot;
       const g = (p.lines || []).reduce((s, l) => s + num(l.qty) * num(l.cost), 0); const k = g > 0 ? tot / g : 0;
-      (p.lines || []).forEach(l => { const v = num(l.qty) * num(l.cost) * k; if (l.itemId) a.purStock += v; else a.directCost += v; });
+      (p.lines || []).forEach(l => { const v = num(l.qty) * num(l.cost) * k; const it2 = l.itemId && itemById(l.itemId); if (it2 && !it2.service) a.purStock += v; else a.directCost += v; });
     }
     (p.payments || []).forEach(x => { if (x.date >= f && x.date <= t) { a.supPaid += num(x.amount); addTo(a.outByMethod, x.method || 'Other', num(x.amount)); } });
   });
   db.expenses.forEach(x => { if (x.date >= f && x.date <= t) { a.expTot += num(x.amount); addTo(a.byCat, x.category || 'Other', num(x.amount)); addTo(a.outByMethod, x.method || 'Other', num(x.amount)); } });
-  a.cogs = a.cogsStock + a.directCost; a.gross = a.revenue - a.cogs; a.net = a.gross - a.expTot;
+  // damaged / lost / found stock (not opening stock) at the cost when it happened
+  a.stockAdj = 0;
+  db.moves.forEach(m => { if (m.date < f || m.date > t || /opening/i.test(m.note || '')) return; const it = itemById(m.itemId); if (!it || it.service) return; a.stockAdj -= num(m.qty) * (m.cost !== undefined ? num(m.cost) : num(it.cost)); });
+  a.stockAdj = r2(a.stockAdj);
+  a.cogs = a.cogsStock + a.directCost + a.stockAdj; a.gross = a.revenue - a.cogs; a.net = a.gross - a.expTot;
   a.partsProfit = a.partsRev - a.cogsStock;
   db.docs.filter(d => d.type === 'QUO' && d.date >= f && d.date <= t).forEach(q => { a.quotes++; a.quoteVal += docTotal(q); if (['Accepted', 'Converted'].includes(q.status)) { a.won++; a.wonVal += docTotal(q); } });
   a.cashIn = a.collected; a.cashOut = a.supPaid + a.expTot; a.cashNet = a.cashIn - a.cashOut;
   return a;
 }
 const receivables = () => r2(activeInvoices().reduce((s, d) => s + Math.max(0, docBal(d)), 0));
+// money customers paid in excess of their invoices (owed back or to use on the next invoice)
+const customerCredits = () => { const m = {}; activeInvoices().forEach(d => { const b = docBal(d); if (b < -0.004) m[d.customerId] = (m[d.customerId] || 0) - b; }); return m; };
 const stockValue = () => r2(db.items.filter(i => !i.service).reduce((s, i) => s + Math.max(0, stockQty(i.id)) * num(i.cost), 0));
 const pct = (a, b) => b ? (a / b * 100).toFixed(1) + '%' : '—';
 const daysBetween = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 864e5);
@@ -2832,6 +2857,7 @@ function secPL(a, P) {
     ['t', 'Total revenue', a.revenue],
     ['h', 'Cost of sales'],
     ['s', 'Spare parts used (cost from stock)', a.cogsStock],
+    ...(Math.abs(a.stockAdj) > 0.004 ? [['s', 'Stock adjustments (damaged, lost, found)', a.stockAdj]] : []),
     ...(a.directCost > 0.004 ? [['s', 'Direct job purchases (not stocked)', a.directCost]] : []),
     ['t', 'Total cost of sales', a.cogs],
     ['g', 'Gross profit · margin ' + pct(a.gross, a.revenue), a.gross],
@@ -3043,7 +3069,7 @@ function reportStock() { openReport({title: 'Stock movement & valuation', ar: '�
 function reportAR() { openReport({title: 'Receivables ageing', ar: 'أعمار الذمم المدينة', period: false, body: (ctx, P) => {
   const od = activeInvoices().filter(d => docBal(d) > 0.004).sort((a, b) => (a.due || a.date).localeCompare(b.due || b.date));
   return KP([['Total receivable', fmt(receivables()), 'var(--yellow)', true], ['Overdue', fmt(od.filter(d => ageIdx(d.due || d.date) > 0).reduce((s, d) => s + docBal(d), 0)), 'var(--red)'], ['Open invoices', String(od.length)], ['Over 90 days', fmt(ageing('rec').tot[4])]], P) +
-    secAgeing('rec', P) + H('Open invoices', P) + TB([['Invoice'], ['Customer'], ['Due'], ['Days late', 1], ['Balance', 1]], od.map(d => [esc(d.number), esc((custById(d.customerId) || {}).name || ''), dfmt(d.due || d.date), Math.max(0, daysBetween(d.due || d.date, today())), fmt(docBal(d))]), null, P, 'Nothing outstanding.'); }}); }
+    secAgeing('rec', P) + (() => { const cr = Object.entries(customerCredits()); return cr.length ? H('Customer credits (overpaid – refund or use on next invoice)', P) + TB([['Customer'], ['Credit', 1]], cr.map(([c, v]) => [esc((custById(c) || {}).name || ''), fmt(v)]), ['Total credits', fmt(cr.reduce((s, x) => s + x[1], 0))], P) : ''; })() + H('Open invoices', P) + TB([['Invoice'], ['Customer'], ['Due'], ['Days late', 1], ['Balance', 1]], od.map(d => [esc(d.number), esc((custById(d.customerId) || {}).name || ''), dfmt(d.due || d.date), Math.max(0, daysBetween(d.due || d.date, today())), fmt(docBal(d))]), null, P, 'Nothing outstanding.'); }}); }
 function reportAP() { openReport({title: 'Payables & purchases', ar: 'الذمم الدائنة والمشتريات', body: (ctx, P) => { const a = acct(ctx.f, ctx.t);
   return KP([['Owed to suppliers', fmt(payables()), 'var(--yellow)', true], ['Purchases in period', fmt(a.purTot)], ['Paid to suppliers', fmt(a.supPaid)], ['Suppliers', String(db.suppliers.length)]], P) + secAgeing('pay', P) + secPurchases(a, P); }}); }
 function reportCash() { openReport({title: 'Cash book', ar: 'دفتر النقدية', body: (ctx, P) => { const a = acct(ctx.f, ctx.t);
