@@ -323,6 +323,11 @@ textarea.in{min-height:80px;resize:vertical}
 .lrep{display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-top:8px;padding-top:8px;border-top:1px dashed #ffb27a}
 /* layout chooser */
 .btn.rbtn{border-color:#ff6a00;color:#c2410c}
+.pdfhost{position:fixed;left:-10000px;top:0;width:794px;background:#fff;z-index:-1}
+.pdfhost .paper{border:0!important;box-shadow:none!important;border-radius:0!important;margin:0;overflow:visible;padding:36px 38px}
+.btns.sharebar{grid-template-columns:repeat(4,1fr)}
+.btns.sharebar .btn{flex-direction:column;gap:3px;font-size:12px;padding:8px 4px;min-height:58px}
+@media (max-width:360px){.btns.sharebar .btn{font-size:11px}}
 .layseg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
 @media (min-width:700px){.layseg{grid-template-columns:repeat(6,1fr)}}
 .layseg button{background:var(--card,#fff);border:1.5px solid var(--line,#ddd);border-radius:12px;padding:8px 6px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;font-weight:600;font-size:12.5px;min-height:44px;color:inherit}
@@ -560,6 +565,8 @@ const ICON = {
   cash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 10v4M18 10v4"/></svg>',
   wrench: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14.5 6.5a4 4 0 0 0 5 5L21 13l-8 8-3-3 8-8-1.5-1.5a4 4 0 0 1-5-5L13 2z"/><path d="M3 21l5-5"/></svg>',
   truck: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 6h12v10H2zM14 10h4l4 4v2h-8z"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>',
+  mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
+  share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>',
   dl: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>',
 };
 
@@ -1350,6 +1357,111 @@ function editDoc(type, id, fromDoc) {
   });
 }
 
+/* ---------- real PDF files: share, WhatsApp, email ---------- */
+let pdfLibs = null;
+const loadScript = src => new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = src; sc.onload = res; sc.onerror = () => rej(new Error('Could not load ' + src)); document.head.appendChild(sc); });
+function pdfReady() {
+  if (!pdfLibs) pdfLibs = Promise.all([window.html2canvas ? 0 : loadScript('vendor/html2canvas.min.js'), window.jspdf ? 0 : loadScript('vendor/jspdf.umd.min.js')]).catch(e => { pdfLibs = null; throw e; });
+  return pdfLibs;
+}
+// renders a .paper document to an A4 PDF; page breaks fall between table rows / blocks, never through them
+async function htmlToPdf(html) {
+  await pdfReady();
+  const host = document.createElement('div'); host.className = 'pdfhost'; host.innerHTML = html;
+  document.body.appendChild(host);
+  try {
+    await Promise.all(Array.from(host.querySelectorAll('img')).map(im => im.complete ? 0 : new Promise(r => { im.onload = im.onerror = r; })));
+    await new Promise(r => setTimeout(r, 60));
+    const paper = host.querySelector('.paper') || host;
+    const W = paper.offsetWidth, H = paper.offsetHeight, top0 = paper.getBoundingClientRect().top;
+    const cuts = new Set([H]);
+    paper.querySelectorAll(':scope > *, tr, .rsig, .ptot, .terms div, .rblk').forEach(el => { const r = el.getBoundingClientRect(); cuts.add(Math.round(r.bottom - top0)); cuts.add(Math.round(r.top - top0)); });
+    const cutList = Array.from(cuts).sort((a, b) => a - b);
+    const scale = 2;
+    const canvas = await html2canvas(paper, {scale, backgroundColor: '#ffffff', useCORS: true, logging: false, windowWidth: 900});
+    const pdf = new jspdf.jsPDF({unit: 'pt', format: 'a4', compress: true});
+    const pw = pdf.internal.pageSize.getWidth(), ph = pdf.internal.pageSize.getHeight();
+    const k = pw / W; const pageH = ph / k; const margin = 26;
+    let start = 0, page = 0;
+    while (start < H - 2) {
+      const topM = page ? margin : 0, room = pageH - topM - (H - start > pageH - topM ? margin : 0);
+      let end = start + room;
+      if (end < H) { const c = cutList.filter(y => y > start + 80 && y <= end).pop(); if (c) end = c; } else end = H;
+      const slice = document.createElement('canvas');
+      slice.width = canvas.width; slice.height = Math.ceil((end - start) * scale);
+      const g = slice.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, slice.width, slice.height);
+      g.drawImage(canvas, 0, Math.floor(start * scale), canvas.width, slice.height, 0, 0, canvas.width, slice.height);
+      if (page) pdf.addPage();
+      pdf.addImage(slice.toDataURL("image/jpeg", 0.85), 'JPEG', 0, topM * k, pw, (end - start) * k);
+      start = end; page++;
+    }
+    return pdf.output('datauristring').split(',')[1];
+  } finally { host.remove(); }
+}
+const b64ToBlob = (b64, mime) => { const bin = atob(b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], {type: mime}); };
+function downloadBlob(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); }
+// text that the existing WhatsApp builders produce, without opening WhatsApp
+function captureWa(fn, ...args) { let u = ''; const o = window.openLink; window.openLink = x => { u = x; }; try { fn(...args); } finally { window.openLink = o; } try { return decodeURIComponent((u.split('text=')[1] || '')); } catch (e) { return ''; } }
+const fileSafe = t => String(t).replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+// one entry point for documents, reports and statements
+async function sendPdf(o, how) {
+  // o: {html, name, phone, email, subject, body, wa}
+  let b64;
+  toast('Preparing PDF…');
+  try { b64 = await htmlToPdf(o.html); } catch (e) { toast('Could not make the PDF: ' + e.message); return; }
+  const name = fileSafe(o.name) + '.pdf', AB = window.AndroidBridge;
+  if (AB && AB.shareFile) {
+    if (how === 'wa') AB.whatsappFile(b64, 'application/pdf', name, waNumber(o.phone || ''), o.wa || '');
+    else if (how === 'email') AB.emailFile(b64, 'application/pdf', name, o.email || '', o.subject || o.name, o.body || '');
+    else if (how === 'save') AB.saveFile(b64, 'application/pdf', name);
+    else AB.shareFile(b64, 'application/pdf', name, o.wa || '');
+    return;
+  }
+  const blob = b64ToBlob(b64, 'application/pdf');
+  const file = (() => { try { return new File([blob], name, {type: 'application/pdf'}); } catch (e) { return null; } })();
+  if ((how === 'share' || how === 'wa') && file && navigator.canShare && navigator.canShare({files: [file]})) {
+    try { await navigator.share({files: [file], title: o.name, text: how === 'wa' ? (o.wa || '') : ''}); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  downloadBlob(blob, name);
+  if (how === 'email') { openLink(`mailto:${encodeURIComponent(o.email || '')}?subject=${encodeURIComponent(o.subject || o.name)}&body=${encodeURIComponent((o.body || '') + '\n\n(Attach the downloaded PDF: ' + name + ')')}`); toast('PDF downloaded — attach it to the email'); }
+  else if (how === 'wa') { const n = waNumber(o.phone || ''); openLink((n ? `https://wa.me/${n}` : 'https://wa.me/') + '?text=' + encodeURIComponent(o.wa || '')); toast('PDF downloaded — attach it in WhatsApp'); }
+  else toast('PDF downloaded: ' + name);
+}
+function docMailBody(d, kind) {
+  const c = custById(d.customerId) || {}; const s = S();
+  const what = kind === 'insp' ? `Inspection Report ${repNo(d, kind)}` : kind === 'wcr' ? `Work Completion Report ${repNo(d, kind)}` : `${d.type === 'INV' ? 'Invoice' : 'Quotation'} ${d.number}`;
+  let b = `Dear ${c.contact || c.name || 'Customer'},\n\nPlease find attached ${what}${d.subject ? ' (' + d.subject + ')' : ''}.`;
+  if (!kind) {
+    b += `\n\nTotal: ${money(docTotal(d))}`;
+    if (d.type === 'INV') { if (docPaid(d)) b += `\nPaid: ${money(docPaid(d))}\nBalance due: ${money(docBal(d))}`; b += `\nDue date: ${dfmt(d.due)}\n\n${s.payNote || ''}`; }
+    else b += `\nValid until: ${dfmt(d.due)}`;
+  }
+  b += `\n\nIf you have any questions, please call us on ${s.phone}.\n\nBest regards,\n${s.name}\n${s.phone} | ${s.email} | ${s.web}`;
+  return {subject: `${what} – ${s.name}`, body: b};
+}
+function docPdfOpts(d, kind) {
+  const c = custById(d.customerId) || {};
+  const m = docMailBody(d, kind);
+  return {
+    html: kind ? reportHTML(d, kind) : docHTML(d),
+    name: `${kind ? repNo(d, kind) : d.number} - ${c.name || ''}`,
+    phone: c.phone, email: c.email, subject: m.subject, body: m.body,
+    wa: kind ? captureWa(waReport, d, kind) : captureWa(waDoc, d)
+  };
+}
+const shareBtns = (p) => `<div class="btns sharebar" style="margin-bottom:14px">
+  <button type="button" class="btn pri" id="${p}Share">${ICON.share}Share PDF</button>
+  <button type="button" class="btn" id="${p}Wa">${ICON.wa}WhatsApp</button>
+  <button type="button" class="btn" id="${p}Mail">${ICON.mail}Email</button>
+  <button type="button" class="btn" id="${p}Print">${ICON.print}Print</button></div>`;
+function bindShare(el, p, getOpts, print) {
+  const go = how => async ev => { const b = ev.currentTarget; if (b.disabled) return; b.disabled = true; try { await sendPdf(getOpts(), how); } finally { setTimeout(() => { b.disabled = false; }, 800); } };
+  el.querySelector('#' + p + 'Share').onclick = go('share');
+  el.querySelector('#' + p + 'Wa').onclick = go('wa');
+  el.querySelector('#' + p + 'Mail').onclick = go('email');
+  el.querySelector('#' + p + 'Print').onclick = print;
+}
+
 /* ---------- inspection & work completion reports ---------- */
 const COND = ['', 'Good', 'Needs service', 'Worn – replace soon', 'Faulty', 'Not working', 'Unsafe – stop use'];
 const DONE = ['Completed', 'Partly done', 'Pending', 'Not required'];
@@ -1419,10 +1531,9 @@ function waReport(d, kind) {
 function viewReport(d, kind) {
   const ins = kind === 'insp';
   openSheet((ins ? 'Inspection report ' : 'Work completion ') + repNo(d, kind), `
-    <div class="btns" style="margin-bottom:14px"><button type="button" class="btn pri" id="rPrint">${ICON.print}Print / PDF</button><button type="button" class="btn" id="rWa">${ICON.wa}WhatsApp</button></div>
+    ${shareBtns('r')}
     ${reportHTML(d, kind)}`, el => {
-    el.querySelector('#rPrint').onclick = () => printReport(d, kind);
-    el.querySelector('#rWa').onclick = () => waReport(d, kind);
+    bindShare(el, 'r', () => docPdfOpts(d, kind), () => printReport(d, kind));
   });
 }
 
@@ -1570,8 +1681,7 @@ function viewDoc(id) {
   const d = docById(id); if (!d) return;
   const isInv = d.type === 'INV';
   const actions = [];
-  actions.push(`<button type="button" class="btn pri" id="aPrint">${ICON.print}Print / PDF</button>`);
-  actions.push(`<button type="button" class="btn" id="aWa">${ICON.wa}WhatsApp</button>`);
+
   if (isInv && !d.cancelled && docBal(d) > 0) actions.push(`<button type="button" class="btn pri" id="aPay">${ICON.pay}Record payment</button>`);
   if (!isInv && d.status !== 'Converted') actions.push(`<button type="button" class="btn pri" id="aConv">${ICON.conv}Convert to invoice</button>`);
   actions.push(`<button type="button" class="btn rbtn" id="aRep">${ICON.inv}${isInv ? 'Work completion report' : 'Inspection report'}</button>`);
@@ -1582,7 +1692,7 @@ function viewDoc(id) {
   actions.push(`<button type="button" class="btn danger" id="aDel">${ICON.trash}Delete</button>`);
   const pays = isInv && (d.payments || []).length ? `<div class="sec"><h2>Payments</h2></div><div class="list">${d.payments.map((p, i) => `<div class="item"><div class="main"><div class="t">${money(p.amount)}</div><div class="s">${dfmt(p.date)} · ${esc(p.method)}${p.note ? ' · ' + esc(p.note) : ''}</div></div><button type="button" class="btn danger" data-delpay="${i}" aria-label="Delete payment">${ICON.trash}</button></div>`).join('')}</div>` : '';
   const layBtns = LAYOUTS.map(([k, n]) => `<button type="button" data-lay="${k}" class="${docLayout(d) === k ? 'on' : ''}" aria-pressed="${docLayout(d) === k}"><span class="thumb" aria-hidden="true">${layThumb(k)}</span>${n}</button>`).join('');
-  openSheet(d.number, `<div class="btns" style="margin-bottom:14px">${actions.join('')}</div>${pays}<div class="sec"><h2>Design</h2><span class="hint">Tap to change this ${isInv ? 'invoice' : 'quote'}</span></div><div class="layseg" id="laySeg">${layBtns}</div><div class="sec"><h2>Preview</h2></div><div id="docPrev">${docHTML(d)}</div>`, el => {
+  openSheet(d.number, `${shareBtns('a')}<div class="btns" style="margin-bottom:14px">${actions.join('')}</div>${pays}<div class="sec"><h2>Design</h2><span class="hint">Tap to change this ${isInv ? 'invoice' : 'quote'}</span></div><div class="layseg" id="laySeg">${layBtns}</div><div class="sec"><h2>Preview</h2></div><div id="docPrev">${docHTML(d)}</div>`, el => {
     el.querySelectorAll('[data-lay]').forEach(b => b.onclick = () => {
       d.layout = b.dataset.lay; save();
       el.querySelectorAll('[data-lay]').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); });
@@ -1590,8 +1700,7 @@ function viewDoc(id) {
       toast(LAYOUTS.find(x => x[0] === d.layout)[1] + ' design');
     });
     const reopen = () => reopenWith(() => viewDoc(id));
-    el.querySelector('#aPrint').onclick = () => printDoc(d);
-    el.querySelector('#aWa').onclick = () => waDoc(d);
+    bindShare(el, 'a', () => docPdfOpts(d), () => printDoc(d));
     el.querySelector('#aEdit').onclick = () => { closeSheet(() => editDoc(d.type, d.id)); };
     el.querySelector('#aRep').onclick = () => {
       const R = isInv ? d.wcr : d.insp;
@@ -2770,7 +2879,7 @@ function printHTML(html, name) {
 
 /* generic report sheet: period chips + actions + body */
 function openReport(o) {
-  openSheet(o.title, `<div id="rTop"></div><div class="btns" style="margin-bottom:12px"><button type="button" class="btn pri" id="rPrint">${ICON.print}Print / PDF</button>${o.wa ? `<button type="button" class="btn" id="rWa">${ICON.wa}WhatsApp</button>` : `<button type="button" class="btn" id="rXls">${ICON.dl}Excel</button>`}</div><div id="rBody"></div>`, el => {
+  openSheet(o.title, `<div id="rTop"></div><div class="btns" style="margin-bottom:12px"><button type="button" class="btn pri" id="rPdf">${ICON.share}Share PDF</button><button type="button" class="btn" id="rPrint">${ICON.print}Print</button>${o.wa ? `<button type="button" class="btn" id="rWa">${ICON.wa}WhatsApp</button>` : `<button type="button" class="btn" id="rXls">${ICON.dl}Excel</button>`}</div><div id="rBody"></div>`, el => {
     const ctx = {};
     const draw = () => {
       const [f, t] = o.period === false ? ['0000-01-01', '9999-12-31'] : periodRange(state.rep);
@@ -2784,6 +2893,12 @@ function openReport(o) {
     el.querySelector('#rPrint').onclick = () => {
       const html = o.paper ? o.paper(ctx) : reportPaper(o.title, o.ar || '', o.period === false ? 'As of ' + dfmt(today()) : periodLabel(ctx.f, ctx.t), o.body(ctx, true));
       if (html) printHTML(html, `FitX ${o.title} ${fileRange(ctx.f, ctx.t)}`);
+    };
+    el.querySelector('#rPdf').onclick = async ev => {
+      const html = o.paper ? o.paper(ctx) : reportPaper(o.title, o.ar || '', o.period === false ? 'As of ' + dfmt(today()) : periodLabel(ctx.f, ctx.t), o.body(ctx, true));
+      if (!html) return;
+      ev.currentTarget.disabled = true;
+      try { await sendPdf({html, name: `FitX ${o.title} ${fileRange(ctx.f, ctx.t)}`, subject: `${o.title} – ${S().name}`, body: `Please find attached the ${o.title}.\n\n${S().name}`}, 'share'); } finally { ev.currentTarget.disabled = false; }
     };
     const wa = el.querySelector('#rWa'); if (wa) wa.onclick = () => o.wa(ctx);
     const xl = el.querySelector('#rXls'); if (xl) xl.onclick = () => exportWorkbook(ctx.f, ctx.t);
