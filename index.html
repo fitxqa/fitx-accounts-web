@@ -289,6 +289,7 @@ textarea.in{min-height:80px;resize:vertical}
 .paper th{background:#111;color:#fff;font-size:11px;text-align:left;padding:8px}
 .paper table.eqt th{background:#ff6a00;color:#000}
 .paper .leq{font-size:10.5px;color:#666;margin-top:3px}
+.paper .lnote{font-size:11px;color:#333;margin-top:3px;white-space:pre-wrap;line-height:1.45}
 .paper table.eqt td{padding:6px 8px}
 .paper td{border-bottom:1px solid #e8e8e8;padding:8px;vertical-align:top}
 .paper .n{text-align:right;white-space:nowrap}
@@ -1317,6 +1318,7 @@ function editDoc(type, id, fromDoc) {
             <label><span class="hint">Model</span><input class="in lmodel" value="${esc(l.model || '')}" placeholder="e.g. 95T"></label>
           </div>
           <label style="display:block;margin-bottom:8px"><span class="hint">Serial No. (SN)</span><input class="in lsn" value="${esc(l.sn || '')}" placeholder="e.g. ITR123456" autocapitalize="characters" style="text-transform:uppercase"></label>
+          <label style="display:block;margin-bottom:8px"><span class="hint">Details (shown under this item)</span><textarea class="in lnote" rows="2" placeholder="e.g. Belt slipping under load – replaced, aligned and tested at all speeds">${esc(l.note || '')}</textarea></label>
           <div class="row3">
             <label><span class="hint">Qty</span><input class="in lqty" type="number" step="any" min="0" inputmode="decimal" value="${l.qty}"></label>
             <label><span class="hint">Price</span><input class="in lprice" type="number" step="0.01" min="0" inputmode="decimal" value="${l.price || ''}" placeholder="0.00"></label>
@@ -1342,6 +1344,7 @@ function editDoc(type, id, fromDoc) {
       if (e.target.classList.contains('lbrand')) { l.brand = e.target.value; return; }
       if (e.target.classList.contains('lmodel')) { l.model = e.target.value; return; }
       if (e.target.classList.contains('lsn')) { l.sn = e.target.value.toUpperCase(); return; }
+      if (e.target.classList.contains('lnote')) { l.note = e.target.value; return; }
       if (e.target.classList.contains('lfind')) { l.find = e.target.value; return; }
       if (e.target.classList.contains('lrem')) { l.rem = e.target.value; return; }
       if (e.target.classList.contains('lqty')) l.qty = e.target.value;
@@ -1358,12 +1361,12 @@ function editDoc(type, id, fromDoc) {
       if (e.target.value === NEWITEM) { e.target.value = l.itemId || ''; quickItem(l); return; }
       l.itemId = e.target.value;
       const it = itemById(l.itemId);
-      if (it) { l.desc = it.name + (it.sku ? ' (' + it.sku + ')' : ''); l.price = it.price; l.kind = it.service ? 'service' : 'part'; l.cost = it.service ? 0 : num(it.cost); }
+      if (it) { l.desc = it.name + (it.sku ? ' (' + it.sku + ')' : ''); l.price = it.price; l.kind = it.service ? 'service' : 'part'; l.cost = it.service ? 0 : num(it.cost); if (it.descr && !(l.note || '').trim()) l.note = it.descr; }
       else { delete l.cost; }
       drawLines();
     });
     const quickItem = l => editItem(null, it => {
-      l.itemId = it.id; l.desc = it.name + (it.sku ? ' (' + it.sku + ')' : ''); l.price = it.price;
+      l.itemId = it.id; l.desc = it.name + (it.sku ? ' (' + it.sku + ')' : ''); l.price = it.price; if (it.descr && !(l.note || '').trim()) l.note = it.descr;
       l.kind = it.service ? 'service' : 'part'; l.cost = it.service ? 0 : num(it.cost);
       if (!num(l.qty)) l.qty = 1;
       drawLines(); toast((it.service ? 'Service' : 'Item') + ' added');
@@ -1397,13 +1400,13 @@ function editDoc(type, id, fromDoc) {
         if (type === 'QUO') R.recommend = (f.rRec || '').trim(); else R.nextDue = f.rNext || '';
         if (R.by) S().lastTech = R.by;
       }
-      draft.lines = draft.lines.filter(l => (l.desc || '').trim() || num(l.price) || lineEq(l)).map(l => {
+      draft.lines = draft.lines.filter(l => (l.desc || '').trim() || num(l.price) || lineEq(l) || (l.note || '').trim()).map(l => {
         const kind = lineKind(l); const it = l.itemId && itemById(l.itemId);
         const cost = kind !== 'part' ? 0 : (l.cost !== undefined && l.cost !== '' ? r2(l.cost) : (it ? r2(it.cost) : 0));
         const out = {itemId: l.itemId || '', desc: (l.desc || '').trim(), qty: num(l.qty), price: r2(l.price), kind, cost};
         const b = (l.brand || '').trim(), m = (l.model || '').trim(), sn = (l.sn || '').trim().toUpperCase();
         if (b) out.brand = b; if (m) out.model = m; if (sn) out.sn = sn;
-        ['cond', 'find', 'done', 'rem'].forEach(k => { const v = (l[k] || '').trim(); if (v) out[k] = v; });
+        ['cond', 'find', 'done', 'rem', 'note'].forEach(k => { const v = (l[k] || '').trim(); if (v) out[k] = v; });
         return out;
       });
       if (!draft.customerId) { toast('Please select a customer'); return; }
@@ -1545,14 +1548,15 @@ function reportHTML(d, kind) {
   const lines = d.lines || [];
   const eqLines = lines.filter(l => lineEq(l) || l.cond || l.find);
   const eqCell = l => [l.brand, l.model].filter(Boolean).map(esc).join(' ') + (l.sn ? `<div style="white-space:nowrap"><b>SN: ${esc(l.sn)}</b></div>` : '');
+  const noteHTML = l => l.note ? `<div class="lnote">${esc(l.note)}</div>` : '';
   let table;
   if (ins) {
-    const rows = (eqLines.length ? eqLines : lines).map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.desc)}</td><td>${eqCell(l) || '—'}</td><td><b style="color:${condColor(l.cond)}">${esc(l.cond || '—')}</b>${l.find ? `<div class="leq" style="color:#333">${esc(l.find)}</div>` : ''}</td></tr>`).join('');
+    const rows = (eqLines.length ? eqLines : lines).map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.desc)}${noteHTML(l)}</td><td>${eqCell(l) || '—'}</td><td><b style="color:${condColor(l.cond)}">${esc(l.cond || '—')}</b>${l.find ? `<div class="leq" style="color:#333">${esc(l.find)}</div>` : ''}</td></tr>`).join('');
     table = `<h3>Equipment inspected</h3><table><thead><tr><th>#</th><th>Equipment / item</th><th>Brand · Model · SN</th><th>Condition &amp; findings</th></tr></thead><tbody>${rows}</tbody></table>
       <h3>Recommended work</h3><table><thead><tr><th>#</th><th>Work / part</th><th class="n">Qty</th></tr></thead><tbody>${lines.map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.desc)}</td><td class="n">${l.qty}</td></tr>`).join('')}</tbody></table>
       <p class="hint" style="color:#555;margin:-6px 0 10px">Prices: see Quotation <b>${esc(d.number)}</b>.</p>`;
   } else {
-    const rows = lines.map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.desc)}${l.find || l.cond ? `<div class="leq">Found: ${esc([l.cond, l.find].filter(Boolean).join(' – '))}</div>` : ''}</td><td>${eqCell(l) || '—'}</td><td><b style="color:${doneColor(l.done || 'Completed')}">${esc(l.done || 'Completed')}</b>${l.rem ? `<div class="leq" style="color:#333">${esc(l.rem)}</div>` : ''}</td></tr>`).join('');
+    const rows = lines.map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.desc)}${noteHTML(l)}${l.find || l.cond ? `<div class="leq">Found: ${esc([l.cond, l.find].filter(Boolean).join(' – '))}</div>` : ''}</td><td>${eqCell(l) || '—'}</td><td><b style="color:${doneColor(l.done || 'Completed')}">${esc(l.done || 'Completed')}</b>${l.rem ? `<div class="leq" style="color:#333">${esc(l.rem)}</div>` : ''}</td></tr>`).join('');
     table = `<h3>Work carried out</h3><table><thead><tr><th>#</th><th>Work done / part fitted</th><th>Brand · Model · SN</th><th>Status &amp; remarks</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
   const all = lines.length, done = lines.filter(l => (l.done || 'Completed') === 'Completed').length;
@@ -1625,7 +1629,7 @@ function docHTML(d, layout) {
   const coLines = `${esc(s.address)}<br>Tel: ${esc(s.phone)} · ${esc(s.email)}<br>${esc(s.web)}${s.cr ? '<br>CR No. ' + esc(s.cr) : ''}`;
   const custLines = `<b>${esc(c.name || '')}</b>${c.contact ? '<br>Attn: ' + esc(c.contact) : ''}${addrText(c) ? '<br>' + esc(addrText(c)) : ''}${c.phone ? '<br>Tel: ' + esc(c.phone) : ''}${c.email ? '<br>' + esc(c.email) : ''}`;
   const detLines = `${isInv ? 'Invoice' : 'Quotation'} No: <b>${esc(d.number)}</b><br>Date: ${dfmt(d.date)}<br>${isInv ? 'Due' : 'Valid until'}: ${dfmt(d.due)}${d.fromQuote ? '<br>Ref quote: ' + esc(d.fromQuote) : ''}${d.jobType ? '<br>Service: ' + esc(d.jobType) : ''}${d.subject ? '<br>Re: ' + esc(d.subject) : ''}`;
-  const rows = (d.lines || []).map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.desc)}${lineEq(l) ? `<div class="leq">${esc(eqText(l))}</div>` : ''}</td><td class="n">${l.qty}</td><td class="n">${fmt(l.price)}</td><td class="n">${fmt(num(l.qty) * num(l.price))}</td></tr>`).join('');
+  const rows = (d.lines || []).map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.desc)}${lineEq(l) ? `<div class="leq">${esc(eqText(l))}</div>` : ''}${l.note ? `<div class="lnote">${esc(l.note)}</div>` : ''}</td><td class="n">${l.qty}</td><td class="n">${fmt(l.price)}</td><td class="n">${fmt(num(l.qty) * num(l.price))}</td></tr>`).join('');
   const oldEq = (d.equipment || []).filter(e => e.brand || e.model || e.sn || e.name);
   const eqTable = oldEq.length ? `<table class="eqt"><thead><tr><th>#</th><th>Equipment</th><th>Brand</th><th>Model</th><th>Serial No.</th></tr></thead><tbody>${oldEq.map((e, k) => `<tr><td>${k + 1}</td><td>${esc(e.name || '')}</td><td>${esc(e.brand || '')}</td><td>${esc(e.model || '')}</td><td style="white-space:nowrap"><b>${esc(e.sn || '')}</b></td></tr>`).join('')}</tbody></table>` : '';
   const table = `${eqTable}<table><thead><tr><th>#</th><th>Description</th><th class="n">Qty</th><th class="n">Unit price</th><th class="n">Amount</th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -1732,7 +1736,7 @@ function waDoc(d) {
   const c = custById(d.customerId) || {}; const s = S(); const isInv = d.type === 'INV';
   let m = `Dear ${c.name || 'Customer'},\n\n${isInv ? 'Invoice' : 'Quotation'} *${d.number}* dated ${dfmt(d.date)}${d.subject ? '\nRe: ' + d.subject : ''}\n\n`;
   if ((d.equipment || []).length) m += '*Equipment*\n' + (d.equipment || []).map(e => `• ${[e.name, e.brand, e.model].filter(Boolean).join(' ')}${e.sn ? ' — SN: ' + e.sn : ''}`).join('\n') + '\n\n';
-  m += (d.lines || []).map(l => `• ${l.desc} — ${l.qty} × ${fmt(l.price)}${lineEq(l) ? '\n   ' + eqText(l) : ''}`).join('\n');
+  m += (d.lines || []).map(l => `• ${l.desc} — ${l.qty} × ${fmt(l.price)}${lineEq(l) ? '\n   ' + eqText(l) : ''}${l.note ? '\n   ' + l.note.replace(/\n/g, '\n   ') : ''}`).join('\n');
   m += `\n\n*Total: ${money(docTotal(d))}*`;
   if (isInv) {
     if (docPaid(d)) m += `\nPaid: ${money(docPaid(d))}\n*Balance: ${money(docBal(d))}*`;
@@ -2264,6 +2268,7 @@ function editItem(id, after, prefill) {
         <label class="f"><span>Part code / SKU</span><input class="in" name="sku" value="${esc(i.sku)}"></label>
         <label class="f"><span>Category</span><select class="in" name="category" id="iCat">${catOptions(S().stockCats, i.category)}</select></label>
       </div>
+      <label class="f"><span>Description (optional – copied into invoice / quote lines)</span><textarea class="in" name="descr" rows="2" placeholder="e.g. Includes removal of old belt, fitting, alignment and test run">${esc(i.descr || '')}</textarea></label>
       <div class="row3">
         <label class="f"><span>Cost (QAR)</span><input class="in" type="number" step="0.01" min="0" inputmode="decimal" name="cost" value="${i.cost ?? ''}"></label>
         <label class="f"><span>Sell price</span><input class="in" type="number" step="0.01" min="0" inputmode="decimal" name="price" value="${i.price ?? ''}"></label>
@@ -2289,7 +2294,7 @@ function editItem(id, after, prefill) {
     el.querySelector('#iForm').onsubmit = e => {
       e.preventDefault(); const f = formData(e.target);
       if (f.category === NEWCAT) f.category = '';
-      const data = {name: f.name.trim(), sku: f.sku.trim(), category: f.category.trim(), cost: r2(f.cost), price: r2(f.price), unit: f.unit.trim() || (service ? 'job' : 'pcs'), minQty: service ? 0 : num(f.minQty), service};
+      const data = {name: f.name.trim(), sku: f.sku.trim(), descr: (f.descr || '').trim(), category: f.category.trim(), cost: r2(f.cost), price: r2(f.price), unit: f.unit.trim() || (service ? 'job' : 'pcs'), minQty: service ? 0 : num(f.minQty), service};
       let saved;
       if (id) { Object.assign(i, data); saved = i; }
       else {
