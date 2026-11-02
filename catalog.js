@@ -5,6 +5,7 @@
 (function () {
   'use strict';
   const S_ = ' › ';
+  const CATALOG_VER = 2; // raise when new catalog items are added, so every device adds them once
   // [main category, sub-category, unit, [names…]]
   const SERVICES = [
     ['Gym Equipment Service', 'Treadmill', 'job', ['Treadmill preventive maintenance', 'Treadmill repair – diagnosis & fault finding', 'Running belt replacement (labour)', 'Running belt alignment & tensioning', 'Deck lubrication', 'Drive belt replacement (labour)', 'Motor brush replacement (labour)', 'Roller replacement (labour)', 'Incline motor repair', 'Speed & incline calibration']],
@@ -13,6 +14,11 @@
     ['Gym Equipment Service', 'Rower & ski', 'job', ['Rower service', 'Rower chain / strap replacement (labour)']],
     ['Gym Equipment Service', 'Stair climber', 'job', ['Stair climber service', 'Stair climber step chain repair']],
     ['Gym Equipment Service', 'Strength equipment', 'job', ['Selectorized machine service', 'Cable replacement (labour)', 'Pulley replacement (labour)', 'Weight stack & guide rod lubrication', 'Plate-loaded machine service', 'Smith machine service', 'Bench & rack inspection / tightening']],
+    ['Gym Equipment Service', 'Cardio equipment', 'job', ['Treadmill – service & repair', 'Curved / manual treadmill – service & repair', 'Elliptical cross trainer – service & repair', 'Adaptive motion trainer (AMT) – service & repair', 'Arc trainer – service & repair', 'Upright bike – service & repair', 'Recumbent bike – service & repair', 'Spin bike / indoor cycle – service & repair', 'Air bike / fan bike – service & repair', 'Rowing machine – service & repair', 'Ski erg – service & repair', 'Stair climber / stepper – service & repair', 'Stepmill / revolving stairs – service & repair', 'Vertical climber – service & repair', 'Upper body ergometer (hand cycle) – service & repair', 'Lateral trainer – service & repair', 'Cross trainer (total body) – service & repair', 'Vibration plate – service & repair']],
+    ['Gym Equipment Service', 'Strength – selectorized machines', 'job', ['Chest press machine – service & repair', 'Incline chest press machine – service & repair', 'Pec deck / rear delt fly – service & repair', 'Shoulder press machine – service & repair', 'Lateral raise machine – service & repair', 'Lat pulldown machine – service & repair', 'Seated row machine – service & repair', 'Lat pulldown / row combo – service & repair', 'Pullover machine – service & repair', 'Biceps curl machine – service & repair', 'Triceps extension machine – service & repair', 'Triceps dip / press machine – service & repair', 'Assisted chin & dip machine – service & repair', 'Abdominal crunch machine – service & repair', 'Back extension machine – service & repair', 'Rotary torso machine – service & repair', 'Leg press machine – service & repair', 'Leg extension machine – service & repair', 'Seated leg curl machine – service & repair', 'Lying leg curl machine – service & repair', 'Leg extension / curl combo – service & repair', 'Hip abductor / adductor – service & repair', 'Glute kickback machine – service & repair', 'Standing calf raise machine – service & repair', 'Seated calf raise machine – service & repair', 'Multi-station gym – service & repair']],
+    ['Gym Equipment Service', 'Strength – cable & functional', 'job', ['Cable crossover – service & repair', 'Functional trainer (dual adjustable pulley) – service & repair', 'Single cable column – service & repair', 'Lat pulldown / low row station – service & repair', 'Multi-jungle / multi-station cable rig – service & repair']],
+    ['Gym Equipment Service', 'Strength – plate loaded', 'job', ['Plate-loaded chest press – service & repair', 'Plate-loaded incline press – service & repair', 'Plate-loaded shoulder press – service & repair', 'Plate-loaded lat pulldown – service & repair', 'Plate-loaded row – service & repair', 'T-bar row – service & repair', 'Leg press 45° – service & repair', 'Hack squat – service & repair', 'Pendulum squat – service & repair', 'Belt squat – service & repair', 'V-squat – service & repair', 'Plate-loaded leg extension – service & repair', 'Plate-loaded leg curl – service & repair', 'Hip thrust machine – service & repair', 'Plate-loaded calf raise – service & repair', 'Landmine station – service & repair']],
+    ['Gym Equipment Service', 'Strength – racks, benches & free weights', 'job', ['Smith machine – service & repair', 'Power rack / squat cage – service & repair', 'Half rack – service & repair', 'Squat rack – service & repair', 'Olympic flat bench press – service & repair', 'Olympic incline bench press – service & repair', 'Olympic decline bench press – service & repair', 'Adjustable bench – service & repair', 'Flat bench – service & repair', 'Preacher curl bench – service & repair', 'Roman chair / hyperextension – service & repair', 'Ab / sit-up bench – service & repair', 'Dip & pull-up station (power tower) – service & repair', 'Dumbbell rack – service & repair', 'Barbell rack – service & repair', 'Weight plate tree – service & repair', 'Kettlebell rack – service & repair', 'Storage rack (accessories) – service & repair']],
     ['Gym Equipment Service', 'General', 'job', ['Service visit / call-out charge', 'Diagnosis / inspection fee', 'Preventive maintenance visit (per gym)', 'Equipment installation & assembly', 'Equipment dismantling & relocation', 'Annual Maintenance Contract (AMC)', 'Emergency call-out (after hours)']],
     ['Gym Equipment Service', 'General', 'hour', ['Technician labour (per hour)']],
     ['Electronic Repair', 'Boards', 'job', ['MCB (motor control board) repair', 'MCB replacement & set-up (labour)', 'Console / display board repair', 'Lower board / inverter repair', 'Power supply board repair', 'Heart rate board repair']],
@@ -77,7 +83,7 @@
     const OLD = ['Belts', 'Motors', 'Electronics / Boards', 'Cables', 'Rollers', 'Decks', 'Consoles', 'Lubricant', 'Accessories'];
     st.stockCats = st.stockCats.filter(c => !OLD.includes(c) || db.items.some(i => i.category === c || String(i.category || '').startsWith(c + S_)));
     JOBS.forEach(j => { if (!st.jobTypes.includes(j)) st.jobTypes.push(j); });
-    st.catalogV1 = true;
+    st.catalogV1 = true; st.catalogVer = CATALOG_VER;
     save();
     return added;
   }
@@ -102,10 +108,10 @@
   // signed in to the cloud: add the catalog to the company data once it has loaded
   (window.FITX_AFTER_SYNC = window.FITX_AFTER_SYNC || []).push(() => {
     const missing = SERVICES.concat(PARTS).some(([m, sub, u, names]) => names.some(n => !db.items.some(i => i.id === 'cat_' + slug(n) || (i.name || '').toLowerCase() === n.toLowerCase())));
-    if (!S().catalogV1 || missing) { const n = importCatalog(); if (n) { render(); toast(`FitX catalog added: ${n} services & parts`); } }
+    if (!S().catalogV1 || (S().catalogVer || 1) < CATALOG_VER || missing) { const n = importCatalog(); if (n) { render(); toast(`FitX catalog added: ${n} services & parts`); } }
   });
   // first start after this update
-  if (!S().catalogV1) {
+  if (!S().catalogV1 || (S().catalogVer || 1) < CATALOG_VER) {
     const n = importCatalog();
     if (n) setTimeout(() => toast(`FitX catalog added: ${n} services & parts`), 1200);
   }
