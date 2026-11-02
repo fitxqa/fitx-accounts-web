@@ -99,6 +99,11 @@
     }
   };
 
+  // signed in to the cloud: add the catalog to the company data once it has loaded
+  (window.FITX_AFTER_SYNC = window.FITX_AFTER_SYNC || []).push(() => {
+    const missing = SERVICES.concat(PARTS).some(([m, sub, u, names]) => names.some(n => !db.items.some(i => i.id === 'cat_' + slug(n) || (i.name || '').toLowerCase() === n.toLowerCase())));
+    if (!S().catalogV1 || missing) { const n = importCatalog(); if (n) { render(); toast(`FitX catalog added: ${n} services & parts`); } }
+  });
   // first start after this update
   if (!S().catalogV1) {
     const n = importCatalog();

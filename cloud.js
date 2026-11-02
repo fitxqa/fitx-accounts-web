@@ -224,6 +224,8 @@
       lsSet(LS_LINK, {cid, uid: C.user.uid, email: C.user.email, role});
       setStatus('ok'); C.lastSync = Date.now();
       applyRole(); render(); refreshCloudSheet();
+      // one-time data set-ups (e.g. the FitX catalog) run on the cloud copy so they are saved for every device
+      (window.FITX_AFTER_SYNC || []).forEach(fn => { try { fn(); } catch (e) {} });
     });
   }
   function detach() {

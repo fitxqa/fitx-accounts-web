@@ -569,6 +569,7 @@ const ICON = {
   cash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 10v4M18 10v4"/></svg>',
   wrench: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14.5 6.5a4 4 0 0 0 5 5L21 13l-8 8-3-3 8-8-1.5-1.5a4 4 0 0 1-5-5L13 2z"/><path d="M3 21l5-5"/></svg>',
   truck: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 6h12v10H2zM14 10h4l4 4v2h-8z"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>',
   mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
   share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>',
   dl: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>',
@@ -1208,9 +1209,41 @@ function customerOptions(sel) {
 }
 const NEWITEM = '__newitem__';
 const isService = id => { const it = itemById(id); return !!(it && it.service); };
+// items grouped by category (services first, then parts; treadmill belt sizes last)
+function groupedItemOptions(list, sel) {
+  const groups = {};
+  list.forEach(i => { const g = i.category || (i.service ? 'Other services' : 'Other parts'); (groups[g] = groups[g] || []).push(i); });
+  const rank = g => { const its = groups[g]; const svc = its.every(i => i.service) ? 0 : 1; const tm = its.some(i => i.tm) ? 1 : 0; return svc * 10 + tm; };
+  return Object.keys(groups).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b)).map(g =>
+    `<optgroup label="${esc(g)} (${groups[g].length})">${groups[g].sort((a, b) => a.name.localeCompare(b.name)).map(i => `<option value="${i.id}" ${i.id === sel ? 'selected' : ''}>${esc(i.name)}${i.sku ? ' · ' + esc(i.sku) : ''}</option>`).join('')}</optgroup>`).join('');
+}
 function itemOptions(sel) {
-  const list = db.items.slice().sort((a, b) => a.name.localeCompare(b.name));
-  return `<option value="">Type your own (no item)</option><option value="${NEWITEM}">+ Add new item / service…</option>` + list.map(i => `<option value="${i.id}" ${i.id === sel ? 'selected' : ''}>${i.service ? '[Service] ' : ''}${esc(i.name)}${i.sku ? ' · ' + esc(i.sku) : ''}</option>`).join('');
+  return `<option value="">Type your own (no item)</option><option value="${NEWITEM}">+ Add new item / service…</option>` + groupedItemOptions(db.items, sel);
+}
+/* searchable picker: type part of a name, code, category or treadmill model; filter by main category */
+function pickItem(opts, cb) {
+  const pool = db.items.filter(i => !opts.partsOnly || !i.service);
+  const mains = Array.from(new Set(pool.map(i => catParent(i.category || (i.service ? 'Other services' : 'Other parts')))));
+  const svcMains = mains.filter(m => pool.filter(i => catParent(i.category || '') === m).every(i => i.service)).sort();
+  const partMains = mains.filter(m => !svcMains.includes(m)).sort();
+  let cat = '';
+  openSheet(opts.partsOnly ? 'Pick a spare part' : 'Pick a service or part', `
+    <input class="search" id="pkQ" placeholder="Search name, code, category or treadmill model" aria-label="Search items">
+    <div class="chips" id="pkC" style="flex-wrap:wrap"></div>
+    <div class="list" id="pkL"></div>`, el => {
+    const q = el.querySelector('#pkQ'); setTimeout(() => q.focus(), 150);
+    const chip = (v, l) => `<button type="button" data-c="${esc(v)}" class="${cat === v ? 'on' : ''}">${esc(l)}</button>`;
+    const draw = () => {
+      el.querySelector('#pkC').innerHTML = chip('', 'All') + (opts.partsOnly ? '' : chip('__svc', 'All services')) + chip('__part', 'All parts') + svcMains.map(m => chip(m, m)).join('') + partMains.map(m => chip(m, m)).join('');
+      el.querySelectorAll('#pkC [data-c]').forEach(b => b.onclick = () => { cat = b.dataset.c; draw(); });
+      const words = q.value.toLowerCase().split(/\s+/).filter(Boolean);
+      const list = pool.filter(i => (!cat || (cat === '__svc' ? i.service : cat === '__part' ? !i.service : catParent(i.category || (i.service ? 'Other services' : 'Other parts')) === cat)) &&
+        words.every(w => [i.name, i.sku, i.category, i.descr, ...(i.fits || [])].join(' ').toLowerCase().includes(w))).sort((a, b) => (a.category || '').localeCompare(b.category || '') || a.name.localeCompare(b.name));
+      el.querySelector('#pkL').innerHTML = list.length ? list.slice(0, 150).map(i => `<button type="button" class="item" data-p="${i.id}"><div class="main"><div class="t">${esc(i.name)}</div><div class="s">${esc(i.category || '—')}${i.sku ? ' · ' + esc(i.sku) : ''}${i.service ? ' · Service' : ' · Stock ' + stockQty(i.id)}</div></div><div class="r amt">${fmt(i.price)}</div></button>`).join('') + (list.length > 150 ? `<div class="empty">${list.length - 150} more — type to narrow the search</div>` : '') : '<div class="empty">Nothing found.</div>';
+      el.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { const it = itemById(b.dataset.p); closeSheet(() => cb(it)); });
+    };
+    q.oninput = draw; draw();
+  });
 }
 
 /* equipment (brand / model / serial no.) on invoices & quotes */
@@ -1309,7 +1342,7 @@ function editDoc(type, id, fromDoc) {
       linesEl.innerHTML = draft.lines.map((l, i) => `
         <div class="line" data-i="${i}">
           <div class="lt"><span>Line ${i + 1}</span>${draft.lines.length > 1 ? `<button type="button" class="ldel">Remove</button>` : ''}</div>
-          <div style="display:flex;gap:8px;margin-bottom:8px"><select class="in litem" aria-label="Item or service">${itemOptions(l.itemId)}</select><button type="button" class="btn lnew" aria-label="Add new item">+ New</button></div>
+          <div style="display:flex;gap:8px;margin-bottom:8px"><select class="in litem" aria-label="Item or service">${itemOptions(l.itemId)}</select><button type="button" class="btn lpick" aria-label="Search items">${ICON.search || '&#128269;'}</button><button type="button" class="btn lnew" aria-label="Add new item">+ New</button></div>
           <button type="button" class="lnk ltm" style="margin:-2px 0 8px">${ICON.wrench.replace('<svg ', '<svg width="14" height="14" style="vertical-align:-2px" ')} Pick part by treadmill model</button>
           <div class="kind" role="radiogroup" aria-label="Line type"><button type="button" data-kind="service" class="${lineKind(l) === 'service' ? 'on' : ''}">Maintenance / labour</button><button type="button" data-kind="part" class="${lineKind(l) === 'part' ? 'on' : ''}">Spare part</button></div>
           <input class="in ldesc" aria-label="Description" placeholder="Description (e.g. Labour – service visit)" value="${esc(l.desc)}" style="margin-bottom:8px">
@@ -1372,6 +1405,7 @@ function editDoc(type, id, fromDoc) {
       drawLines(); toast((it.service ? 'Service' : 'Item') + ' added');
     }, {name: l.itemId ? '' : (l.desc || '').trim(), price: num(l.price) || ''});
     linesEl.addEventListener('click', e => {
+      const pk = e.target.closest('.lpick'); if (pk) { const row = pk.closest('[data-i]'); pickItem({partsOnly: false}, it => { const sel = row.querySelector('.litem'); sel.value = it.id; sel.dispatchEvent(new Event('change', {bubbles: true})); }); return; }
       const tb = e.target.closest('.ltm');
       if (tb) { const l = draft.lines[+tb.closest('.line').dataset.i]; treadmillFinder(it => { l.itemId = it.id; l.desc = it.name + (it.sku ? ' (' + it.sku + ')' : ''); l.price = it.price; l.kind = 'part'; l.cost = num(it.cost); if (!num(l.qty)) l.qty = 1; drawLines(); toast('Part added'); }); return; }
       const kb = e.target.closest('[data-kind]');
@@ -2516,8 +2550,7 @@ function viewPurchases() {
   });
 }
 function partOptions(sel) {
-  const list = db.items.filter(i => !i.service).sort((a, b) => a.name.localeCompare(b.name));
-  return `<option value="">No stock item (direct job cost)</option><option value="${NEWITEM}">+ Add new spare part…</option>` + list.map(i => `<option value="${i.id}" ${i.id === sel ? 'selected' : ''}>${esc(i.name)}${i.sku ? ' · ' + esc(i.sku) : ''}</option>`).join('');
+  return `<option value="">No stock item (direct job cost)</option><option value="${NEWITEM}">+ Add new spare part…</option>` + groupedItemOptions(db.items.filter(i => !i.service), sel);
 }
 /* weighted average cost: new cost = (stock on hand × old cost + bought qty × net unit cost) ÷ total qty.
    Supplier discount is spread over the bill lines, so the cost is what was really paid. */
@@ -2569,7 +2602,7 @@ function editPurchase(id, prefill) {
       linesEl.innerHTML = draft.lines.map((l, i) => `
         <div class="line" data-i="${i}">
           <div class="lt"><span>Line ${i + 1}</span>${draft.lines.length > 1 ? `<button type="button" class="ldel">Remove</button>` : ''}</div>
-          <div style="display:flex;gap:8px;margin-bottom:8px"><select class="in litem" aria-label="Spare part">${partOptions(l.itemId)}</select><button type="button" class="btn lnew" aria-label="Add new spare part">+ New</button></div>
+          <div style="display:flex;gap:8px;margin-bottom:8px"><select class="in litem" aria-label="Spare part">${partOptions(l.itemId)}</select><button type="button" class="btn lpick" aria-label="Search parts">${ICON.search || '&#128269;'}</button><button type="button" class="btn lnew" aria-label="Add new spare part">+ New</button></div>
           <button type="button" class="lnk ltm" style="margin:-2px 0 8px">${ICON.wrench.replace('<svg ', '<svg width="14" height="14" style="vertical-align:-2px" ')} Pick part by treadmill model</button>
           <input class="in ldesc" aria-label="Description" placeholder="Description" value="${esc(l.desc)}" style="margin-bottom:8px">
           <div class="row3">
@@ -2601,6 +2634,7 @@ function editPurchase(id, prefill) {
       setItem(l, it); if (!num(l.qty)) l.qty = 1; drawLines(); toast('Spare part added');
     }, {name: l.itemId ? '' : (l.desc || '').trim(), cost: num(l.cost) || ''});
     linesEl.addEventListener('click', e => {
+      const pk = e.target.closest('.lpick'); if (pk) { const row = pk.closest('[data-i]'); pickItem({partsOnly: true}, it => { const sel = row.querySelector('.litem'); sel.value = it.id; sel.dispatchEvent(new Event('change', {bubbles: true})); }); return; }
       const tb = e.target.closest('.ltm');
       if (tb) { const l = draft.lines[+tb.closest('.line').dataset.i]; treadmillFinder(it => { setItem(l, it); if (!num(l.qty)) l.qty = 1; drawLines(); toast('Part added'); }); return; }
       const nb = e.target.closest('.lnew');
