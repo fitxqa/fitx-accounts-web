@@ -16,6 +16,10 @@
     ['1400', 'Prepaid expenses & deposits', 'asset', ''], ['1500', 'Tools & equipment', 'asset', 'fixed'], ['1510', 'Vehicles', 'asset', 'fixed'],
     ['2000', 'Accounts payable (suppliers)', 'liability', 'ap'], ['2100', 'Accrued expenses', 'liability', ''],
     ['2200', 'Customer advances', 'liability', ''], ['2300', 'Loans', 'liability', ''], ['2400', 'End of service benefits payable', 'liability', ''],
+    ['1410', 'Employee advances & loans', 'asset', ''], ['2410', 'Salaries payable', 'liability', ''], ['2420', 'Social insurance payable (GRSIA)', 'liability', ''],
+    ['2500', 'Corporate income tax payable', 'liability', ''], ['2510', 'Withholding tax payable', 'liability', ''],
+    ['6500', 'Salaries & wages', 'expense', 'pay'], ['6510', 'Employer social insurance', 'expense', 'pay'], ['6520', 'End of service gratuity', 'expense', 'pay'],
+    ['6530', 'Overtime & bonuses', 'expense', 'pay'], ['8000', 'Corporate income tax', 'expense', 'tax'],
     ['3000', "Owner's capital", 'equity', 'capital'], ['3100', "Owner's drawings", 'equity', 'drawings'],
     ['3200', 'Retained earnings', 'equity', 're'], ['3900', 'Opening balance equity', 'equity', 'obe'],
     ['4000', 'Maintenance & repair income', 'income', 'svc'], ['4100', 'Spare parts sales', 'income', 'parts'],
@@ -151,6 +155,8 @@
       add(k + 'inv', p.date, A(1300), stockNet, 'Bill · ' + who, p.number, open);
       add(k + 'job', p.date, A(5010), r2(purTotal(p) - stockNet), 'Bill · ' + who, p.number, open);
       add(k + 'ap', p.date, A(2000), -purTotal(p), 'Bill · ' + who, p.number, open);
+      const wht = typeof purWht === 'function' ? purWht(p) : 0;
+      if (wht) { add(k + 'whtap', p.date, A(2000), wht, `WHT ${p.whtRate}% · ` + who, p.number, open); add(k + 'wht', p.date, 'acc_2510', -wht, `WHT ${p.whtRate}% · ` + who, p.number, open); }
       (p.payments || []).forEach((x, i) => {
         add('pp:' + p.id + ':' + i + ':ap', x.date, A(2000), num(x.amount), `Paid · ${who}`, p.number, open);
         add('pp:' + p.id + ':' + i + ':b', x.date, moneyAcc(x.acc, x.method), -num(x.amount), `Paid · ${who} (${x.method || ''})`, p.number, open);
@@ -178,6 +184,7 @@
       const open = () => editJournal(j.id);
       (j.lines || []).forEach((l, i) => add('jr:' + j.id + ':' + i, j.date, l.acc, num(l.dr) - num(l.cr), l.memo || j.memo || 'Journal', j.no || 'Journal', open));
     });
+    (window.FITX_POSTERS || []).forEach(fn => { try { fn(add, A); } catch (e) { console.error(e); } });
     return P;
   }
   window.ledgerPostings = postings;

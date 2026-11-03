@@ -699,14 +699,18 @@ function lineUnitCost(l) {
 const discFactor = d => { const s = subTotal(d); return s > 0 ? docTotal(d) / s : 0; };
 /* suppliers & purchases */
 const supById = id => db.suppliers.find(s => s.id === id);
+const WHT_OPTS = [['', 'None (Qatar supplier)'], ['5', '5% – royalties & technical fees'], ['7', '7% – other services, commissions, interest']];
 const purById = id => db.purchases.find(p => p.id === id);
 const purTotal = p => r2((p.lines || []).reduce((s, l) => s + num(l.qty) * num(l.cost), 0) - num(p.discount));
 const purPaid = p => r2((p.payments || []).reduce((s, x) => s + num(x.amount), 0));
-const purBal = p => r2(purTotal(p) - purPaid(p));
+// Qatar withholding tax deducted from payments to non-resident suppliers (5% royalties & technical fees, 7% other services)
+const purWht = p => num(p.whtRate) ? r2(purTotal(p) * num(p.whtRate) / 100) : 0;
+const purNet = p => r2(purTotal(p) - purWht(p));
+const purBal = p => r2(purNet(p) - purPaid(p));
 const supBalance = sid => r2(db.purchases.filter(p => p.supplierId === sid).reduce((s, p) => s + purBal(p), 0));
 function purStatus(p) {
-  const t = purTotal(p), pd = purPaid(p);
-  if (t > 0 && pd >= t) return ['Paid', 'b-green'];
+  const t = purNet(p), pd = purPaid(p);
+  if (t > 0 && pd >= t - 0.004) return ['Paid', 'b-green'];
   if (p.due && p.due < today()) return [pd > 0 ? 'Overdue · part paid' : 'Overdue', 'b-red'];
   if (pd > 0) return ['Part paid', 'b-yellow'];
   return ['Unpaid', 'b-orange'];
@@ -877,7 +881,8 @@ function setTop(title, actLabel, fn) {
 function render() {
   $$('#tabs button[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === NAV_GROUP[state.tab]));
   $$('#side button[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === state.tab));
-  ({home: viewHome, sales: viewSales, customers: viewCustomers, stock: viewStock, expenses: viewExpensesTab, suppliers: viewSuppliersTab, reports: viewReportsTab, more: viewMore, banking: () => viewBanking(), ledger: () => viewLedger()})[state.tab]();
+  const V = Object.assign({home: viewHome, sales: viewSales, customers: viewCustomers, stock: viewStock, expenses: viewExpensesTab, suppliers: viewSuppliersTab, reports: viewReportsTab, more: viewMore, banking: () => viewBanking(), ledger: () => viewLedger()}, window.FITX_VIEWS || {});
+  (V[state.tab] || viewHome)();
   bindSubnav();
   const lb = lastBackup();
   $('#sideFoot').innerHTML = `${esc(S().name)}<br>${lb ? 'Last backup ' + dfmt(lb) : 'No backup yet'}`;
@@ -2510,6 +2515,7 @@ function editSupplier(id, after) {
         <label class="f"><span>Email</span><input class="in" name="email" type="email" value="${esc(s.email)}"></label>
       </div>
       <label class="f"><span>Country / city</span><input class="in" name="area" value="${esc(s.area)}" placeholder="e.g. Doha, Dubai, China"></label>
+      <label class="f"><span>Withholding tax (non-resident supplier, no office in Qatar)</span><select class="in" name="wht">${WHT_OPTS.map(([v, l]) => `<option value="${v}" ${String(s.wht || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <label class="f"><span>Notes</span><textarea class="in" name="notes" placeholder="Brands supplied, payment terms…">${esc(s.notes)}</textarea></label>
       <button class="btn pri full" type="submit">Save supplier</button>
     </form>`, el => {
@@ -2625,6 +2631,7 @@ function editPurchase(id, prefill) {
       <div id="plines"></div>
       <button type="button" class="btn full" id="pAddLine">+ Add line</button>
       <label class="f" style="margin-top:12px"><span>Discount (QAR)</span><input class="in" type="number" step="0.01" min="0" inputmode="decimal" name="discount" id="pDisc" value="${draft.discount || ''}" placeholder="0.00"></label>
+      <label class="f" style="margin-top:12px"><span>Withholding tax (Qatar)</span><select class="in" name="whtRate" id="pWht">${WHT_OPTS.map(([v, l]) => `<option value="${v}" ${String(draft.whtRate || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <div class="tot" id="pTot"></div>
       <label class="f" style="margin-top:12px;display:flex;gap:10px;align-items:center"><input type="checkbox" name="updateCost" ${draft.updateCost !== false ? 'checked' : ''} style="width:20px;height:20px"><span style="margin:0;color:var(--text)">Update each part’s cost price to this purchase price</span></label>
       <label class="f"><span>Notes</span><textarea class="in" name="notes" placeholder="Optional">${esc(draft.notes)}</textarea></label>
@@ -2634,7 +2641,9 @@ function editPurchase(id, prefill) {
     const gross = () => draft.lines.reduce((s, l) => s + num(l.qty) * num(l.cost), 0);
     const drawTot = () => {
       draft.discount = num(el.querySelector('#pDisc').value);
-      el.querySelector('#pTot').innerHTML = `<div><span>Subtotal</span><span>${fmt(gross())}</span></div>${draft.discount ? `<div><span>Discount</span><span>− ${fmt(draft.discount)}</span></div>` : ''}<div class="g"><span>Total</span><span>${money(gross() - draft.discount)}</span></div>`;
+      draft.whtRate = el.querySelector('#pWht').value;
+      const wt = num(draft.whtRate) ? r2((gross() - draft.discount) * num(draft.whtRate) / 100) : 0;
+      el.querySelector('#pTot').innerHTML = `<div><span>Subtotal</span><span>${fmt(gross())}</span></div>${draft.discount ? `<div><span>Discount</span><span>− ${fmt(draft.discount)}</span></div>` : ''}<div class="g"><span>Total</span><span>${money(gross() - draft.discount)}</span></div>${wt ? `<div><span>Withholding tax ${draft.whtRate}% (pay to GTA)</span><span>− ${fmt(wt)}</span></div><div class="g"><span>Pay supplier</span><span>${money(gross() - draft.discount - wt)}</span></div>` : ''}`;
     };
     const drawLines = () => {
       linesEl.innerHTML = draft.lines.map((l, i) => `
@@ -2682,12 +2691,14 @@ function editPurchase(id, prefill) {
     });
     el.querySelector('#pAddLine').onclick = () => { draft.lines.push({itemId: '', desc: '', qty: 1, cost: ''}); drawLines(); };
     el.querySelector('#pDisc').oninput = drawTot;
+    el.querySelector('#pWht').onchange = drawTot;
+    el.querySelector('#pSup').addEventListener('change', e => { const sp = supById(e.target.value); if (sp && !existing) { el.querySelector('#pWht').value = sp.wht || ''; drawTot(); } });
     el.querySelector('#pNewSup').onclick = () => editSupplier(null, s => { el.querySelector('#pSup').innerHTML = supplierOptions(s.id); draft.supplierId = s.id; });
     drawLines();
     el.querySelector('#purForm').onsubmit = e => {
       e.preventDefault(); const f = formData(e.target);
       draft.supplierId = f.supplierId; draft.date = f.date; draft.due = f.due; draft.ref = f.ref.trim(); draft.notes = f.notes;
-      draft.discount = num(f.discount); draft.updateCost = !!f.updateCost;
+      draft.discount = num(f.discount); draft.updateCost = !!f.updateCost; draft.whtRate = f.whtRate || '';
       draft.lines = draft.lines.filter(l => (l.desc || '').trim() || l.itemId || num(l.cost)).map(l => ({itemId: l.itemId || '', desc: (l.desc || '').trim() || ((itemById(l.itemId) || {}).name || ''), qty: num(l.qty), cost: r2(l.cost)}));
       if (!draft.supplierId) { toast('Please select a supplier'); return; }
       if (!draft.lines.length) { toast('Add at least one line'); draft.lines.push({itemId: '', desc: '', qty: 1, cost: ''}); drawLines(); return; }
@@ -2718,6 +2729,7 @@ function viewPurchase(id) {
     </tbody><tfoot>
       ${num(p.discount) ? `<tr><td colspan="3">Subtotal</td><td class="n">${fmt(sub)}</td></tr><tr><td colspan="3">Discount</td><td class="n">− ${fmt(p.discount)}</td></tr>` : ''}
       <tr><td colspan="3">Total</td><td class="n">${fmt(purTotal(p))}</td></tr>
+      ${purWht(p) ? `<tr><td colspan="3">Withholding tax ${p.whtRate}% (payable to GTA)</td><td class="n">− ${fmt(purWht(p))}</td></tr><tr><td colspan="3">Net payable to supplier</td><td class="n">${fmt(purNet(p))}</td></tr>` : ''}
       <tr><td colspan="3">Paid</td><td class="n" style="color:var(--green)">${fmt(purPaid(p))}</td></tr>
       <tr><td colspan="3">Balance</td><td class="n" style="color:var(--yellow)">${fmt(purBal(p))}</td></tr>
     </tfoot></table></div>
@@ -2798,10 +2810,13 @@ function acct(f, t) {
   a.stockAdj = 0;
   db.moves.forEach(m => { if (m.date < f || m.date > t || /opening/i.test(m.note || '')) return; const it = itemById(m.itemId); if (!it || it.service) return; a.stockAdj -= num(m.qty) * (m.cost !== undefined ? num(m.cost) : num(it.cost)); });
   a.stockAdj = r2(a.stockAdj);
+  // other modules (payroll) add their costs: a.expTot / a.byCat (accrued) and a.extraOut (cash paid)
+  a.accruedExp = 0; a.extraOut = 0;
+  (window.FITX_ACCT_HOOKS || []).forEach(fn => { try { fn(a, f, t); } catch (e) { console.error(e); } });
   a.cogs = a.cogsStock + a.directCost + a.stockAdj; a.gross = a.revenue - a.cogs; a.net = a.gross - a.expTot;
   a.partsProfit = a.partsRev - a.cogsStock;
   db.docs.filter(d => d.type === 'QUO' && d.date >= f && d.date <= t).forEach(q => { a.quotes++; a.quoteVal += docTotal(q); if (['Accepted', 'Converted'].includes(q.status)) { a.won++; a.wonVal += docTotal(q); } });
-  a.cashIn = a.collected; a.cashOut = a.supPaid + a.expTot; a.cashNet = a.cashIn - a.cashOut;
+  a.cashIn = a.collected; a.cashOut = a.supPaid + a.expTot - a.accruedExp + a.extraOut; a.cashNet = a.cashIn - a.cashOut;
   return a;
 }
 const receivables = () => r2(activeInvoices().reduce((s, d) => s + Math.max(0, docBal(d)), 0));
@@ -2862,6 +2877,7 @@ function supLedger(sid, f, t) {
   const ev = [];
   db.purchases.filter(p => p.supplierId === sid).forEach(p => {
     ev.push({date: p.date, sort: p.date + '0' + p.created, ref: p.number, desc: 'Purchase' + (p.ref ? ' · ref ' + p.ref : ''), dr: purTotal(p), cr: 0});
+    if (purWht(p)) ev.push({date: p.date, sort: p.date + '0' + p.created + 'w', ref: p.number, desc: `Withholding tax ${p.whtRate}% (paid to GTA)`, dr: 0, cr: purWht(p)});
     (p.payments || []).forEach((x, i) => ev.push({date: x.date, sort: x.date + '1' + p.created + i, ref: p.number, desc: 'Payment · ' + (x.method || '') + (x.note ? ' · ' + x.note : ''), dr: 0, cr: num(x.amount)}));
   });
   return ledgerFrom(ev, f, t);
@@ -3454,6 +3470,7 @@ render();
 </script>
 <script src="catalog.js"></script>
 <script src="ledger.js"></script>
+<script src="payroll.js"></script>
 <script src="cloud.js"></script>
 </body>
 </html>
