@@ -228,6 +228,17 @@ textarea.in{min-height:80px;resize:vertical}
 .line{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-bottom:10px;box-shadow:var(--sh)}
 .line .lt{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;color:var(--muted);font-size:12px;font-weight:700}
 .line .lt button{background:none;border:0;color:var(--red);font-size:13px;min-height:36px;font-weight:600}
+.sline{display:grid;grid-template-columns:14px minmax(0,1fr) 38px 46px 66px 34px;gap:6px;align-items:center;margin-top:6px}
+.sline .in{min-height:40px;padding:6px 8px;font-size:14px}
+.sline .sarr{color:var(--muted);font-weight:800;text-align:center}
+.sline .btn{min-height:40px;min-width:0;width:100%;padding:0;justify-content:center;border-radius:10px}
+.sline .in.lqty,.sline .in.lprice{padding:6px 5px;text-align:center}
+.sline .sarr{font-size:13px}
+.sline .lamt{display:none}
+.sline .lwarn{grid-column:2/-1}
+.sline .lwarn .warn,.sline .lwarn .hint{margin-top:0}
+.subhd{display:grid;grid-template-columns:14px minmax(0,1fr) 38px 46px 66px 34px;gap:6px;margin-top:10px;font-size:11px;color:var(--muted);font-weight:700}
+.lsub{margin-top:8px}
 .line .amt{display:flex;align-items:center;justify-content:flex-end;font-weight:800;min-height:44px}
 .tot{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh)}
 .tot div{display:flex;justify-content:space-between;padding:4px 0}
@@ -292,6 +303,9 @@ textarea.in{min-height:80px;resize:vertical}
 .paper .lnote{font-size:11px;color:#333;margin-top:3px;white-space:pre-wrap;line-height:1.45}
 .paper table.eqt td{padding:6px 8px}
 .paper td{border-bottom:1px solid #e8e8e8;padding:8px;vertical-align:top}
+.paper tr.sub td{padding-top:4px;padding-bottom:4px;font-size:.94em;color:#333}
+.paper tr.sub td:nth-child(2){padding-left:22px}
+.paper tr.sub td:first-child{color:#888}
 .paper .n{text-align:right;white-space:nowrap}
 .paper .ptot{margin-left:auto;width:260px;max-width:100%}
 .paper .ptot div{display:flex;justify-content:space-between;gap:10px;padding:4px 0}
@@ -666,6 +680,11 @@ function soldQty(itemId, exceptDocId) {
 const purQtyOf = itemId => db.purchases.reduce((s, p) => s + (p.lines || []).reduce((a, l) => a + (l.itemId === itemId ? num(l.qty) : 0), 0), 0);
 const stockIn = itemId => db.moves.filter(m => m.itemId === itemId).reduce((s, m) => s + num(m.qty), 0) + purQtyOf(itemId);
 /* parts vs service per line; cost snapshot taken when the line is saved */
+/* sub items: a line with sub:true belongs to the main line above it; numbered 1.1, 1.2 … */
+function lineNos(lines) {
+  let n = 0, k = 0;
+  return (lines || []).map((l, i) => { if (l.sub && i > 0 && n) { k++; return n + '.' + k; } n++; k = 0; return String(n); });
+}
 function lineKind(l) {
   if (l.kind === 'part' || l.kind === 'service') return l.kind;
   const it = l.itemId && itemById(l.itemId);
@@ -1339,9 +1358,15 @@ function editDoc(type, id, fromDoc) {
       return num(l.qty) > avail ? `<div class="warn">Only ${avail} in stock</div>` : `<div class="hint" style="margin-top:4px">${avail} in stock</div>`;
     };
     const drawLines = () => {
-      linesEl.innerHTML = draft.lines.map((l, i) => `
+      if (draft.lines[0]) delete draft.lines[0].sub;
+      const nos = lineNos(draft.lines), mains = draft.lines.filter(x => !x.sub).length;
+      const subRow = (l, i) => `<div class="sline" data-i="${i}"><span class="sarr" aria-hidden="true">↳</span><input class="in ldesc" aria-label="Sub item ${nos[i]} description" placeholder="Sub item" value="${esc(l.desc)}"><button type="button" class="btn spick" aria-label="Search items">${ICON.search || '&#128269;'}</button><input class="in lqty" type="number" step="any" min="0" inputmode="decimal" aria-label="Qty" value="${l.qty}"><input class="in lprice" type="number" step="0.01" min="0" inputmode="decimal" aria-label="Price" value="${l.price || ''}" placeholder="Price"><button type="button" class="btn danger sdel" aria-label="Remove sub item">×</button><span class="lamt"></span><div class="lwarn">${lineWarn(l)}</div></div>`;
+      linesEl.innerHTML = draft.lines.map((l, i) => {
+        if (l.sub) return '';
+        const subs = []; for (let j = i + 1; j < draft.lines.length && draft.lines[j].sub; j++) subs.push(subRow(draft.lines[j], j));
+        return `
         <div class="line" data-i="${i}">
-          <div class="lt"><span>Line ${i + 1}</span>${draft.lines.length > 1 ? `<button type="button" class="ldel">Remove</button>` : ''}</div>
+          <div class="lt"><span>Line ${nos[i]}</span>${mains > 1 ? `<button type="button" class="ldel">Remove</button>` : ''}</div>
           <div style="display:flex;gap:8px;margin-bottom:8px"><select class="in litem" aria-label="Item or service">${itemOptions(l.itemId)}</select><button type="button" class="btn lpick" aria-label="Search items">${ICON.search || '&#128269;'}</button><button type="button" class="btn lnew" aria-label="Add new item">+ New</button></div>
           <button type="button" class="lnk ltm" style="margin:-2px 0 8px">${ICON.wrench.replace('<svg ', '<svg width="14" height="14" style="vertical-align:-2px" ')} Pick part by treadmill model</button>
           <div class="kind" role="radiogroup" aria-label="Line type"><button type="button" data-kind="service" class="${lineKind(l) === 'service' ? 'on' : ''}">Maintenance / labour</button><button type="button" data-kind="part" class="${lineKind(l) === 'part' ? 'on' : ''}">Spare part</button></div>
@@ -1366,12 +1391,14 @@ function editDoc(type, id, fromDoc) {
             <label><span class="hint">Work status</span><select class="in ldone">${DONE.map(c => `<option ${(l.done || 'Completed') === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
             <label><span class="hint">Remarks</span><input class="in lrem" value="${esc(l.rem || '')}" placeholder="e.g. Tested OK"></label>
           </div>`) : ''}
-        </div>`).join('');
+          ${subs.length ? `<div class="subhd"><span></span><span>Sub items</span><span></span><span>Qty</span><span>Price</span><span></span></div>${subs.join('')}` : ''}
+          <button type="button" class="btn full lsub">+ Sub item</button>
+        </div>`; }).join('');
       drawTot();
     };
     el.querySelector('#rOn').onchange = e => { R.on = e.target.checked; el.querySelector('#rBox').classList.toggle('hidden', !R.on); drawLines(); };
     linesEl.addEventListener('input', e => {
-      const row = e.target.closest('.line'); if (!row) return;
+      const row = e.target.closest('[data-i]'); if (!row) return;
       const l = draft.lines[+row.dataset.i];
       if (e.target.classList.contains('ldesc')) l.desc = e.target.value;
       if (e.target.classList.contains('lbrand')) { l.brand = e.target.value; return; }
@@ -1387,10 +1414,10 @@ function editDoc(type, id, fromDoc) {
       drawTot();
     });
     linesEl.addEventListener('change', e => {
-      if (e.target.classList.contains('lcond')) { draft.lines[+e.target.closest('.line').dataset.i].cond = e.target.value; return; }
-      if (e.target.classList.contains('ldone')) { draft.lines[+e.target.closest('.line').dataset.i].done = e.target.value; return; }
+      if (e.target.classList.contains('lcond')) { draft.lines[+e.target.closest('[data-i]').dataset.i].cond = e.target.value; return; }
+      if (e.target.classList.contains('ldone')) { draft.lines[+e.target.closest('[data-i]').dataset.i].done = e.target.value; return; }
       if (!e.target.classList.contains('litem')) return;
-      const row = e.target.closest('.line'); const l = draft.lines[+row.dataset.i];
+      const row = e.target.closest('[data-i]'); const l = draft.lines[+row.dataset.i];
       if (e.target.value === NEWITEM) { e.target.value = l.itemId || ''; quickItem(l); return; }
       l.itemId = e.target.value;
       const it = itemById(l.itemId);
@@ -1405,6 +1432,12 @@ function editDoc(type, id, fromDoc) {
       drawLines(); toast((it.service ? 'Service' : 'Item') + ' added');
     }, {name: l.itemId ? '' : (l.desc || '').trim(), price: num(l.price) || ''});
     linesEl.addEventListener('click', e => {
+      const sp = e.target.closest('.spick');
+      if (sp) { const l = draft.lines[+sp.closest('[data-i]').dataset.i]; pickItem({partsOnly: false}, it => { l.itemId = it.id; l.desc = it.name + (it.sku ? ' (' + it.sku + ')' : ''); l.price = it.price; l.kind = it.service ? 'service' : 'part'; l.cost = it.service ? 0 : num(it.cost); if (!num(l.qty)) l.qty = 1; drawLines(); }); return; }
+      const sd = e.target.closest('.sdel');
+      if (sd) { draft.lines.splice(+sd.closest('[data-i]').dataset.i, 1); drawLines(); return; }
+      const sb = e.target.closest('.lsub');
+      if (sb) { let j = +sb.closest('.line').dataset.i + 1; while (j < draft.lines.length && draft.lines[j].sub) j++; draft.lines.splice(j, 0, {itemId: '', desc: '', qty: 1, price: 0, sub: true}); drawLines(); const inp = linesEl.querySelector(`.sline[data-i="${j}"] .ldesc`); if (inp) inp.focus(); return; }
       const pk = e.target.closest('.lpick'); if (pk) { const row = pk.closest('[data-i]'); pickItem({partsOnly: false}, it => { const sel = row.querySelector('.litem'); sel.value = it.id; sel.dispatchEvent(new Event('change', {bubbles: true})); }); return; }
       const tb = e.target.closest('.ltm');
       if (tb) { const l = draft.lines[+tb.closest('.line').dataset.i]; treadmillFinder(it => { l.itemId = it.id; l.desc = it.name + (it.sku ? ' (' + it.sku + ')' : ''); l.price = it.price; l.kind = 'part'; l.cost = num(it.cost); if (!num(l.qty)) l.qty = 1; drawLines(); toast('Part added'); }); return; }
@@ -1413,7 +1446,8 @@ function editDoc(type, id, fromDoc) {
       const nb = e.target.closest('.lnew');
       if (nb) { quickItem(draft.lines[+nb.closest('.line').dataset.i]); return; }
       if (!e.target.classList.contains('ldel')) return;
-      draft.lines.splice(+e.target.closest('.line').dataset.i, 1); drawLines();
+      const di = +e.target.closest('.line').dataset.i; let n = 1; while (draft.lines[di + n] && draft.lines[di + n].sub) n++;
+      draft.lines.splice(di, n); drawLines();
     });
     el.querySelector('#addLine').onclick = () => { draft.lines.push({itemId: '', desc: '', qty: 1, price: 0}); drawLines(); };
     el.querySelector('#dDisc').oninput = drawTot;
@@ -1438,11 +1472,13 @@ function editDoc(type, id, fromDoc) {
         const kind = lineKind(l); const it = l.itemId && itemById(l.itemId);
         const cost = kind !== 'part' ? 0 : (l.cost !== undefined && l.cost !== '' ? r2(l.cost) : (it ? r2(it.cost) : 0));
         const out = {itemId: l.itemId || '', desc: (l.desc || '').trim(), qty: num(l.qty), price: r2(l.price), kind, cost};
+        if (l.sub) out.sub = true;
         const b = (l.brand || '').trim(), m = (l.model || '').trim(), sn = (l.sn || '').trim().toUpperCase();
         if (b) out.brand = b; if (m) out.model = m; if (sn) out.sn = sn;
         ['cond', 'find', 'done', 'rem', 'note'].forEach(k => { const v = (l[k] || '').trim(); if (v) out[k] = v; });
         return out;
       });
+      if (draft.lines[0]) delete draft.lines[0].sub;
       if (!draft.customerId) { toast('Please select a customer'); return; }
       if (!draft.lines.length) { toast('Add at least one line'); draft.lines.push({itemId: '', desc: '', qty: 1, price: 0}); drawLines(); return; }
       let saved;
@@ -1587,10 +1623,11 @@ function reportHTML(d, kind) {
   if (ins) {
     const rows = (eqLines.length ? eqLines : lines).map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.desc)}${noteHTML(l)}</td><td>${eqCell(l) || '—'}</td><td><b style="color:${condColor(l.cond)}">${esc(l.cond || '—')}</b>${l.find ? `<div class="leq" style="color:#333">${esc(l.find)}</div>` : ''}</td></tr>`).join('');
     table = `<h3>Equipment inspected</h3><table><thead><tr><th>#</th><th>Equipment / item</th><th>Brand · Model · SN</th><th>Condition &amp; findings</th></tr></thead><tbody>${rows}</tbody></table>
-      <h3>Recommended work</h3><table><thead><tr><th>#</th><th>Work / part</th><th class="n">Qty</th></tr></thead><tbody>${lines.map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.desc)}</td><td class="n">${l.qty}</td></tr>`).join('')}</tbody></table>
+      <h3>Recommended work</h3><table><thead><tr><th>#</th><th>Work / part</th><th class="n">Qty</th></tr></thead><tbody>${lines.map((l, i) => `<tr${l.sub && i ? ' class="sub"' : ''}><td>${lineNos(lines)[i]}</td><td>${esc(l.desc)}</td><td class="n">${l.qty}</td></tr>`).join('')}</tbody></table>
       <p class="hint" style="color:#555;margin:-6px 0 10px">Prices: see Quotation <b>${esc(d.number)}</b>.</p>`;
   } else {
-    const rows = lines.map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.desc)}${noteHTML(l)}${l.find || l.cond ? `<div class="leq">Found: ${esc([l.cond, l.find].filter(Boolean).join(' – '))}</div>` : ''}</td><td>${eqCell(l) || '—'}</td><td><b style="color:${doneColor(l.done || 'Completed')}">${esc(l.done || 'Completed')}</b>${l.rem ? `<div class="leq" style="color:#333">${esc(l.rem)}</div>` : ''}</td></tr>`).join('');
+    const nos = lineNos(lines);
+    const rows = lines.map((l, i) => `<tr${l.sub && i ? ' class="sub"' : ''}><td>${nos[i]}</td><td>${esc(l.desc)}${noteHTML(l)}${l.find || l.cond ? `<div class="leq">Found: ${esc([l.cond, l.find].filter(Boolean).join(' – '))}</div>` : ''}</td><td>${eqCell(l) || '—'}</td><td><b style="color:${doneColor(l.done || 'Completed')}">${esc(l.done || 'Completed')}</b>${l.rem ? `<div class="leq" style="color:#333">${esc(l.rem)}</div>` : ''}</td></tr>`).join('');
     table = `<h3>Work carried out</h3><table><thead><tr><th>#</th><th>Work done / part fitted</th><th>Brand · Model · SN</th><th>Status &amp; remarks</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
   const all = lines.length, done = lines.filter(l => (l.done || 'Completed') === 'Completed').length;
@@ -1622,9 +1659,9 @@ function waReport(d, kind) {
   const c = custById(d.customerId) || {}; const s = S(); const ins = kind === 'insp'; const R = (ins ? d.insp : d.wcr) || {};
   let m = `Dear ${c.name || 'Customer'},\n\n*${ins ? 'Inspection Report' : 'Work Completion Report'}* ${repNo(d, kind)}\nDate: ${dfmt(R.date || d.date)}${R.by ? '\n' + (ins ? 'Inspected by' : 'Technician') + ': ' + R.by : ''}\n`;
   if (R.summary) m += `\n${R.summary}\n`;
-  m += '\n' + (d.lines || []).map(l => {
+  m += '\n' + (d.lines || []).map((l, i) => {
     const eq = [l.brand, l.model].filter(Boolean).join(' ') + (l.sn ? ' SN ' + l.sn : '');
-    return `• ${l.desc}${eq ? ' (' + eq + ')' : ''} — ${ins ? (l.cond || 'not inspected') + (l.find ? ': ' + l.find : '') : (l.done || 'Completed') + (l.rem ? ': ' + l.rem : '')}`;
+    return `${l.sub && i ? '    ◦' : '•'} ${l.desc}${eq ? ' (' + eq + ')' : ''} — ${ins ? (l.cond || 'not inspected') + (l.find ? ': ' + l.find : '') : (l.done || 'Completed') + (l.rem ? ': ' + l.rem : '')}`;
   }).join('\n');
   if (ins && R.recommend) m += `\n\n*Recommendation:* ${R.recommend}\nQuotation: ${d.number} (${money(docTotal(d))})`;
   if (!ins && R.nextDue) m += `\n\nNext service due: ${dfmt(R.nextDue)}`;
@@ -1663,7 +1700,8 @@ function docHTML(d, layout) {
   const coLines = `${esc(s.address)}<br>Tel: ${esc(s.phone)} · ${esc(s.email)}<br>${esc(s.web)}${s.cr ? '<br>CR No. ' + esc(s.cr) : ''}`;
   const custLines = `<b>${esc(c.name || '')}</b>${c.contact ? '<br>Attn: ' + esc(c.contact) : ''}${addrText(c) ? '<br>' + esc(addrText(c)) : ''}${c.phone ? '<br>Tel: ' + esc(c.phone) : ''}${c.email ? '<br>' + esc(c.email) : ''}`;
   const detLines = `${isInv ? 'Invoice' : 'Quotation'} No: <b>${esc(d.number)}</b><br>Date: ${dfmt(d.date)}<br>${isInv ? 'Due' : 'Valid until'}: ${dfmt(d.due)}${d.fromQuote ? '<br>Ref quote: ' + esc(d.fromQuote) : ''}${d.jobType ? '<br>Service: ' + esc(d.jobType) : ''}${d.subject ? '<br>Re: ' + esc(d.subject) : ''}`;
-  const rows = (d.lines || []).map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.desc)}${lineEq(l) ? `<div class="leq">${esc(eqText(l))}</div>` : ''}${l.note ? `<div class="lnote">${esc(l.note)}</div>` : ''}</td><td class="n">${l.qty}</td><td class="n">${fmt(l.price)}</td><td class="n">${fmt(num(l.qty) * num(l.price))}</td></tr>`).join('');
+  const nos = lineNos(d.lines);
+  const rows = (d.lines || []).map((l, i) => { const sub = nos[i].includes('.'), free = sub && !num(l.price); return `<tr${sub ? ' class="sub"' : ''}><td>${nos[i]}</td><td>${esc(l.desc)}${lineEq(l) ? `<div class="leq">${esc(eqText(l))}</div>` : ''}${l.note ? `<div class="lnote">${esc(l.note)}</div>` : ''}</td><td class="n">${l.qty}</td><td class="n">${free ? '' : fmt(l.price)}</td><td class="n">${free ? '' : fmt(num(l.qty) * num(l.price))}</td></tr>`; }).join('');
   const oldEq = (d.equipment || []).filter(e => e.brand || e.model || e.sn || e.name);
   const eqTable = oldEq.length ? `<table class="eqt"><thead><tr><th>#</th><th>Equipment</th><th>Brand</th><th>Model</th><th>Serial No.</th></tr></thead><tbody>${oldEq.map((e, k) => `<tr><td>${k + 1}</td><td>${esc(e.name || '')}</td><td>${esc(e.brand || '')}</td><td>${esc(e.model || '')}</td><td style="white-space:nowrap"><b>${esc(e.sn || '')}</b></td></tr>`).join('')}</tbody></table>` : '';
   const table = `${eqTable}<table><thead><tr><th>#</th><th>Description</th><th class="n">Qty</th><th class="n">Unit price</th><th class="n">Amount</th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -1770,7 +1808,7 @@ function waDoc(d) {
   const c = custById(d.customerId) || {}; const s = S(); const isInv = d.type === 'INV';
   let m = `Dear ${c.name || 'Customer'},\n\n${isInv ? 'Invoice' : 'Quotation'} *${d.number}* dated ${dfmt(d.date)}${d.subject ? '\nRe: ' + d.subject : ''}\n\n`;
   if ((d.equipment || []).length) m += '*Equipment*\n' + (d.equipment || []).map(e => `• ${[e.name, e.brand, e.model].filter(Boolean).join(' ')}${e.sn ? ' — SN: ' + e.sn : ''}`).join('\n') + '\n\n';
-  m += (d.lines || []).map(l => `• ${l.desc} — ${l.qty} × ${fmt(l.price)}${lineEq(l) ? '\n   ' + eqText(l) : ''}${l.note ? '\n   ' + l.note.replace(/\n/g, '\n   ') : ''}`).join('\n');
+  m += (d.lines || []).map((l, i) => `${l.sub && i ? '    ◦' : '•'} ${l.desc} — ${l.qty}${l.sub && i && !num(l.price) ? '' : ' × ' + fmt(l.price)}${lineEq(l) ? '\n   ' + eqText(l) : ''}${l.note ? '\n   ' + l.note.replace(/\n/g, '\n   ') : ''}`).join('\n');
   m += `\n\n*Total: ${money(docTotal(d))}*`;
   if (isInv) {
     if (docPaid(d)) m += `\nPaid: ${money(docPaid(d))}\n*Balance: ${money(docBal(d))}*`;
