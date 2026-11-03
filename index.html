@@ -1353,6 +1353,7 @@ function editDoc(type, id, fromDoc) {
       <div class="sec"><h2>Totals</h2></div>
       <label class="f"><span>Discount (QAR)</span><input class="in" type="number" step="0.01" min="0" inputmode="decimal" name="discount" id="dDisc" value="${draft.discount || ''}" placeholder="0.00"></label>
       <div class="tot" id="dTot"></div>
+      ${type === 'INV' && window.remindPanel ? remindPanel(draft, !existing) : ''}
       <label class="f" style="margin-top:12px"><span>Notes (shown on ${label.toLowerCase()})</span><textarea class="in" name="notes" placeholder="Optional">${esc(draft.notes)}</textarea></label>
       <label class="f"><span style="display:flex;justify-content:space-between;align-items:center">Terms & conditions <button type="button" class="btn" id="dTermsReset" style="min-height:34px;padding:4px 10px;font-size:12px">Reset to default</button></span><textarea class="in" name="terms" id="dTerms" rows="7">${esc(draft.terms)}</textarea></label>
       <p class="hint" style="margin-top:-6px">Change the default wording in More → Company settings.</p>
@@ -1469,6 +1470,7 @@ function editDoc(type, id, fromDoc) {
       el.querySelector('#dCust').innerHTML = customerOptions(c.id); draft.customerId = c.id;
     });
     drawLines();
+    if (type === 'INV' && window.bindRemind) bindRemind(el, draft);
     el.querySelector('#docForm').onsubmit = e => {
       e.preventDefault();
       const f = formData(e.target);
@@ -3479,6 +3481,7 @@ render();
 <script src="ledger.js"></script>
 <script src="payroll.js"></script>
 <script src="install.js"></script>
+<script src="reminders.js"></script>
 <script src="cloud.js"></script>
 </body>
 </html>
