@@ -59,7 +59,6 @@
 <td style="padding:0 0 0 14px;border-left:2px solid ${OR};vertical-align:middle">
 <div style="font-size:15px;line-height:1.25;font-weight:bold;color:#0d0d0d">${esc(m.name || s.name)}</div>
 ${m.title ? `<div style="font-size:11px;line-height:1.4;font-weight:bold;color:${OR};letter-spacing:.6px;text-transform:uppercase">${esc(m.title)}</div>` : ''}
-${m.name ? `<div style="font-size:12px;font-weight:bold;color:#0d0d0d">${esc(s.name)}</div>` : ''}
 ${tel ? `<div style="margin-top:3px;white-space:nowrap">${tel}</div>` : ''}${net ? `<div style="white-space:nowrap">${net}</div>` : ''}
 ${foot ? `<div style="font-size:11px;color:#999999">${esc(foot)}</div>` : ''}
 </td></tr></table>`;
