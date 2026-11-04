@@ -251,7 +251,7 @@
         <div class="row"><label class="f"><span>Nationality type</span><select class="in" name="nat" id="eNat">${NAT.map(n => `<option ${e.nat === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>${f('country', 'Nationality', e.country, '', 'e.g. India')}</div>
         <div class="row">${f('qid', 'QID number', e.qid, '', '11 digits')}${f('visa', 'Visa / passport no.', e.visa)}</div>
         <div class="row">${f('join', 'Joining date', e.join, 'date')}${f('left', 'Last working day (if left)', e.left, 'date')}</div>
-        ${f('phone', 'Mobile', e.phone, 'tel', '5xxxxxxx')}
+        <div class="row">${f('phone', 'Mobile', e.phone, 'tel', '5xxxxxxx')}${f('email', 'Email (for payslips)', e.email, 'email')}</div>
         <div class="sec"><h2>Monthly salary (QAR)</h2></div>
         <div class="row">${f('basic', 'Basic salary *', e.basic, 'number', '', 'required')}${f('housing', 'Housing allowance', e.housing, 'number')}</div>
         <div class="row">${f('transport', 'Transport allowance', e.transport, 'number')}${f('food', 'Food allowance', e.food, 'number')}</div>
@@ -274,7 +274,7 @@
       hint();
       el.querySelector('#empForm').onsubmit = ev => {
         ev.preventDefault(); const v = formData(ev.target);
-        const rec = {name: v.name.trim(), no: v.no.trim(), job: v.job.trim(), nat: v.nat, country: v.country.trim(), qid: v.qid.trim(), visa: v.visa.trim(), join: v.join, left: v.left || '', phone: v.phone.trim(),
+        const rec = {name: v.name.trim(), no: v.no.trim(), job: v.job.trim(), nat: v.nat, country: v.country.trim(), qid: v.qid.trim(), visa: v.visa.trim(), join: v.join, left: v.left || '', phone: v.phone.trim(), email: (v.email || '').trim(),
           basic: r2(v.basic), housing: r2(v.housing), transport: r2(v.transport), food: r2(v.food), other: r2(v.other), pay: v.pay, bank: v.bank.trim().toUpperCase(), iban: v.iban.replace(/\s+/g, '').toUpperCase(),
           siEmp: num(v.siEmp), siEr: num(v.siEr), siBase: v.siBase ? r2(v.siBase) : '', grat: !!v.grat, notes: v.notes};
         let saved;
@@ -452,6 +452,7 @@
     const opts = () => ({html: html(), name: `Payslip ${l.name} ${r.month}`, phone: e.phone, subject: `Payslip ${monthLabel(r.month)}`, body: `Dear ${l.name},\n\nPlease find attached your payslip for ${monthLabel(r.month)}.\nNet pay: QAR ${fmt(l.net)}\n\n${S().name}`, wa: `Dear ${l.name}, your payslip for ${monthLabel(r.month)} is attached. Net pay: QAR ${fmt(l.net)}.`});
     openSheet('Payslip · ' + l.name, `<div class="btns" style="margin-bottom:12px">${btn('psShare', ICON.share + 'Share PDF', 'pri')}${btn('psWa', ICON.wa + 'WhatsApp')}${btn('psMail', ICON.mail + 'Email')}${btn('psPrint', ICON.print + 'Print')}</div><div style="overflow:auto">${html()}</div>`, el => {
       bindShare(el, 'ps', opts, () => printHTML(html(), `Payslip ${l.name} ${r.month}`));
+      if (window.FitxMail && FitxMail.specPayslip) el.querySelector('#psMail').onclick = () => FitxMail.compose(FitxMail.specPayslip(r, l, e, html));
     });
   }
   function registerBody(r) {
@@ -677,7 +678,7 @@
 
   /* ---------- wiring ---------- */
   window.FITX_VIEWS = Object.assign(window.FITX_VIEWS || {}, {payroll: viewPayroll, tax: viewTax});
-  window.FitxPayroll = {calcLine, gratuity, advBal, gratProv, viewRun, editEmployee, payslip, sifExport, citEstimate, settlement, editRun, newRun, payrollSettings};
+  window.FitxPayroll = {monthLabel, calcLine, gratuity, advBal, gratProv, viewRun, editEmployee, payslip, sifExport, citEstimate, settlement, editRun, newRun, payrollSettings};
   if (typeof NAV_GROUP !== 'undefined') { NAV_GROUP.payroll = 'more'; NAV_GROUP.tax = 'more'; }
   const icPay = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 11h6M19 8v6"/></svg>';
   const icTax = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 5 5 19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>';
