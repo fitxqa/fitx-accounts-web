@@ -40,25 +40,25 @@
   }
 
   /* ---------- signature with logo (white / orange) ---------- */
-  const LOGO_URL = 'https://fitxqa.github.io/fitx-accounts-web/icons/email-logo.png';
+  const LOGO_URL = 'https://fitxqa.github.io/fitx-accounts-web/icons/email-logo-dark.png';
   const OR = '#ff6a00';
   function sigHTML(logoSrc) {
     const s = S(), m = M();
     const web = s.web ? (/^https?:/i.test(s.web) ? s.web : 'https://' + s.web) : '';
     const mail = m.from || s.email;
     const lab = t => `<span style="color:${OR};font-weight:bold">${t}</span>&nbsp;`;
-    const tel = [s.phone && lab('T') + esc(s.phone), m.mobile && lab('M') + esc(m.mobile)].filter(Boolean).join('&nbsp;&nbsp;|&nbsp;&nbsp;');
+    const tel = [s.phone && lab('T') + esc(s.phone), m.mobile && lab('M') + esc(m.mobile)].filter(Boolean).map(x => `<div style="white-space:nowrap">${x}</div>`).join('');
     const net = [mail && lab('E') + `<a href="mailto:${esc(mail)}" style="color:#333333;text-decoration:none">${esc(mail)}</a>`, s.web && lab('W') + `<a href="${esc(web)}" style="color:#333333;text-decoration:none">${esc(s.web)}</a>`].filter(Boolean).map(x => `<div>${x}</div>`).join('');
-    return `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#333333;background:#ffffff">
-<tr><td style="padding:4px 16px 4px 0;vertical-align:middle"><img src="${logoSrc || LOGO_URL}" width="130" alt="FitX Sports Equipment Services" style="display:block;width:130px;height:auto;border:0"></td>
-<td style="padding:4px 0 4px 16px;border-left:3px solid ${OR};vertical-align:middle">
-${m.name ? `<div style="font-size:16px;font-weight:bold;color:#111111">${esc(m.name)}</div>` : ''}
+    return `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#333333;background:#ffffff;border:1px solid #e6e6e6">
+<tr><td width="128" style="width:128px;background:#0d0d0d;padding:14px 12px;vertical-align:middle;border-right:4px solid ${OR}"><img src="${logoSrc || LOGO_URL}" width="128" alt="FitX Sports Equipment Services" style="display:block;width:128px;height:auto;border:0"></td>
+<td style="padding:12px 16px;vertical-align:middle;background:#ffffff">
+${m.name ? `<div style="font-size:16px;font-weight:bold;color:#0d0d0d">${esc(m.name)}</div>` : ''}
 ${m.title ? `<div style="font-size:11px;font-weight:bold;color:${OR};text-transform:uppercase;letter-spacing:1px">${esc(m.title)}</div>` : ''}
-<div style="font-weight:bold;color:#111111;margin-top:4px">${esc(s.name)}</div>
-${tel ? `<div>${tel}</div>` : ''}${net}
+<div style="font-weight:bold;color:#0d0d0d;margin-top:4px">${esc(s.name)}</div>
+${tel}${net}
 ${s.address || s.cr ? `<div style="color:#777777;font-size:12px">${esc([s.address, s.cr && 'CR No. ' + s.cr].filter(Boolean).join(' · '))}</div>` : ''}
 </td></tr>
-<tr><td colspan="2" style="padding-top:8px"><div style="border-top:2px solid ${OR};padding-top:6px;font-size:11px;color:#777777">Gym equipment repair &middot; Maintenance &middot; Spare parts &middot; Refurbishing</div></td></tr>
+<tr><td colspan="2" style="background:#0d0d0d;padding:7px 18px;font-size:11px;color:#ffffff;letter-spacing:.3px">Gym equipment repair <span style="color:${OR}">&#9679;</span> Maintenance <span style="color:${OR}">&#9679;</span> Spare parts <span style="color:${OR}">&#9679;</span> Refurbishing</td></tr>
 </table>`;
   }
   // formatted email for mail apps that accept HTML: message + logo signature
@@ -96,7 +96,7 @@ ${s.address || s.cr ? `<div style="color:#777777;font-size:12px">${esc([s.addres
       <button class="btn pri full" type="submit" style="margin-top:12px">Save</button></form>`, el => {
       const f = el.querySelector('#sgForm');
       const keep = () => { const v = formData(f); Object.assign(m, {name: v.name.trim(), title: v.title.trim(), mobile: v.mobile.trim(), from: v.from.trim(), signoff: v.signoff.trim(), textSig: !!v.textSig}); };
-      const draw = () => { keep(); el.querySelector('#sgPv').innerHTML = sigHTML('icons/email-logo.png'); };
+      const draw = () => { keep(); el.querySelector('#sgPv').innerHTML = sigHTML('icons/email-logo-dark.png'); };
       f.addEventListener('input', draw); draw();
       el.querySelector('#sgCopy').onclick = async () => { keep(); const pv = el.querySelector('#sgPv'); pv.innerHTML = sigHTML(); const ok = await copyRich(pv, sigHTML()); toast(ok ? 'Signature copied – paste it into your mail signature settings' : 'Could not copy – use Download instead'); };
       el.querySelector('#sgDl').onclick = () => {
@@ -127,7 +127,7 @@ ${s.address || s.cr ? `<div style="color:#777777;font-size:12px">${esc([s.addres
     origMore();
     const bus = Array.from(document.querySelectorAll('#main .sec h2')).find(h => /business/i.test(h.textContent));
     const list = bus && bus.parentElement.nextElementSibling; if (!list) return;
-    list.insertAdjacentHTML('beforeend', `<button type="button" class="item rcard" id="mMail"><span class="ic">${ICON.mail}</span><div class="main"><div class="t">Email signature</div><div class="s">White &amp; orange FitX logo signature – copy to your mail app</div></div></button>`);
+    list.insertAdjacentHTML('beforeend', `<button type="button" class="item rcard" id="mMail"><span class="ic">${ICON.mail}</span><div class="main"><div class="t">Email signature</div><div class="s">Black, orange &amp; white FitX logo signature – copy to your mail app</div></div></button>`);
     document.getElementById('mMail').onclick = settings;
   };
   window.FitxMail = {pdfPreview, settings, sigHTML, htmlBody};
