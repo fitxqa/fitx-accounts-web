@@ -84,12 +84,28 @@
   document.head.appendChild(css);
   const icBell = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
   const icWa = (window.ICON && ICON.wa) || '';
-  const chipsHTML = (sel) => `<div class="rmchips">${OPTS.map(m => `<button type="button" data-rmm="${m}" class="${sel.includes(m) ? 'on' : ''}">${m === 12 ? '12 months' : m === 1 ? '1 month' : m + ' months'}</button>`).join('')}</div>`;
-  const bindChips = (el, arr, onChange) => el.querySelectorAll('[data-rmm]').forEach(b => b.onclick = () => {
-    const m = +b.dataset.rmm, i = arr.indexOf(m);
-    if (i >= 0) arr.splice(i, 1); else arr.push(m);
-    arr.sort((a, b) => a - b); b.classList.toggle('on', i < 0); if (onChange) onChange();
-  });
+  // drop-down list of common schedules, with "Custom…" for any mix of months
+  const PRESETS = [['none', 'No reminder', []], ['1', 'After 1 month', [1]], ['2', 'After 2 months', [2]], ['3', 'After 3 months', [3]], ['6', 'After 6 months', [6]], ['9', 'After 9 months', [9]], ['12', 'After 12 months (yearly)', [12]],
+    ['q', 'Every 3 months (3, 6, 9, 12)', [3, 6, 9, 12]], ['h', 'Every 6 months (6, 12)', [6, 12]], ['m', '1, 3, 6 & 12 months', [1, 3, 6, 12]], ['all', 'All (1, 2, 3, 6, 9, 12 months)', [1, 2, 3, 6, 9, 12]], ['c', 'Custom…', null]];
+  const presetOf = sel => { const k = sel.slice().sort((a, b) => a - b).join(','); const p = PRESETS.find(x => x[2] && x[2].join(',') === k); return p ? p[0] : 'c'; };
+  const chipsHTML = (sel) => { const cur = presetOf(sel);
+    return `<select class="in rmsel" aria-label="Service reminder">${PRESETS.map(([k, l]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <div class="rmchips ${cur === 'c' ? '' : 'hidden'}" style="margin-top:8px">${OPTS.map(m => `<button type="button" data-rmm="${m}" class="${sel.includes(m) ? 'on' : ''}">${m === 12 ? '12 months' : m === 1 ? '1 month' : m + ' months'}</button>`).join('')}</div>`; };
+  const bindChips = (el, arr, onChange) => {
+    const selEl = el.querySelector('.rmsel'), chips = el.querySelector('.rmchips');
+    const syncChips = () => chips.querySelectorAll('[data-rmm]').forEach(b => b.classList.toggle('on', arr.includes(+b.dataset.rmm)));
+    if (selEl) selEl.onchange = () => {
+      const p = PRESETS.find(x => x[0] === selEl.value);
+      chips.classList.toggle('hidden', selEl.value !== 'c');
+      if (p && p[2]) { arr.splice(0, arr.length, ...p[2]); syncChips(); }
+      if (onChange) onChange();
+    };
+    chips.querySelectorAll('[data-rmm]').forEach(b => b.onclick = () => {
+      const m = +b.dataset.rmm, i = arr.indexOf(m);
+      if (i >= 0) arr.splice(i, 1); else arr.push(m);
+      arr.sort((x, y) => x - y); syncChips(); if (onChange) onChange();
+    });
+  };
 
   /* ---------- invoice editor panel ---------- */
   window.remindPanel = function (draft, isNew) {
@@ -101,7 +117,7 @@
     const p = el.querySelector('#rmPanel'); if (!p) return;
     const hint = () => {
       const base = (el.querySelector('[name=rDate]') && el.querySelector('#rOn') && el.querySelector('#rOn').checked && el.querySelector('[name=rDate]').value) || el.querySelector('[name=date]').value || today();
-      p.querySelector('#rmHint').textContent = draft.remind.length ? 'Remind the customer on: ' + draft.remind.map(m => dfmt(addMonths(base, m))).join(', ') : 'Tap the months after this job when the customer should get a service reminder.';
+      p.querySelector('#rmHint').textContent = draft.remind.length ? 'Remind the customer on: ' + draft.remind.map(m => dfmt(addMonths(base, m))).join(', ') : 'Choose when the customer should get a service reminder.';
     };
     bindChips(p, draft.remind, hint); hint();
     const dt = el.querySelector('[name=date]'); if (dt) dt.addEventListener('change', hint);
@@ -158,7 +174,7 @@
   function remindSettings() {
     const r = R(); const defs = (r.defaults || []).slice();
     openSheet('Service reminder settings', `<form id="rmsForm">
-      <div class="f"><span style="display:block;margin-bottom:8px">Tick these months on every new invoice</span>${chipsHTML(defs)}</div>
+      <div class="f"><span style="display:block;margin-bottom:8px">Default for every new invoice</span>${chipsHTML(defs)}</div>
       <label class="f" style="margin-top:12px"><span>WhatsApp message</span><textarea class="in" name="msg" rows="10">${esc(r.msg || DEF_MSG)}</textarea></label>
       <p class="hint" style="margin-top:-6px">Words in { } are filled in: {customer} {equipment} {period} {invoice} {date} {company} {phone}</p>
       <div class="btns"><button type="button" class="btn" id="rmsReset">Reset message</button><button type="submit" class="btn pri">Save</button></div></form>`, el => {
