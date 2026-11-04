@@ -57,7 +57,8 @@
     return `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:12.5px;line-height:1.5;color:#333333">
 <tr><td style="padding:0 14px 0 0;vertical-align:middle"><img src="${logoSrc || LOGO_URL}" width="104" height="44" alt="FitX" style="display:block;width:104px;height:44px;border:0"></td>
 <td style="padding:0 0 0 14px;border-left:2px solid ${OR};vertical-align:middle">
-<div style="font-size:15px;line-height:1.25;font-weight:bold;color:#0d0d0d">${esc(m.name || s.name)}${m.title ? `<span style="font-size:11px;font-weight:bold;color:${OR};letter-spacing:.6px;text-transform:uppercase">&nbsp;&nbsp;${esc(m.title)}</span>` : ''}</div>
+<div style="font-size:15px;line-height:1.25;font-weight:bold;color:#0d0d0d">${esc(m.name || s.name)}</div>
+${m.title ? `<div style="font-size:11px;line-height:1.4;font-weight:bold;color:${OR};letter-spacing:.6px;text-transform:uppercase">${esc(m.title)}</div>` : ''}
 ${m.name ? `<div style="font-size:12px;font-weight:bold;color:#0d0d0d">${esc(s.name)}</div>` : ''}
 ${tel ? `<div style="margin-top:3px;white-space:nowrap">${tel}</div>` : ''}${net ? `<div style="white-space:nowrap">${net}</div>` : ''}
 ${foot ? `<div style="font-size:11px;color:#999999">${esc(foot)}</div>` : ''}
