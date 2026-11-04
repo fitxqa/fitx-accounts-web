@@ -12,7 +12,12 @@
     .pvw .pg{width:100%;max-width:640px;aspect-ratio:1/1.4142;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.18);position:relative;overflow:hidden}
     .pvw .pg img{position:absolute;left:0;width:100%}
     .pvw .pn{font-size:12px;color:var(--muted)}
-    .sigpv{white-space:pre-wrap;font-size:13px;line-height:1.5;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+    .sigbox{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;overflow-x:auto}
+    .sghelp{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:12px 0;background:var(--card)}
+    .sghelp summary{font-weight:700;cursor:pointer}
+    .sghelp ul{padding-left:18px;line-height:1.6;margin:8px 0 0}
+    label.ck{display:flex;gap:10px;align-items:flex-start;margin:8px 0}
+    label.ck input{width:20px;height:20px;flex-shrink:0;margin-top:2px}
     body.role-tech #mMail{display:none!important}`;
   document.head.appendChild(css);
   async function pdfPreview(html, name) {
@@ -34,21 +39,73 @@
     });
   }
 
-  /* ---------- signature (used in the email text) ---------- */
+  /* ---------- signature with logo (white / orange) ---------- */
+  const LOGO_URL = 'https://fitxqa.github.io/fitx-accounts-web/icons/email-logo.png';
+  const OR = '#ff6a00';
+  function sigHTML(logoSrc) {
+    const s = S(), m = M();
+    const web = s.web ? (/^https?:/i.test(s.web) ? s.web : 'https://' + s.web) : '';
+    const mail = m.from || s.email;
+    const lab = t => `<span style="color:${OR};font-weight:bold">${t}</span>&nbsp;`;
+    const tel = [s.phone && lab('T') + esc(s.phone), m.mobile && lab('M') + esc(m.mobile)].filter(Boolean).join('&nbsp;&nbsp;|&nbsp;&nbsp;');
+    const net = [mail && lab('E') + `<a href="mailto:${esc(mail)}" style="color:#333333;text-decoration:none">${esc(mail)}</a>`, s.web && lab('W') + `<a href="${esc(web)}" style="color:#333333;text-decoration:none">${esc(s.web)}</a>`].filter(Boolean).map(x => `<div>${x}</div>`).join('');
+    return `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#333333;background:#ffffff">
+<tr><td style="padding:4px 16px 4px 0;vertical-align:middle"><img src="${logoSrc || LOGO_URL}" width="130" alt="FitX Sports Equipment Services" style="display:block;width:130px;height:auto;border:0"></td>
+<td style="padding:4px 0 4px 16px;border-left:3px solid ${OR};vertical-align:middle">
+${m.name ? `<div style="font-size:16px;font-weight:bold;color:#111111">${esc(m.name)}</div>` : ''}
+${m.title ? `<div style="font-size:11px;font-weight:bold;color:${OR};text-transform:uppercase;letter-spacing:1px">${esc(m.title)}</div>` : ''}
+<div style="font-weight:bold;color:#111111;margin-top:4px">${esc(s.name)}</div>
+${tel ? `<div>${tel}</div>` : ''}${net}
+${s.address || s.cr ? `<div style="color:#777777;font-size:12px">${esc([s.address, s.cr && 'CR No. ' + s.cr].filter(Boolean).join(' · '))}</div>` : ''}
+</td></tr>
+<tr><td colspan="2" style="padding-top:8px"><div style="border-top:2px solid ${OR};padding-top:6px;font-size:11px;color:#777777">Gym equipment repair &middot; Maintenance &middot; Spare parts &middot; Refurbishing</div></td></tr>
+</table>`;
+  }
+  // formatted email for mail apps that accept HTML: message + logo signature
+  function htmlBody(main) {
+    return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#333333">${esc(main).replace(/\n/g, '<br>')}<br><br>${sigHTML()}</div>`;
+  }
+  async function copyRich(el, html) {
+    try {
+      if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([new ClipboardItem({'text/html': new Blob([html], {type: 'text/html'}), 'text/plain': new Blob([el.innerText], {type: 'text/plain'})})]);
+        return true;
+      }
+    } catch (e) {}
+    try {
+      const r = document.createRange(); r.selectNodeContents(el);
+      const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      const ok = document.execCommand('copy'); sel.removeAllRanges(); return ok;
+    } catch (e) { return false; }
+  }
   function settings() {
     const m = M();
-    const sample = () => docMailBody({type: 'INV', number: 'INV-0001', date: today(), due: today(), lines: [], payments: [], discount: 0, customerId: ''}).body.split('\n').slice(-7).join('\n');
     openSheet('Email signature', `<form id="sgForm" autocomplete="off">
-      <p class="hint" style="margin-top:0">Email opens your mail app (Gmail, Outlook…) with the PDF attached and the message written. This signature is added at the end.</p>
       <div class="row"><label class="f"><span>Your name</span><input class="in" name="name" value="${esc(m.name || '')}" placeholder="e.g. Muhsin"></label><label class="f"><span>Job title</span><input class="in" name="title" value="${esc(m.title || '')}" placeholder="e.g. Sales Department"></label></div>
       <div class="row"><label class="f"><span>Mobile</span><input class="in" name="mobile" type="tel" value="${esc(m.mobile || '')}"></label><label class="f"><span>Email shown</span><input class="in" name="from" type="email" value="${esc(m.from || S().email || '')}"></label></div>
       <label class="f"><span>Sign-off</span><input class="in" name="signoff" value="${esc(m.signoff || 'Best regards,')}"></label>
-      <div class="sec"><h2>Preview</h2></div><div class="sigpv" id="sgPv"></div>
+      <div class="sec"><h2>Your signature with logo</h2></div>
+      <div class="sigbox" id="sgPv"></div>
+      <div class="btns" style="margin-top:10px"><button type="button" class="btn pri" id="sgCopy">${ICON.copy || ''}Copy signature</button><button type="button" class="btn" id="sgDl">${ICON.dl}Download (.html)</button></div>
+      <details class="sghelp"><summary>Where to paste it (one time)</summary><ul>
+        <li><b>Gmail on a computer:</b> ⚙ → See all settings → General → Signature → Create new → paste → choose it for new emails and replies → Save changes.</li>
+        <li><b>Outlook:</b> Settings → Mail → Compose and reply (or Signatures) → New signature → paste → Save.</li>
+        <li><b>Phone mail apps:</b> the Gmail phone app only allows a text signature. Leave its "Mobile signature" empty, so the text signature from FitX is used.</li>
+      </ul><p class="hint">The logo is loaded from your FitX web address, so it shows for your customers.</p></details>
+      <label class="ck"><input type="checkbox" name="textSig" ${m.textSig !== false ? 'checked' : ''}><span>Add my text signature to emails opened from FitX<br><small style="color:var(--muted)">Turn off if your mail app already adds the logo signature</small></span></label>
       <button class="btn pri full" type="submit" style="margin-top:12px">Save</button></form>`, el => {
       const f = el.querySelector('#sgForm');
-      const keep = () => { const v = formData(f); Object.assign(m, {name: v.name.trim(), title: v.title.trim(), mobile: v.mobile.trim(), from: v.from.trim(), signoff: v.signoff.trim()}); };
-      const draw = () => { keep(); el.querySelector('#sgPv').textContent = sample(); };
+      const keep = () => { const v = formData(f); Object.assign(m, {name: v.name.trim(), title: v.title.trim(), mobile: v.mobile.trim(), from: v.from.trim(), signoff: v.signoff.trim(), textSig: !!v.textSig}); };
+      const draw = () => { keep(); el.querySelector('#sgPv').innerHTML = sigHTML('icons/email-logo.png'); };
       f.addEventListener('input', draw); draw();
+      el.querySelector('#sgCopy').onclick = async () => { keep(); const pv = el.querySelector('#sgPv'); pv.innerHTML = sigHTML(); const ok = await copyRich(pv, sigHTML()); toast(ok ? 'Signature copied – paste it into your mail signature settings' : 'Could not copy – use Download instead'); };
+      el.querySelector('#sgDl').onclick = () => {
+        keep();
+        const html = `<!doctype html><html><head><meta charset="utf-8"><title>FitX email signature</title></head><body style="margin:24px;background:#ffffff">${sigHTML()}</body></html>`;
+        const AB = window.AndroidBridge;
+        if (AB && AB.saveFile) AB.saveFile(btoa(unescape(encodeURIComponent(html))), 'text/html', 'FitX-email-signature.html');
+        else downloadBlob(new Blob([html], {type: 'text/html'}), 'FitX-email-signature.html');
+      };
       f.onsubmit = ev => { ev.preventDefault(); keep(); save(); closeSheet(() => toast('Signature saved')); };
     });
   }
@@ -70,8 +127,8 @@
     origMore();
     const bus = Array.from(document.querySelectorAll('#main .sec h2')).find(h => /business/i.test(h.textContent));
     const list = bus && bus.parentElement.nextElementSibling; if (!list) return;
-    list.insertAdjacentHTML('beforeend', `<button type="button" class="item rcard" id="mMail"><span class="ic">${ICON.mail}</span><div class="main"><div class="t">Email signature</div><div class="s">Name, title and mobile at the end of your emails</div></div></button>`);
+    list.insertAdjacentHTML('beforeend', `<button type="button" class="item rcard" id="mMail"><span class="ic">${ICON.mail}</span><div class="main"><div class="t">Email signature</div><div class="s">White &amp; orange FitX logo signature – copy to your mail app</div></div></button>`);
     document.getElementById('mMail').onclick = settings;
   };
-  window.FitxMail = {pdfPreview, settings};
+  window.FitxMail = {pdfPreview, settings, sigHTML, htmlBody};
 })();

@@ -1569,7 +1569,11 @@ async function sendPdf(o, how) {
   const name = fileSafe(o.name) + '.pdf', AB = window.AndroidBridge;
   if (AB && AB.shareFile) {
     if (how === 'wa') AB.whatsappFile(b64, 'application/pdf', name, waNumber(o.phone || ''), o.wa || '');
-    else if (how === 'email') AB.emailFile(b64, 'application/pdf', name, o.email || '', o.subject || o.name, o.body || '');
+    else if (how === 'email') {
+      const html = o.main && window.FitxMail && FitxMail.htmlBody ? FitxMail.htmlBody(o.main) : '';
+      if (html && AB.emailFileHtml) AB.emailFileHtml(b64, 'application/pdf', name, o.email || '', o.subject || o.name, o.body || '', html);
+      else AB.emailFile(b64, 'application/pdf', name, o.email || '', o.subject || o.name, o.body || '');
+    }
     else if (how === 'save') AB.saveFile(b64, 'application/pdf', name);
     else AB.shareFile(b64, 'application/pdf', name, o.wa || '');
     return;
@@ -1601,13 +1605,15 @@ function docMailBody(d, kind) {
     if (!isInv) L.push('', 'To go ahead, simply reply to this email or call us and we will schedule the work at your convenience.');
   }
   L.push('', `If you have any questions, please call us on ${s.phone}.`, '', m.signoff || 'Best regards,');
+  const main = L.join('\n'); L.length = 0;
   if (m.name) L.push(m.name);
   if (m.title) L.push(m.title);
   L.push(s.name);
   L.push([s.phone && 'Tel: ' + s.phone, m.mobile && 'Mobile: ' + m.mobile].filter(Boolean).join(' | '));
   L.push([m.from || s.email, s.web].filter(Boolean).join(' | '));
   if (s.address || s.cr) L.push([s.address, s.cr && 'CR No. ' + s.cr].filter(Boolean).join(' · '));
-  return {subject: `${what}${d.subject && !kind ? ' – ' + d.subject : ''} | ${s.name}`, body: L.join('\n')};
+  const sig = L.join('\n');
+  return {subject: `${what}${d.subject && !kind ? ' – ' + d.subject : ''} | ${s.name}`, body: m.textSig === false ? main : main + '\n' + sig, main, sig};
 }
 function docPdfOpts(d, kind) {
   const c = custById(d.customerId) || {};
@@ -1615,7 +1621,7 @@ function docPdfOpts(d, kind) {
   return {
     html: kind ? reportHTML(d, kind) : docHTML(d),
     name: `${kind ? repNo(d, kind) : d.number} - ${c.name || ''}`,
-    phone: c.phone, email: c.email, subject: m.subject, body: m.body,
+    phone: c.phone, email: c.email, subject: m.subject, body: m.body, main: m.main,
     wa: kind ? captureWa(waReport, d, kind) : captureWa(waDoc, d)
   };
 }
