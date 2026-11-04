@@ -1518,7 +1518,8 @@ function pdfReady() {
   return pdfLibs;
 }
 // renders a .paper document to an A4 PDF; page breaks fall between table rows / blocks, never through them
-async function htmlToPdf(html) {
+async function htmlToPdf(html, opt) {
+  const pages = [];
   await pdfReady();
   const host = document.createElement('div'); host.className = 'pdfhost'; host.innerHTML = html;
   document.body.appendChild(host);
@@ -1545,10 +1546,13 @@ async function htmlToPdf(html) {
       const g = slice.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, slice.width, slice.height);
       g.drawImage(canvas, 0, Math.floor(start * scale), canvas.width, slice.height, 0, 0, canvas.width, slice.height);
       if (page) pdf.addPage();
-      pdf.addImage(slice.toDataURL("image/jpeg", 0.85), 'JPEG', 0, topM * k, pw, (end - start) * k);
+      const jpg = slice.toDataURL("image/jpeg", 0.85);
+      pdf.addImage(jpg, 'JPEG', 0, topM * k, pw, (end - start) * k);
+      if (opt && opt.pages) pages.push({src: jpg, top: topM * k / ph, h: (end - start) * k / ph});
       start = end; page++;
     }
-    return pdf.output('datauristring').split(',')[1];
+    const b64 = pdf.output('datauristring').split(',')[1];
+    return opt && opt.pages ? {b64, pages} : b64;
   } finally { host.remove(); }
 }
 const b64ToBlob = (b64, mime) => { const bin = atob(b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], {type: mime}); };
@@ -3482,6 +3486,7 @@ render();
 <script src="payroll.js"></script>
 <script src="install.js"></script>
 <script src="reminders.js"></script>
+<script src="email.js"></script>
 <script src="cloud.js"></script>
 </body>
 </html>
