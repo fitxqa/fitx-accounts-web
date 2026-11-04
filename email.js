@@ -9,6 +9,9 @@
   const M = () => { const s = S(); s.mail = s.mail || {}; return s.mail; };
   const configured = () => !!(M().clientId && M().tenantId);
   const RESUME = 'fitx_mail_resume';
+  const provider = () => M().provider || 'cpanel';
+  const cpReady = () => !!(M().cpUrl && M().cpKey);
+  const ready = () => provider() === 'cpanel' ? cpReady() : configured();
 
   /* ---------- Microsoft sign-in (MSAL) ---------- */
   let pca = null, loading = null;
@@ -165,6 +168,87 @@
     });
   }
 
+  function plainText(d, msg) {
+    const s = S(), m = M(), isInv = d.type === 'INV';
+    const amt = isInv ? docBal(d) : docTotal(d);
+    return `${msg}\n\n${isInv ? 'Invoice' : 'Quotation'} no.: ${d.number}\nDate: ${dfmt(d.date)}\n${isInv ? 'Due date' : 'Valid until'}: ${dfmt(d.due)}\n${isInv ? 'Amount due' : 'Total amount'}: ${money(amt)}\n${isInv && s.payNote ? '\n' + s.payNote + '\n' : ''}\n${m.signoff || 'Best regards,'}\n${m.name || s.name}${m.title ? '\n' + m.title : ''}${m.name ? '\n' + s.name : ''}\nTel: ${s.phone}${m.mobile ? ' | Mobile: ' + m.mobile : ''}\n${m.from || s.email}\n${s.web}`;
+  }
+  const phpStr = v => String(v || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  function phpScript(key, from, name, pass) {
+    return `<?php
+/* FitX Accounts – email sender for Bluehost / cPanel hosting.
+   Upload this file to public_html with cPanel File Manager. Created ${today()}.
+   Keep it private: the key below lets the FitX app send email from ${from}. */
+$KEY       = '${phpStr(key)}';
+$FROM      = '${phpStr(from)}';
+$FROM_NAME = '${phpStr(name)}';
+$IMAP_PASS = '${phpStr(pass)}';   // optional mailbox password: keeps a copy of each email in "Sent"
+$ALLOWED_ORIGINS = array('https://fitxqa.github.io', 'https://appassets.androidplatform.net');
+
+$origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
+if (in_array($origin, $ALLOWED_ORIGINS, true)) { header('Access-Control-Allow-Origin: ' . $origin); header('Vary: Origin'); }
+header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type');
+header('Content-Type: application/json; charset=utf-8');
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
+function reply($code, $data) { http_response_code($code); echo json_encode($data); exit; }
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') reply(200, array('ok' => true, 'msg' => 'FitX mail script is installed. Send email from the FitX Accounts app.'));
+
+$in = json_decode(file_get_contents('php://input'), true);
+if (!is_array($in) || !isset($in['key']) || !hash_equals($KEY, (string)$in['key'])) reply(403, array('ok' => false, 'error' => 'Wrong key. In the app, create the mail script again and upload the new file.'));
+if (isset($in['action']) && $in['action'] === 'ping') reply(200, array('ok' => true, 'php' => PHP_VERSION, 'from' => $FROM, 'sent_copy' => ($IMAP_PASS !== '' && function_exists('imap_open'))));
+
+function clean_list($v) { $out = array(); foreach ((array)$v as $a) { $a = trim(str_replace(array("\\r", "\\n"), '', (string)$a)); if (filter_var($a, FILTER_VALIDATE_EMAIL)) $out[] = $a; } return $out; }
+function hdr($s) { return '=?UTF-8?B?' . base64_encode(str_replace(array("\\r", "\\n"), ' ', (string)$s)) . '?='; }
+function b64($s) { $s = preg_replace('/[^A-Za-z0-9+\\/=]/', '', (string)$s); return base64_decode($s, true) === false ? '' : $s; }
+function fname($s) { $s = preg_replace('/[^A-Za-z0-9 ._()\\-]/', '_', (string)$s); return $s === '' ? 'file' : $s; }
+function ctype($s) { return preg_match('#^[A-Za-z0-9.+-]+/[A-Za-z0-9.+-]+$#', (string)$s) ? $s : 'application/octet-stream'; }
+
+$to = clean_list(isset($in['to']) ? $in['to'] : array());
+$cc = clean_list(isset($in['cc']) ? $in['cc'] : array());
+if (!$to) reply(400, array('ok' => false, 'error' => 'No valid email address to send to.'));
+if (count($to) + count($cc) > 10) reply(400, array('ok' => false, 'error' => 'Too many recipients.'));
+$subject = hdr(isset($in['subject']) ? $in['subject'] : '');
+$html = isset($in['html']) ? (string)$in['html'] : '';
+$text = isset($in['text']) ? (string)$in['text'] : strip_tags($html);
+$fromName = (isset($in['fromName']) && $in['fromName'] !== '') ? $in['fromName'] : $FROM_NAME;
+$atts = (isset($in['attachments']) && is_array($in['attachments'])) ? $in['attachments'] : array();
+
+$e = "\\r\\n";
+$b1 = 'fx1_' . bin2hex(random_bytes(8)); $b2 = 'fx2_' . bin2hex(random_bytes(8)); $b3 = 'fx3_' . bin2hex(random_bytes(8));
+$body  = "--$b1{$e}Content-Type: multipart/related; boundary=\\"$b2\\"{$e}{$e}";
+$body .= "--$b2{$e}Content-Type: multipart/alternative; boundary=\\"$b3\\"{$e}{$e}";
+$body .= "--$b3{$e}Content-Type: text/plain; charset=UTF-8{$e}Content-Transfer-Encoding: base64{$e}{$e}" . chunk_split(base64_encode($text));
+$body .= "--$b3{$e}Content-Type: text/html; charset=UTF-8{$e}Content-Transfer-Encoding: base64{$e}{$e}" . chunk_split(base64_encode($html));
+$body .= "--$b3--{$e}";
+foreach ($atts as $a) { if (empty($a['cid'])) continue; $d = b64(isset($a['data']) ? $a['data'] : ''); if ($d === '') continue; $n = fname($a['name']);
+  $body .= "--$b2{$e}Content-Type: " . ctype($a['type']) . "; name=\\"$n\\"{$e}Content-Transfer-Encoding: base64{$e}Content-ID: <" . fname($a['cid']) . ">{$e}Content-Disposition: inline; filename=\\"$n\\"{$e}{$e}" . chunk_split($d); }
+$body .= "--$b2--{$e}";
+foreach ($atts as $a) { if (!empty($a['cid'])) continue; $d = b64(isset($a['data']) ? $a['data'] : ''); if ($d === '') continue; $n = fname($a['name']);
+  $body .= "--$b1{$e}Content-Type: " . ctype($a['type']) . "; name=\\"$n\\"{$e}Content-Transfer-Encoding: base64{$e}Content-Disposition: attachment; filename=\\"$n\\"{$e}{$e}" . chunk_split($d); }
+$body .= "--$b1--";
+
+$headers = array('From: ' . hdr($fromName) . " <$FROM>", "Reply-To: $FROM", 'MIME-Version: 1.0', "Content-Type: multipart/mixed; boundary=\\"$b1\\"", 'X-Mailer: FitX Accounts');
+if ($cc) $headers[] = 'Cc: ' . implode(', ', $cc);
+$copy = !empty($in['copy']);
+$imapOk = ($IMAP_PASS !== '' && function_exists('imap_open'));
+$send = $headers; if ($copy && !$imapOk) $send[] = "Bcc: $FROM";
+if (!mail(implode(', ', $to), $subject, $body, implode("\\r\\n", $send), '-f' . $FROM)) reply(500, array('ok' => false, 'error' => 'The mail server did not accept the email. Check that ' . $FROM . ' exists in cPanel → Email Accounts.'));
+
+$saved = false;
+if ($copy && $imapOk) {
+  $msg = 'Date: ' . date('r') . $e . 'To: ' . implode(', ', $to) . $e . ($cc ? 'Cc: ' . implode(', ', $cc) . $e : '') . "Subject: $subject" . $e . implode($e, $headers) . $e . $e . $body;
+  foreach (array('INBOX.Sent', 'Sent', 'INBOX.Sent Items') as $box) {
+    $mb = '{localhost:993/imap/ssl/novalidate-cert}' . $box;
+    $im = @imap_open($mb, $FROM, $IMAP_PASS, 0, 1);
+    if ($im) { $saved = @imap_append($im, $mb, $msg, '\\\\Seen'); @imap_close($im); if ($saved) break; }
+  }
+  @imap_errors(); @imap_alerts();
+}
+reply(200, array('ok' => true, 'to' => $to, 'saved_to_sent' => $saved));
+`;
+  }
+
   /* ---------- compose & send ---------- */
   async function compose(id) {
     const d = docById(id); if (!d) return;
@@ -173,8 +257,11 @@
     const R = isInv ? d.wcr : d.insp, repKind = isInv ? 'wcr' : 'insp';
     const hasRep = !!(R && R.on);
     let tk = null;
-    if (configured()) { try { tk = await token(); } catch (e) { tk = null; } }
-    const fromHtml = !configured()
+    if (provider() === 'outlook' && configured()) { try { tk = await token(); } catch (e) { tk = null; } }
+    const fromHtml = provider() === 'cpanel'
+      ? (cpReady() ? `<div class="mailfrom"><span>From: <b>${esc(M().from || 'sales@fitx.qa')}</b></span><span class="badge b-green">Bluehost</span></div>`
+        : `<div class="mailfrom"><span>Email sending is not set up yet.</span><button type="button" class="btn pri" id="mlSetup" style="min-height:36px;padding:4px 12px">Set up</button></div>`)
+      : !configured()
       ? `<div class="mailfrom"><span>Outlook is not set up yet.</span><button type="button" class="btn" id="mlSetup" style="min-height:36px;padding:4px 12px">Set up</button></div>`
       : tk ? `<div class="mailfrom"><span>From: <b>${esc(tk.acc.username)}</b>${fromAddr() && fromAddr() !== tk.acc.username.toLowerCase() ? ' as <b>' + esc(M().from) + '</b>' : ''}</span><span class="badge b-green">Outlook</span></div>`
         : `<div class="mailfrom"><span>Sign in to Outlook${M().from ? ' (' + esc(M().from) + ')' : ''} to send.</span><button type="button" class="btn pri" id="mlSign" style="min-height:36px;padding:4px 12px">Sign in</button></div>`;
@@ -208,27 +295,37 @@
         const to = splitAddr(v.to), cc = splitAddr(v.cc);
         const bad = to.concat(cc).find(a => !okAddr(a)); if (bad) { toast('Check the email address: ' + bad); return; }
         if (!to.length) { toast('Enter the customer email'); return; }
-        if (!configured()) { toast('Set up Outlook first'); settings(); return; }
-        const t = await token().catch(() => null);
-        if (!t) { toast('Sign in to Outlook first'); signIn(id).catch(e => toast(e.message || String(e))); return; }
+        if (!ready()) { toast('Set up email sending first'); settings(() => closeSheet(() => compose(id))); return; }
+        let t = null;
+        if (provider() === 'outlook') { t = await token().catch(() => null); if (!t) { toast('Sign in to Outlook first'); signIn(id).catch(e => toast(e.message || String(e))); return; } }
         const btn = el.querySelector('#mlSend'); btn.disabled = true; btn.textContent = 'Sending…';
         try {
-          const atts = [];
-          const pdf1 = await htmlToPdf(docHTML(d));
-          atts.push({'@odata.type': '#microsoft.graph.fileAttachment', name: fileSafe(d.number + ' - ' + (c.name || '')) + '.pdf', contentType: 'application/pdf', contentBytes: pdf1});
-          if (hasRep && v.rep) atts.push({'@odata.type': '#microsoft.graph.fileAttachment', name: fileSafe(repNo(d, repKind) + ' - ' + (c.name || '')) + '.pdf', contentType: 'application/pdf', contentBytes: await htmlToPdf(reportHTML(d, repKind))});
-          const logo = await logoPng();
-          atts.push({'@odata.type': '#microsoft.graph.fileAttachment', name: 'logo.png', contentType: 'image/png', contentBytes: logo, isInline: true, contentId: 'fitxlogo'});
-          const size = atts.reduce((s2, a) => s2 + a.contentBytes.length, 0);
-          if (size > 3.6e6) throw new Error('The attachments are too large to send (over 3 MB). Try without the report.');
-          const message = {subject: v.subject, body: {contentType: 'HTML', content: emailHTML(d, v.msg, 'cid:fitxlogo', atts.filter(a => !a.isInline).map(a => a.name))},
-            toRecipients: to.map(a => ({emailAddress: {address: a}})), ccRecipients: cc.map(a => ({emailAddress: {address: a}})), attachments: atts};
-          const me = (t.acc.username || '').toLowerCase();
-          const url = fromAddr() && fromAddr() !== me ? `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(fromAddr())}/sendMail` : 'https://graph.microsoft.com/v1.0/me/sendMail';
-          if (fromAddr() && fromAddr() !== me) message.from = {emailAddress: {address: fromAddr()}};
-          const res = await fetch(url, {method: 'POST', headers: {Authorization: 'Bearer ' + t.token, 'Content-Type': 'application/json'}, body: JSON.stringify({message, saveToSentItems: true})});
-          if (!res.ok) { let m = ''; try { m = (await res.json()).error.message; } catch (e) {} throw new Error(res.status === 403 ? 'Outlook refused: this account may not send as ' + (M().from || 'that mailbox') + '. ' + m : (m || 'Outlook error ' + res.status)); }
-          d.mails = d.mails || []; d.mails.push({date: today(), at: Date.now(), to: to.join(', '), by: t.acc.username});
+          const files = [];
+          files.push({name: fileSafe(d.number + ' - ' + (c.name || '')) + '.pdf', type: 'application/pdf', data: await htmlToPdf(docHTML(d))});
+          if (hasRep && v.rep) files.push({name: fileSafe(repNo(d, repKind) + ' - ' + (c.name || '')) + '.pdf', type: 'application/pdf', data: await htmlToPdf(reportHTML(d, repKind))});
+          const logo = {name: 'logo.png', type: 'image/png', data: await logoPng(), cid: 'fitxlogo'};
+          const size = files.concat([logo]).reduce((s2, a) => s2 + a.data.length, 0);
+          const html = emailHTML(d, v.msg, 'cid:fitxlogo', files.map(a => a.name));
+          let by;
+          if (provider() === 'cpanel') {
+            if (size > 14e6) throw new Error('The attachments are too large to send. Try without the report.');
+            const res = await fetch(M().cpUrl, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=UTF-8'}, body: JSON.stringify({key: M().cpKey, to, cc, subject: v.subject, html, text: plainText(d, v.msg), fromName: S().name, copy: M().copySelf !== false, attachments: files.concat([logo])})}).catch(() => { throw new Error('Could not reach ' + M().cpUrl + '. Check the internet and that fitx-mail.php is uploaded.'); });
+            let j = null; try { j = await res.json(); } catch (e) {}
+            if (!res.ok || !j || !j.ok) throw new Error((j && j.error) || ('Mail server error ' + res.status));
+            by = M().from || 'Bluehost';
+          } else {
+            if (size > 3.6e6) throw new Error('The attachments are too large to send (over 3 MB). Try without the report.');
+            const atts = files.map(a => ({'@odata.type': '#microsoft.graph.fileAttachment', name: a.name, contentType: a.type, contentBytes: a.data}));
+            atts.push({'@odata.type': '#microsoft.graph.fileAttachment', name: logo.name, contentType: logo.type, contentBytes: logo.data, isInline: true, contentId: 'fitxlogo'});
+            const message = {subject: v.subject, body: {contentType: 'HTML', content: html}, toRecipients: to.map(a => ({emailAddress: {address: a}})), ccRecipients: cc.map(a => ({emailAddress: {address: a}})), attachments: atts};
+            const me = (t.acc.username || '').toLowerCase();
+            const url = fromAddr() && fromAddr() !== me ? `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(fromAddr())}/sendMail` : 'https://graph.microsoft.com/v1.0/me/sendMail';
+            if (fromAddr() && fromAddr() !== me) message.from = {emailAddress: {address: fromAddr()}};
+            const res = await fetch(url, {method: 'POST', headers: {Authorization: 'Bearer ' + t.token, 'Content-Type': 'application/json'}, body: JSON.stringify({message, saveToSentItems: true})});
+            if (!res.ok) { let m = ''; try { m = (await res.json()).error.message; } catch (e) {} throw new Error(res.status === 403 ? 'Outlook refused: this account may not send as ' + (M().from || 'that mailbox') + '. ' + m : (m || 'Outlook error ' + res.status)); }
+            by = t.acc.username;
+          }
+          d.mails = d.mails || []; d.mails.push({date: today(), at: Date.now(), to: to.join(', '), by});
           if (v.saveMail && !c.email && c.id) c.email = to[0];
           save();
           closeSheet(() => { toast('Email sent to ' + to.join(', ')); reopenWith(() => viewDoc(id)); });
@@ -244,9 +341,25 @@
     const m = M(), s = S();
     const signed = async el => { try { const t = configured() ? await token() : null; el.querySelector('#msStat').innerHTML = !configured() ? 'Not set up' : t ? `Connected: <b>${esc(t.acc.username)}</b>` : 'Not signed in'; el.querySelector('#msOut').classList.toggle('hidden', !t); } catch (e) { el.querySelector('#msStat').textContent = e.message; } };
     openSheet('Email & signature', `<form id="msForm" autocomplete="off">
+      <label class="f"><span>Send from (your email address)</span><input class="in" name="from" type="email" value="${esc(m.from || 'sales@fitx.qa')}"></label>
+      <div class="chips" style="margin-bottom:12px" id="msProv"><button type="button" data-prov="cpanel" class="${provider() === 'cpanel' ? 'on' : ''}">Bluehost / cPanel email</button><button type="button" data-prov="outlook" class="${provider() === 'outlook' ? 'on' : ''}">Outlook (Microsoft 365)</button></div>
+      <div id="msCp" class="${provider() === 'cpanel' ? '' : 'hidden'}">
+        <div class="mailfrom"><span id="cpStat">${cpReady() ? 'Ready – script created' : 'Not set up'}</span><button type="button" class="btn" id="cpTest" style="min-height:36px;padding:4px 12px">Test</button></div>
+        <label class="f"><span>Mail script address</span><input class="in" name="cpUrl" type="url" value="${esc(m.cpUrl || 'https://fitx.qa/fitx-mail.php')}"></label>
+        <label class="f"><span>Email password (optional – only to keep a copy in your Sent folder)</span><input class="in" name="cpPass" type="password" autocomplete="new-password" placeholder="Not stored in the app"></label>
+        <label class="f" style="display:flex;gap:10px;align-items:center"><input type="checkbox" name="copySelf" ${m.copySelf !== false ? 'checked' : ''} style="width:20px;height:20px"><span style="margin:0;color:var(--text)">Keep a copy of every email (in Sent, or in your inbox if no password)</span></label>
+        <button type="button" class="btn pri full" id="cpMake">${ICON.dl}Create mail script (fitx-mail.php)</button>
+        <details class="card" style="margin:12px 0" ${cpReady() ? '' : 'open'}><summary style="font-weight:700;cursor:pointer">How to set it up (one time, 3 minutes)</summary>
+          <ol style="padding-left:20px;line-height:1.7;margin:10px 0 0">
+            <li>Check the email address above (e.g. <b>sales@fitx.qa</b> – it must exist in cPanel → Email Accounts).</li>
+            <li>Tap <b>Create mail script</b>. The file <b>fitx-mail.php</b> is saved to your downloads.</li>
+            <li>Log in to <b>Bluehost → cPanel → File Manager</b>, open <b>public_html</b>, tap <b>Upload</b> and choose fitx-mail.php.</li>
+            <li>Tap <b>Save</b> here, then <b>Test</b>. You will get a test email.</li>
+          </ol>
+          <p class="hint">If your website is not hosted on Bluehost, upload the file to any folder of your Bluehost hosting and put its web address above.</p></details>
+      </div>
+      <div id="msOl" class="${provider() === 'outlook' ? '' : 'hidden'}">
       <div class="mailfrom"><span id="msStat">Checking…</span><span><button type="button" class="btn" id="msIn" style="min-height:36px;padding:4px 12px">Sign in</button> <button type="button" class="btn hidden" id="msOut" style="min-height:36px;padding:4px 12px">Sign out</button></span></div>
-      <div class="sec"><h2>Outlook (Microsoft 365)</h2></div>
-      <label class="f"><span>Send from (mailbox)</span><input class="in" name="from" type="email" value="${esc(m.from || 'sales@fitx.qa')}"></label>
       <label class="f"><span>Application (client) ID</span><input class="in" name="clientId" value="${esc(m.clientId || '')}" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></label>
       <label class="f"><span>Directory (tenant) ID</span><input class="in" name="tenantId" value="${esc(m.tenantId || '')}" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></label>
       <details class="card" style="margin-bottom:12px"><summary style="font-weight:700;cursor:pointer">How to get these IDs (one time, 5 minutes)</summary>
@@ -258,6 +371,8 @@
           <li><b>API permissions → Add → Microsoft Graph → Delegated → Mail.Send</b> (and <b>Mail.Send.Shared</b> if you sign in as a different user than sales@). Then <b>Grant admin consent</b>.</li>
           <li>On <b>Overview</b>, copy the <b>Application (client) ID</b> and <b>Directory (tenant) ID</b> into the boxes above.</li>
         </ol></details>
+      </div>
+      <div class="sec"><h2>Sending options</h2></div>
       <label class="f"><span>Always Cc (optional)</span><input class="in" name="cc" value="${esc(m.cc || '')}" placeholder="e.g. accounts@fitx.qa"></label>
       <label class="f" style="display:flex;gap:10px;align-items:center"><input type="checkbox" name="attachRep" ${m.attachRep !== false ? 'checked' : ''} style="width:20px;height:20px"><span style="margin:0;color:var(--text)">Attach the inspection / work completion report when there is one</span></label>
       <div class="sec"><h2>Signature</h2></div>
@@ -268,10 +383,39 @@
       <div class="card" style="padding:14px" id="msSig">…</div>
       <button class="btn pri full" type="submit" style="margin-top:12px">Save</button></form>`, async el => {
       const f = el.querySelector('#msForm');
-      const keep = () => { const v = formData(f); Object.assign(m, {from: v.from.trim(), clientId: v.clientId.trim(), tenantId: v.tenantId.trim(), cc: v.cc.trim(), attachRep: !!v.attachRep, name: v.name.trim(), title: v.title.trim(), mobile: v.mobile.trim(), signoff: v.signoff.trim(), disclaimer: v.disclaimer.trim()}); };
+      let prov = provider();
+      el.querySelectorAll('[data-prov]').forEach(b => b.onclick = () => { prov = b.dataset.prov; el.querySelectorAll('[data-prov]').forEach(x => x.classList.toggle('on', x === b)); el.querySelector('#msCp').classList.toggle('hidden', prov !== 'cpanel'); el.querySelector('#msOl').classList.toggle('hidden', prov !== 'outlook'); if (prov === 'outlook') signed(el); });
+      const keep = () => { const v = formData(f); Object.assign(m, {provider: prov, cpUrl: v.cpUrl.trim(), copySelf: !!v.copySelf, from: v.from.trim(), clientId: v.clientId.trim(), tenantId: v.tenantId.trim(), cc: v.cc.trim(), attachRep: !!v.attachRep, name: v.name.trim(), title: v.title.trim(), mobile: v.mobile.trim(), signoff: v.signoff.trim(), disclaimer: v.disclaimer.trim()}); };
       const drawSig = async () => { keep(); el.querySelector('#msSig').innerHTML = signatureHTML('data:image/png;base64,' + await logoPng()); };
       f.addEventListener('input', () => { clearTimeout(f._t); f._t = setTimeout(drawSig, 300); });
-      drawSig(); signed(el);
+      drawSig(); if (prov === 'outlook') signed(el);
+      el.querySelector('#cpMake').onclick = () => {
+        keep();
+        if (!okAddr(m.from || '')) { toast('Enter the email address to send from'); return; }
+        if (!m.cpKey) { const a = new Uint8Array(24); crypto.getRandomValues(a); m.cpKey = Array.from(a, x => x.toString(16).padStart(2, '0')).join(''); }
+        const php = phpScript(m.cpKey, m.from, S().name, formData(f).cpPass || '');
+        save();
+        const AB = window.AndroidBridge;
+        if (AB && AB.saveFile) AB.saveFile(btoa(unescape(encodeURIComponent(php))), 'application/octet-stream', 'fitx-mail.php');
+        else downloadBlob(new Blob([php], {type: 'application/octet-stream'}), 'fitx-mail.php');
+        el.querySelector('#cpStat').textContent = 'Script created – upload it to public_html, then Test';
+        toast('fitx-mail.php saved – upload it in cPanel File Manager');
+      };
+      el.querySelector('#cpTest').onclick = async () => {
+        keep(); save();
+        if (!cpReady()) { toast('Create the mail script first'); return; }
+        const st = el.querySelector('#cpStat'); st.textContent = 'Testing…';
+        try {
+          const r = await fetch(m.cpUrl, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=UTF-8'}, body: JSON.stringify({key: m.cpKey, action: 'ping'})});
+          const j = await r.json().catch(() => null);
+          if (!j || !j.ok) throw new Error((j && j.error) || 'No answer from ' + m.cpUrl + ' (' + r.status + ') – is fitx-mail.php uploaded there?');
+          const logo = await logoPng();
+          const r2 = await fetch(m.cpUrl, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=UTF-8'}, body: JSON.stringify({key: m.cpKey, to: [m.from], subject: 'FitX Accounts – test email', fromName: S().name, html: `<div style="font-family:Arial,sans-serif;font-size:14px;color:#333"><p>This is a test email from FitX Accounts. Your email sending works.</p><p>${esc(m.signoff || 'Best regards,')}</p>${signatureHTML('cid:fitxlogo')}</div>`, text: 'This is a test email from FitX Accounts. Your email sending works.', attachments: [{name: 'logo.png', type: 'image/png', data: logo, cid: 'fitxlogo'}]})});
+          const j2 = await r2.json().catch(() => null);
+          if (!j2 || !j2.ok) throw new Error((j2 && j2.error) || 'Sending failed (' + r2.status + ')');
+          st.innerHTML = `<b style="color:var(--green)">Working</b> – test email sent to ${esc(m.from)}${j.sent_copy ? ' · copies saved in Sent' : ''}`;
+        } catch (e) { st.textContent = e.message === 'Failed to fetch' ? 'Could not reach ' + m.cpUrl + ' – check the address and that the file is uploaded' : e.message; }
+      };
       el.querySelector('#msIn').onclick = () => { keep(); save(); signIn().catch(e => toast(e.message || String(e))); };
       el.querySelector('#msOut').onclick = async () => { await signOut(); signed(el); };
       f.onsubmit = ev => { ev.preventDefault(); keep(); save(); closeSheet(() => { toast('Email settings saved'); if (after) after(); }); };
@@ -301,7 +445,7 @@
     origMore();
     const bus = Array.from(document.querySelectorAll('#main .sec h2')).find(h => /business/i.test(h.textContent));
     const list = bus && bus.parentElement.nextElementSibling; if (!list) return;
-    list.insertAdjacentHTML('beforeend', `<button type="button" class="item rcard" id="mMail"><span class="ic">${ICON.mail}</span><div class="main"><div class="t">Email &amp; signature</div><div class="s">${configured() ? 'Outlook · ' + esc(M().from || '') : 'Send invoices from Outlook with your logo signature'}</div></div></button>`);
+    list.insertAdjacentHTML('beforeend', `<button type="button" class="item rcard" id="mMail"><span class="ic">${ICON.mail}</span><div class="main"><div class="t">Email &amp; signature</div><div class="s">${ready() ? (provider() === 'cpanel' ? 'Bluehost' : 'Outlook') + ' · ' + esc(M().from || '') : 'Send invoices by email with your logo signature'}</div></div></button>`);
     document.getElementById('mMail').onclick = () => settings();
   };
   window.FitxMail = {compose, settings, pdfPreview, emailHTML, signatureHTML, logoPng, defaults};
