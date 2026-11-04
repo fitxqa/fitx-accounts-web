@@ -56,7 +56,7 @@
     const foot = [s.address, s.cr && 'CR ' + s.cr].filter(Boolean).join(' · ');
     // fluid layout: logo and details side by side on wide screens, details drop under the logo on narrow phones
     return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse"><tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#333333">
-<div style="display:inline-block;vertical-align:middle;margin:0 18px 10px 0"><img src="${logoSrc || LOGO_URL}" width="150" height="68" alt="FitX Sports Equipment Services" style="display:block;width:150px;height:68px;border:0"></div><div style="display:inline-block;vertical-align:middle;border-left:3px solid ${OR};padding:2px 0 2px 14px;margin:0 0 10px 0">
+<div style="display:inline-block;vertical-align:middle;width:150px;min-width:150px;margin:0 18px 10px 0"><img src="${logoSrc || LOGO_URL}" width="150" height="68" alt="FitX Sports Equipment Services" style="display:block;width:150px;min-width:150px;max-width:150px;height:68px;border:0;outline:none"></div><div style="display:inline-block;vertical-align:middle;border-left:3px solid ${OR};padding:2px 0 2px 14px;margin:0 0 10px 0">
 <div style="font-size:16px;line-height:1.25;font-weight:bold;color:#0d0d0d">${esc(m.name || s.name)}</div>
 ${m.title ? `<div style="font-size:11.5px;line-height:1.4;font-weight:bold;color:${OR};letter-spacing:.6px;text-transform:uppercase">${esc(m.title)}</div>` : ''}
 ${tel ? `<div style="margin-top:4px">${tel}</div>` : ''}${net ? `<div>${net}</div>` : ''}
