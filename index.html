@@ -319,6 +319,11 @@ textarea.in{min-height:80px;resize:vertical}
 .paper .ptot .g{background:#ff6a00;color:#000;font-weight:800;padding:8px 10px;border-radius:6px;margin-top:4px;font-size:14px}
 .paper .pay{margin-top:16px;border:1px dashed #ff6a00;border-radius:8px;padding:10px 12px;line-height:1.6}
 .paper .notes{margin-top:12px;white-space:pre-wrap;color:#444;line-height:1.5}
+.paper .pstamp{display:flex;justify-content:flex-end;margin:6px 0 0;page-break-inside:avoid}
+.paper .pstin{width:200px;text-align:center}
+.paper .pstin img{display:block;width:128px;height:128px;margin:0 auto -14px;opacity:.93}
+.paper .pstl{border-top:1px solid #9a9a9a;padding-top:5px;font-size:10px;color:#222;font-weight:600;line-height:1.35}
+.paper .pstl span{font-weight:400;color:#666}
 .paper .terms{margin-top:14px;border-top:1px solid #e3e3e3;padding-top:10px;font-size:10.5px;color:#444;line-height:1.55;page-break-inside:avoid}
 .paper .terms div{white-space:pre-wrap;margin-top:4px}
 .paper .pf{margin-top:22px;border-top:2px solid #000;padding-top:8px;text-align:center;font-size:11px;color:#555}
@@ -1529,7 +1534,7 @@ async function htmlToPdf(html, opt) {
     const paper = host.querySelector('.paper') || host;
     const W = paper.offsetWidth, H = paper.offsetHeight, top0 = paper.getBoundingClientRect().top;
     const cuts = new Set([H]);
-    paper.querySelectorAll(':scope > *, tr, .rsig, .ptot, .terms div, .rblk').forEach(el => { const r = el.getBoundingClientRect(); cuts.add(Math.round(r.bottom - top0)); cuts.add(Math.round(r.top - top0)); });
+    paper.querySelectorAll(':scope > *, tr, .rsig, .ptot, .pstamp, .terms div, .rblk').forEach(el => { const r = el.getBoundingClientRect(); cuts.add(Math.round(r.bottom - top0)); cuts.add(Math.round(r.top - top0)); });
     const cutList = Array.from(cuts).sort((a, b) => a - b);
     const scale = 2;
     const canvas = await html2canvas(paper, {scale, backgroundColor: '#ffffff', useCORS: true, logging: false, windowWidth: 900});
@@ -1750,7 +1755,10 @@ function docHTML(d, layout) {
     </div>`;
   const pay = isInv && s.payNote ? `<div class="pay"><b>Payment</b><br>${esc(s.payNote)}</div>` : '';
   const notes = d.notes ? `<div class="notes">${esc(d.notes)}</div>` : '';
-  const terms = (() => { const t = d.terms !== undefined ? d.terms : (isInv ? s.invTerms : s.quoTerms); return t ? `<div class="terms"><b>Terms & Conditions</b> <span dir="rtl" lang="ar" style="color:#888">· الشروط والأحكام</span><div>${esc(t)}</div></div>` : ''; })();
+  // company stamp (per document "with / without", default from settings)
+  const withStamp = d.stamp !== undefined ? !!d.stamp : s.stampOn !== false;
+  const stampBlk = withStamp ? `<div class="pstamp"><div class="pstin"><img src="${s.stampImg || window.FITX_STAMP_DATA || 'icons/stamp.png'}" alt="Company stamp"><div class="pstl">For ${esc(s.name)}<br><span>Authorised signature &amp; stamp</span></div></div></div>` : '';
+  const terms = stampBlk + (() => { const t = d.terms !== undefined ? d.terms : (isInv ? s.invTerms : s.quoTerms); return t ? `<div class="terms"><b>Terms & Conditions</b> <span dir="rtl" lang="ar" style="color:#888">· الشروط والأحكام</span><div>${esc(t)}</div></div>` : ''; })();
   const amountDue = isInv ? (st === 'Cancelled' ? 0 : docBal(d)) : docTotal(d);
 
   if (lay === 'modern') return `<div class="paper lay-modern">
@@ -3508,6 +3516,7 @@ render();
 <script src="install.js"></script>
 <script src="reminders.js"></script>
 <script src="email.js"></script>
+<script src="stamp.js"></script>
 <script src="cloud.js"></script>
 </body>
 </html>
