@@ -36,11 +36,11 @@
   const custVars = c => ({customer: c.name || 'Customer', contact: c.contact || c.name || 'Customer'});
 
   /* ---------- logo & signature ---------- */
-  const LOGO_URL = 'https://fitxqa.github.io/fitx-accounts-web/icons/email-logo-dark.png';
+  const LOGO_URL = 'https://fitxqa.github.io/fitx-accounts-web/icons/email-logo-badge.png';
   let logoB64 = null;
   async function logoData() {
     if (logoB64) return logoB64;
-    try { const r = await fetch('icons/email-logo-dark.png'); const b = await r.blob(); logoB64 = await new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1]); fr.readAsDataURL(b); }); }
+    try { const r = await fetch('icons/email-logo-badge.png'); const b = await r.blob(); logoB64 = await new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1]); fr.readAsDataURL(b); }); }
     catch (e) { logoB64 = ''; }
     return logoB64;
   }
@@ -48,20 +48,20 @@
     const s = S(), m = M();
     const web = s.web ? (/^https?:/i.test(s.web) ? s.web : 'https://' + s.web) : '';
     const mail = m.from || s.email;
-    const lab = t => `<span style="color:${OR};font-weight:bold">${t}</span>&nbsp;`;
-    const tel = [s.phone && lab('T') + esc(s.phone), m.mobile && lab('M') + esc(m.mobile)].filter(Boolean).map(x => `<div style="white-space:nowrap">${x}</div>`).join('');
-    const net = [mail && lab('E') + `<a href="mailto:${esc(mail)}" style="color:#333333;text-decoration:none">${esc(mail)}</a>`, s.web && lab('W') + `<a href="${esc(web)}" style="color:#333333;text-decoration:none">${esc(s.web)}</a>`].filter(Boolean).map(x => `<div>${x}</div>`).join('');
-    return `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#333333;background:#ffffff;border:1px solid #e6e6e6">
-<tr><td width="128" style="width:128px;background:#0d0d0d;padding:14px 12px;vertical-align:middle;border-right:4px solid ${OR}"><img src="${logoSrc || LOGO_URL}" width="128" alt="FitX Sports Equipment Services" style="display:block;width:128px;height:auto;border:0"></td>
-<td style="padding:12px 16px;vertical-align:middle;background:#ffffff">
-${m.name ? `<div style="font-size:16px;font-weight:bold;color:#0d0d0d">${esc(m.name)}</div>` : ''}
-${m.title ? `<div style="font-size:11px;font-weight:bold;color:${OR};text-transform:uppercase;letter-spacing:1px">${esc(m.title)}</div>` : ''}
-<div style="font-weight:bold;color:#0d0d0d;margin-top:4px">${esc(s.name)}</div>
-${tel}${net}
-${s.address || s.cr ? `<div style="color:#777777;font-size:12px">${esc([s.address, s.cr && 'CR No. ' + s.cr].filter(Boolean).join(' · '))}</div>` : ''}
-</td></tr>
-<tr><td colspan="2" style="background:#0d0d0d;padding:7px 18px;font-size:11px;color:#ffffff;letter-spacing:.3px">Gym equipment repair <span style="color:${OR}">&#9679;</span> Maintenance <span style="color:${OR}">&#9679;</span> Spare parts <span style="color:${OR}">&#9679;</span> Refurbishing</td></tr>
-</table>`;
+    const lab = t => `<span style="color:${OR};font-weight:bold;font-size:11px">${t}</span>&nbsp;`;
+    const dot = '<span style="color:#cccccc">&nbsp;&nbsp;|&nbsp;&nbsp;</span>';
+    const a = (href, t) => `<a href="${esc(href)}" style="color:#333333;text-decoration:none">${esc(t)}</a>`;
+    const tel = [s.phone && lab('T') + a('tel:' + s.phone.replace(/\s+/g, ''), s.phone), m.mobile && lab('M') + a('tel:' + m.mobile.replace(/\s+/g, ''), m.mobile)].filter(Boolean).join(dot);
+    const net = [mail && lab('E') + a('mailto:' + mail, mail), s.web && lab('W') + a(web, s.web.replace(/^https?:\/\//, ''))].filter(Boolean).join(dot);
+    const foot = [s.address, s.cr && 'CR ' + s.cr].filter(Boolean).join(' · ');
+    return `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:12.5px;line-height:1.5;color:#333333">
+<tr><td style="padding:0 14px 0 0;vertical-align:middle"><img src="${logoSrc || LOGO_URL}" width="104" height="44" alt="FitX" style="display:block;width:104px;height:44px;border:0"></td>
+<td style="padding:0 0 0 14px;border-left:2px solid ${OR};vertical-align:middle">
+<div style="font-size:15px;line-height:1.25;font-weight:bold;color:#0d0d0d">${esc(m.name || s.name)}${m.title ? `<span style="font-size:11px;font-weight:bold;color:${OR};letter-spacing:.6px;text-transform:uppercase">&nbsp;&nbsp;${esc(m.title)}</span>` : ''}</div>
+${m.name ? `<div style="font-size:12px;font-weight:bold;color:#0d0d0d">${esc(s.name)}</div>` : ''}
+${tel ? `<div style="margin-top:3px;white-space:nowrap">${tel}</div>` : ''}${net ? `<div style="white-space:nowrap">${net}</div>` : ''}
+${foot ? `<div style="font-size:11px;color:#999999">${esc(foot)}</div>` : ''}
+</td></tr></table>`;
   }
   function textSig() {
     const s = S(), m = M(), L = [];
@@ -258,7 +258,7 @@ ${sigHTML(logoSrc)}
       const su = el.querySelector('#mlSetup'); if (su) su.onclick = () => settings();
       const lk = el.querySelector('#mlLook'); if (lk) lk.onclick = async () => {
         const v = formData(el.querySelector('#mlForm'));
-        const html = emailHTML(v.msg + (sp.extra ? '\n\n' + sp.extra : ''), sp.title, sp.rows, pick().map(a => fileSafe(a.name) + '.pdf'), 'icons/email-logo-dark.png');
+        const html = emailHTML(v.msg + (sp.extra ? '\n\n' + sp.extra : ''), sp.title, sp.rows, pick().map(a => fileSafe(a.name) + '.pdf'), 'icons/email-logo-badge.png');
         openSheet('Email preview', `<p class="hint" style="margin-top:0"><b>To:</b> ${esc(v.to)}${v.cc ? ' · <b>Cc:</b> ' + esc(v.cc) : ''}<br><b>Subject:</b> ${esc(v.subject)}</p><iframe class="mailprev" title="Email preview" sandbox="allow-same-origin"></iframe>`, e2 => { const fr = e2.querySelector('iframe'); fr.onload = () => { try { fr.style.height = (fr.contentDocument.documentElement.scrollHeight + 8) + 'px'; } catch (e) {} }; fr.srcdoc = html; });
       };
       el.querySelector('#mlForm').onsubmit = async ev => {
@@ -525,7 +525,7 @@ reply(200, array('ok' => true, 'to' => $to, 'saved_to_sent' => $saved));
       };
       const show = () => { el.querySelectorAll('[data-prov]').forEach(x => x.classList.toggle('on', x.dataset.prov === prov)); el.querySelectorAll('[data-for]').forEach(x => x.classList.toggle('hidden', x.dataset.for !== prov)); status(); };
       el.querySelectorAll('[data-prov]').forEach(b => b.onclick = () => { prov = b.dataset.prov; show(); });
-      const drawSig = () => { keep(); el.querySelector('#msSig').innerHTML = sigHTML('icons/email-logo-dark.png'); };
+      const drawSig = () => { keep(); el.querySelector('#msSig').innerHTML = sigHTML('icons/email-logo-badge.png'); };
       f.addEventListener('input', () => { clearTimeout(f._t); f._t = setTimeout(drawSig, 250); });
       show(); drawSig();
       el.querySelectorAll('[data-tpk]').forEach(b => b.onclick = () => editTpl(b.dataset.tpk));
