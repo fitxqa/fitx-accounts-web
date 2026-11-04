@@ -214,8 +214,12 @@ ${sigHTML(logoSrc)}
   /* ---------- compose screen ---------- */
   const css = document.createElement('style');
   css.textContent = `
-    .pvw{display:grid;gap:14px;justify-items:center}
-    .pvw .pg{width:100%;max-width:640px;aspect-ratio:1/1.4142;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.18);position:relative;overflow:hidden}
+    .pvz{position:relative;overflow:auto;max-height:calc(100vh - 230px);min-height:300px;background:#e9eaed;border-radius:12px;padding:12px;touch-action:pan-x pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+    .pvbar{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+    .pvbar .btn{min-height:38px;min-width:44px;padding:0 12px;justify-content:center}
+    .pvbar .zl{min-width:58px;text-align:center;font-weight:800;font-size:14px}
+    .pvw{display:grid;gap:14px;justify-items:center;margin:0 auto}
+    .pvw .pg{width:100%;aspect-ratio:1/1.4142;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.18);position:relative;overflow:hidden}
     .pvw .pg img{position:absolute;left:0;width:100%}
     .pvw .pn{font-size:12px;color:var(--muted)}
     .mailfrom{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:12px;background:var(--orange-l,#fff1e7);margin-bottom:12px;font-size:14px}
@@ -286,13 +290,55 @@ ${sigHTML(logoSrc)}
   }
 
   /* ---------- PDF preview ---------- */
+  // zoom for the PDF preview: pinch, double-tap, buttons, Ctrl + wheel
+  function bindZoom(box, pages, lvl, bIn, bOut, bFit) {
+    let scale = 1;
+    const baseW = () => Math.min(box.clientWidth - 24, 680);
+    const apply = (ns, cx, cy) => {
+      ns = Math.max(1, Math.min(5, ns));
+      if (cx === undefined) { cx = box.clientWidth / 2; cy = box.clientHeight / 2; }
+      const px = (box.scrollLeft + cx) / scale, py = (box.scrollTop + cy) / scale;
+      scale = ns;
+      pages.style.width = Math.round(baseW() * scale) + 'px';
+      box.scrollLeft = px * scale - cx; box.scrollTop = py * scale - cy;
+      lvl.textContent = Math.round(scale * 100) + '%';
+    };
+    apply(1);
+    window.addEventListener('resize', () => apply(scale));
+    bIn.onclick = () => apply(scale * 1.25);
+    bOut.onclick = () => apply(scale / 1.25);
+    bFit.onclick = () => { apply(1); box.scrollTop = 0; box.scrollLeft = 0; };
+    const pt = (t, r) => ({x: t.clientX - r.left, y: t.clientY - r.top});
+    let pinch = null, lastTap = 0;
+    box.addEventListener('touchstart', e => {
+      if (e.touches.length === 2) {
+        const r = box.getBoundingClientRect(), a = pt(e.touches[0], r), b = pt(e.touches[1], r);
+        pinch = {d: Math.hypot(a.x - b.x, a.y - b.y) || 1, s: scale};
+      } else if (e.touches.length === 1) {
+        const now = Date.now();
+        if (now - lastTap < 300) { const r = box.getBoundingClientRect(), p = pt(e.touches[0], r); apply(scale > 1.2 ? 1 : 2.5, p.x, p.y); e.preventDefault(); lastTap = 0; }
+        else lastTap = now;
+      }
+    }, {passive: false});
+    box.addEventListener('touchmove', e => {
+      if (!pinch || e.touches.length !== 2) return;
+      e.preventDefault();
+      const r = box.getBoundingClientRect(), a = pt(e.touches[0], r), b = pt(e.touches[1], r);
+      apply(pinch.s * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d, (a.x + b.x) / 2, (a.y + b.y) / 2);
+    }, {passive: false});
+    box.addEventListener('touchend', e => { if (e.touches.length < 2) pinch = null; });
+    box.addEventListener('wheel', e => { if (!e.ctrlKey && !e.metaKey) return; e.preventDefault(); const r = box.getBoundingClientRect(); apply(scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX - r.left, e.clientY - r.top); }, {passive: false});
+    box.addEventListener('dblclick', e => { const r = box.getBoundingClientRect(); apply(scale > 1.2 ? 1 : 2.5, e.clientX - r.left, e.clientY - r.top); });
+  }
   async function pdfPreview(html, name) {
     toast('Preparing preview…');
     let r; try { r = await htmlToPdf(html, {pages: true}); } catch (e) { toast('Could not make the PDF: ' + e.message); return; }
     const kb = Math.round(r.b64.length * 3 / 4 / 1024);
     openSheet('PDF preview', `<div class="btns" style="margin-bottom:12px"><button type="button" class="btn pri" id="pvShare">${ICON.share}Share PDF</button><button type="button" class="btn" id="pvSave">${ICON.dl}Save PDF</button></div>
       <p class="hint" style="margin-top:-4px">${esc(name)}.pdf · ${r.pages.length} page${r.pages.length > 1 ? 's' : ''} · ${kb} KB</p>
-      <div class="pvw">${r.pages.map((p, i) => `<div class="pg"><img src="${p.src}" alt="Page ${i + 1}" style="top:${(p.top * 100).toFixed(3)}%;height:${(p.h * 100).toFixed(3)}%"></div><div class="pn">Page ${i + 1} of ${r.pages.length}</div>`).join('')}</div>`, el => {
+      <div class="pvbar"><button type="button" class="btn" id="pvOut" aria-label="Zoom out">−</button><span class="zl" id="pvLvl">100%</span><button type="button" class="btn" id="pvIn" aria-label="Zoom in">+</button><button type="button" class="btn" id="pvFit">Fit</button><span class="hint" style="margin-left:auto">Pinch or double-tap to zoom</span></div>
+      <div class="pvz" id="pvZ"><div class="pvw" id="pvW">${r.pages.map((p, i) => `<div class="pg"><img src="${p.src}" alt="Page ${i + 1}" style="top:${(p.top * 100).toFixed(3)}%;height:${(p.h * 100).toFixed(3)}%"></div><div class="pn">Page ${i + 1} of ${r.pages.length}</div>`).join('')}</div></div>`, el => {
+      bindZoom(el.querySelector('#pvZ'), el.querySelector('#pvW'), el.querySelector('#pvLvl'), el.querySelector('#pvIn'), el.querySelector('#pvOut'), el.querySelector('#pvFit'));
       const fn = fileSafe(name) + '.pdf', AB = window.AndroidBridge;
       const out = how => {
         if (AB && AB.shareFile) { if (how === 'save') AB.saveFile(r.b64, 'application/pdf', fn); else AB.shareFile(r.b64, 'application/pdf', fn, ''); return; }
