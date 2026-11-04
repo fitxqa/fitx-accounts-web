@@ -1585,16 +1585,29 @@ async function sendPdf(o, how) {
   else toast('PDF downloaded: ' + name);
 }
 function docMailBody(d, kind) {
-  const c = custById(d.customerId) || {}; const s = S();
-  const what = kind === 'insp' ? `Inspection Report ${repNo(d, kind)}` : kind === 'wcr' ? `Work Completion Report ${repNo(d, kind)}` : `${d.type === 'INV' ? 'Invoice' : 'Quotation'} ${d.number}`;
-  let b = `Dear ${c.contact || c.name || 'Customer'},\n\nPlease find attached ${what}${d.subject ? ' (' + d.subject + ')' : ''}.`;
+  const c = custById(d.customerId) || {}; const s = S(); const m = s.mail || {};
+  const isInv = d.type === 'INV';
+  const what = kind === 'insp' ? `Inspection Report ${repNo(d, kind)}` : kind === 'wcr' ? `Work Completion Report ${repNo(d, kind)}` : `${isInv ? 'Invoice' : 'Quotation'} ${d.number}`;
+  const L = [];
+  L.push(`Dear ${c.contact || c.name || 'Customer'},`, '');
+  if (kind) L.push(`Please find attached our ${what}${d.subject ? ' for ' + d.subject : ''}.`);
+  else if (isInv) L.push(`Thank you for choosing ${s.name}. Please find attached ${what}${d.subject ? ' for ' + d.subject : ''}.`);
+  else L.push(`Thank you for your enquiry. Please find attached our ${what}${d.subject ? ' for ' + d.subject : ''}.`);
   if (!kind) {
-    b += `\n\nTotal: ${money(docTotal(d))}`;
-    if (d.type === 'INV') { if (docPaid(d)) b += `\nPaid: ${money(docPaid(d))}\nBalance due: ${money(docBal(d))}`; b += `\nDue date: ${dfmt(d.due)}\n\n${s.payNote || ''}`; }
-    else b += `\nValid until: ${dfmt(d.due)}`;
+    L.push('', `${isInv ? 'Invoice' : 'Quotation'} no.: ${d.number}`, `Date: ${dfmt(d.date)}`, `${isInv ? 'Due date' : 'Valid until'}: ${dfmt(d.due)}`);
+    if (isInv && docPaid(d)) L.push(`Total: ${money(docTotal(d))}`, `Paid: ${money(docPaid(d))}`, `Balance due: ${money(docBal(d))}`);
+    else L.push(`${isInv ? 'Amount due' : 'Total amount'}: ${money(docTotal(d))}`);
+    if (isInv && s.payNote && docBal(d) > 0.004) L.push('', s.payNote);
+    if (!isInv) L.push('', 'To go ahead, simply reply to this email or call us and we will schedule the work at your convenience.');
   }
-  b += `\n\nIf you have any questions, please call us on ${s.phone}.\n\nBest regards,\n${s.name}\n${s.phone} | ${s.email} | ${s.web}`;
-  return {subject: `${what} – ${s.name}`, body: b};
+  L.push('', `If you have any questions, please call us on ${s.phone}.`, '', m.signoff || 'Best regards,');
+  if (m.name) L.push(m.name);
+  if (m.title) L.push(m.title);
+  L.push(s.name);
+  L.push([s.phone && 'Tel: ' + s.phone, m.mobile && 'Mobile: ' + m.mobile].filter(Boolean).join(' | '));
+  L.push([m.from || s.email, s.web].filter(Boolean).join(' | '));
+  if (s.address || s.cr) L.push([s.address, s.cr && 'CR No. ' + s.cr].filter(Boolean).join(' · '));
+  return {subject: `${what}${d.subject && !kind ? ' – ' + d.subject : ''} | ${s.name}`, body: L.join('\n')};
 }
 function docPdfOpts(d, kind) {
   const c = custById(d.customerId) || {};
