@@ -54,14 +54,14 @@
     const tel = [s.phone && lab('T') + a('tel:' + s.phone.replace(/\s+/g, ''), s.phone), m.mobile && lab('M') + a('tel:' + m.mobile.replace(/\s+/g, ''), m.mobile)].filter(Boolean).join(dot);
     const net = [mail && lab('E') + a('mailto:' + mail, mail), s.web && lab('W') + a(web, s.web.replace(/^https?:\/\//, ''))].filter(Boolean).join(dot);
     const foot = [s.address, s.cr && 'CR ' + s.cr].filter(Boolean).join(' · ');
-    return `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:12.5px;line-height:1.5;color:#333333">
-<tr><td style="padding:0 14px 0 0;vertical-align:middle"><img src="${logoSrc || LOGO_URL}" width="132" height="60" alt="FitX Sports Equipment Services" style="display:block;width:132px;height:60px;border:0"></td>
-<td style="padding:0 0 0 14px;border-left:2px solid ${OR};vertical-align:middle">
-<div style="font-size:15px;line-height:1.25;font-weight:bold;color:#0d0d0d">${esc(m.name || s.name)}</div>
-${m.title ? `<div style="font-size:11px;line-height:1.4;font-weight:bold;color:${OR};letter-spacing:.6px;text-transform:uppercase">${esc(m.title)}</div>` : ''}
-${tel ? `<div style="margin-top:3px;white-space:nowrap">${tel}</div>` : ''}${net ? `<div style="white-space:nowrap">${net}</div>` : ''}
-${foot ? `<div style="font-size:11px;color:#999999">${esc(foot)}</div>` : ''}
-</td></tr></table>`;
+    // fluid layout: logo and details side by side on wide screens, details drop under the logo on narrow phones
+    return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse"><tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#333333">
+<div style="display:inline-block;vertical-align:middle;margin:0 18px 10px 0"><img src="${logoSrc || LOGO_URL}" width="150" height="68" alt="FitX Sports Equipment Services" style="display:block;width:150px;height:68px;border:0"></div><div style="display:inline-block;vertical-align:middle;border-left:3px solid ${OR};padding:2px 0 2px 14px;margin:0 0 10px 0">
+<div style="font-size:16px;line-height:1.25;font-weight:bold;color:#0d0d0d">${esc(m.name || s.name)}</div>
+${m.title ? `<div style="font-size:11.5px;line-height:1.4;font-weight:bold;color:${OR};letter-spacing:.6px;text-transform:uppercase">${esc(m.title)}</div>` : ''}
+${tel ? `<div style="margin-top:4px">${tel}</div>` : ''}${net ? `<div>${net}</div>` : ''}
+${foot ? `<div style="font-size:11.5px;color:#999999">${esc(foot)}</div>` : ''}
+</div></td></tr></table>`;
   }
   function textSig() {
     const s = S(), m = M(), L = [];
@@ -76,10 +76,10 @@ ${foot ? `<div style="font-size:11px;color:#999999">${esc(foot)}</div>` : ''}
   function emailHTML(msg, title, rows, attNames, logoSrc) {
     const row = r => `<tr><td style="padding:8px 14px;color:#666666;font-size:13px;border-bottom:1px solid #eeeeee">${esc(r[0])}</td><td style="padding:8px 14px;text-align:right;font-size:13px;border-bottom:1px solid #eeeeee;${r[2] ? 'font-weight:bold;color:' + OR + ';font-size:15px' : 'color:#0d0d0d'}">${esc(r[1])}</td></tr>`;
     const box = rows && rows.length ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;border:1px solid #e5e5e5;margin:18px 0"><tr><td colspan="2" style="background:#0d0d0d;color:#ffffff;padding:10px 14px;font-weight:bold;font-size:13px;letter-spacing:.5px;border-bottom:3px solid ${OR}">${esc(title.toUpperCase())}</td></tr>${rows.map(row).join('')}</table>` : '';
-    return `<!doctype html><html><body style="margin:0;padding:0;background:#f4f4f4">
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f4f4f4"><tr><td align="center" style="padding:20px 10px">
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px;width:100%;background:#ffffff;border-top:4px solid ${OR}">
-<tr><td style="padding:26px 28px 10px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#333333;line-height:1.6">
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="x-apple-disable-message-reformatting"></head><body style="margin:0;padding:0;background:#f4f4f4;-webkit-text-size-adjust:100%">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f4f4f4"><tr><td align="center" style="padding:16px 8px">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;width:100%;background:#ffffff;border-top:4px solid ${OR}">
+<tr><td style="padding:22px 20px 8px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#333333;line-height:1.6">
 ${esc2(msg)}${box}
 ${attNames && attNames.length ? `<p style="margin:0 0 4px;font-size:13px;color:#555555">Attached: ${attNames.map(esc).join(', ')}</p>` : ''}
 <p style="margin:22px 0 14px">${esc(M().signoff || 'Best regards,')}</p>
