@@ -2121,11 +2121,13 @@ function editCustomer(id, after) {
       <label class="f"><span>Area / place</span><input class="in" name="area" value="${esc(c.area)}" placeholder="e.g. The Pearl, Lusail, Al Sadd"></label>
       <label class="f"><span>Google Maps link (optional)</span><input class="in" name="maps" type="url" value="${esc(c.maps)}" placeholder="Paste a pin link for exact location"></label>
       <label class="f"><span>Notes</span><textarea class="in" name="notes">${esc(c.notes)}</textarea></label>
+      <label class="f" style="display:flex;gap:10px;align-items:center"><input type="checkbox" name="noRemind" ${c.noRemind ? 'checked' : ''} style="width:20px;height:20px;flex-shrink:0"><span style="margin:0;color:var(--text)">No service reminders for this customer</span></label>
       <button class="btn pri full" type="submit">Save customer</button>
     </form>`, el => {
     el.querySelector('#cForm').onsubmit = e => {
       e.preventDefault(); const f = formData(e.target);
       Object.keys(f).forEach(k => f[k] = f[k].trim());
+      f.noRemind = !!f.noRemind;
       let saved;
       if (id) { Object.assign(c, f); saved = c; } else { saved = Object.assign({id: uid()}, f); db.customers.push(saved); }
       save(); closeSheet(() => { if (after) after(saved); else render(); toast('Customer saved'); });

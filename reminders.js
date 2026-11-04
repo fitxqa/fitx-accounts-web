@@ -29,6 +29,7 @@
     (db.docs || []).forEach(d => {
       if (d.type !== 'INV' || d.cancelled || !Array.isArray(d.remind) || !d.remind.length) return;
       const c = custById(d.customerId) || {};
+      if (c.noRemind) return;
       d.remind.forEach(m => {
         const st = (d.remSent || {})[m] || '';
         out.push({d, m, c, due: addMonths(baseDate(d), m), sent: st && !st.startsWith('skip') ? st : '', skipped: st.startsWith('skip') ? st.slice(5) : ''});
@@ -85,7 +86,7 @@
   const icBell = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
   const icWa = (window.ICON && ICON.wa) || '';
   // drop-down list of common schedules, with "Custom…" for any mix of months
-  const PRESETS = [['none', 'No reminder', []], ['1', 'After 1 month', [1]], ['2', 'After 2 months', [2]], ['3', 'After 3 months', [3]], ['6', 'After 6 months', [6]], ['9', 'After 9 months', [9]], ['12', 'After 12 months (yearly)', [12]],
+  const PRESETS = [['none', 'None – no reminder', []], ['1', 'After 1 month', [1]], ['2', 'After 2 months', [2]], ['3', 'After 3 months', [3]], ['6', 'After 6 months', [6]], ['9', 'After 9 months', [9]], ['12', 'After 12 months (yearly)', [12]],
     ['q', 'Every 3 months (3, 6, 9, 12)', [3, 6, 9, 12]], ['h', 'Every 6 months (6, 12)', [6, 12]], ['m', '1, 3, 6 & 12 months', [1, 3, 6, 12]], ['all', 'All (1, 2, 3, 6, 9, 12 months)', [1, 2, 3, 6, 9, 12]], ['c', 'Custom…', null]];
   const presetOf = sel => { const k = sel.slice().sort((a, b) => a - b).join(','); const p = PRESETS.find(x => x[2] && x[2].join(',') === k); return p ? p[0] : 'c'; };
   const chipsHTML = (sel) => { const cur = presetOf(sel);
@@ -109,7 +110,8 @@
 
   /* ---------- invoice editor panel ---------- */
   window.remindPanel = function (draft, isNew) {
-    if (!Array.isArray(draft.remind)) draft.remind = isNew ? (R().defaults || []).slice() : [];
+    const cu = custById(draft.customerId);
+    if (!Array.isArray(draft.remind)) draft.remind = isNew && !(cu && cu.noRemind) ? (R().defaults || []).slice() : [];
     return `<div class="rmpanel" id="rmPanel"><div style="font-weight:800;display:flex;gap:8px;align-items:center;margin-bottom:8px">${icBell}Service reminders (WhatsApp)</div>
       ${chipsHTML(draft.remind)}<p class="hint" id="rmHint"></p></div>`;
   };
@@ -121,6 +123,17 @@
     };
     bindChips(p, draft.remind, hint); hint();
     const dt = el.querySelector('[name=date]'); if (dt) dt.addEventListener('change', hint);
+    // customer set to "No service reminders": switch to None when chosen; otherwise use the default for a new invoice
+    const cs = el.querySelector('#dCust');
+    const note = () => { const c = custById(cs.value); let n = p.querySelector('.rmno'); if (c && c.noRemind) { if (!n) p.insertAdjacentHTML('beforeend', '<p class="hint rmno" style="color:var(--orange-d)">This customer is set to “No service reminders”.</p>'); } else if (n) n.remove(); };
+    if (cs) cs.addEventListener('change', () => {
+      const c = custById(cs.value), sel = p.querySelector('.rmsel');
+      if (c && c.noRemind) { draft.remind.splice(0); }
+      else if (!draft.remind.length && !draft.id) draft.remind.splice(0, 0, ...(R().defaults || []));
+      if (sel) { sel.value = presetOf(draft.remind); sel.dispatchEvent(new Event('change')); }
+      note(); hint();
+    });
+    if (cs) note();
   };
 
   /* ---------- dashboard card (every day while something is due) ---------- */
