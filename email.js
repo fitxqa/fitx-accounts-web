@@ -36,11 +36,11 @@
   const custVars = c => ({customer: c.name || 'Customer', contact: c.contact || c.name || 'Customer'});
 
   /* ---------- logo & signature ---------- */
-  const LOGO_URL = 'https://fitxqa.github.io/fitx-accounts-web/icons/email-logo-badge.png';
+  const LOGO_URL = 'https://fitxqa.github.io/fitx-accounts-web/icons/email-logo-badge2.png';
   let logoB64 = null;
   async function logoData() {
     if (logoB64) return logoB64;
-    try { const r = await fetch('icons/email-logo-badge.png'); const b = await r.blob(); logoB64 = await new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1]); fr.readAsDataURL(b); }); }
+    try { const r = await fetch('icons/email-logo-badge2.png'); const b = await r.blob(); logoB64 = await new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1]); fr.readAsDataURL(b); }); }
     catch (e) { logoB64 = ''; }
     return logoB64;
   }
@@ -55,7 +55,7 @@
     const net = [mail && lab('E') + a('mailto:' + mail, mail), s.web && lab('W') + a(web, s.web.replace(/^https?:\/\//, ''))].filter(Boolean).join(dot);
     const foot = [s.address, s.cr && 'CR ' + s.cr].filter(Boolean).join(' · ');
     return `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:12.5px;line-height:1.5;color:#333333">
-<tr><td style="padding:0 14px 0 0;vertical-align:middle"><img src="${logoSrc || LOGO_URL}" width="104" height="44" alt="FitX" style="display:block;width:104px;height:44px;border:0"></td>
+<tr><td style="padding:0 14px 0 0;vertical-align:middle"><img src="${logoSrc || LOGO_URL}" width="132" height="60" alt="FitX Sports Equipment Services" style="display:block;width:132px;height:60px;border:0"></td>
 <td style="padding:0 0 0 14px;border-left:2px solid ${OR};vertical-align:middle">
 <div style="font-size:15px;line-height:1.25;font-weight:bold;color:#0d0d0d">${esc(m.name || s.name)}</div>
 ${m.title ? `<div style="font-size:11px;line-height:1.4;font-weight:bold;color:${OR};letter-spacing:.6px;text-transform:uppercase">${esc(m.title)}</div>` : ''}
@@ -263,7 +263,7 @@ ${sigHTML(logoSrc)}
       const su = el.querySelector('#mlSetup'); if (su) su.onclick = () => settings();
       const lk = el.querySelector('#mlLook'); if (lk) lk.onclick = async () => {
         const v = formData(el.querySelector('#mlForm'));
-        const html = emailHTML(v.msg + (sp.extra ? '\n\n' + sp.extra : ''), sp.title, sp.rows, pick().map(a => fileSafe(a.name) + '.pdf'), 'icons/email-logo-badge.png');
+        const html = emailHTML(v.msg + (sp.extra ? '\n\n' + sp.extra : ''), sp.title, sp.rows, pick().map(a => fileSafe(a.name) + '.pdf'), 'icons/email-logo-badge2.png');
         openSheet('Email preview', `<p class="hint" style="margin-top:0"><b>To:</b> ${esc(v.to)}${v.cc ? ' · <b>Cc:</b> ' + esc(v.cc) : ''}<br><b>Subject:</b> ${esc(v.subject)}</p><iframe class="mailprev" title="Email preview" sandbox="allow-same-origin"></iframe>`, e2 => { const fr = e2.querySelector('iframe'); fr.onload = () => { try { fr.style.height = (fr.contentDocument.documentElement.scrollHeight + 8) + 'px'; } catch (e) {} }; fr.srcdoc = html; });
       };
       el.querySelector('#mlForm').onsubmit = async ev => {
@@ -572,7 +572,7 @@ reply(200, array('ok' => true, 'to' => $to, 'saved_to_sent' => $saved));
       };
       const show = () => { el.querySelectorAll('[data-prov]').forEach(x => x.classList.toggle('on', x.dataset.prov === prov)); el.querySelectorAll('[data-for]').forEach(x => x.classList.toggle('hidden', x.dataset.for !== prov)); status(); };
       el.querySelectorAll('[data-prov]').forEach(b => b.onclick = () => { prov = b.dataset.prov; show(); });
-      const drawSig = () => { keep(); el.querySelector('#msSig').innerHTML = sigHTML('icons/email-logo-badge.png'); };
+      const drawSig = () => { keep(); el.querySelector('#msSig').innerHTML = sigHTML('icons/email-logo-badge2.png'); };
       f.addEventListener('input', () => { clearTimeout(f._t); f._t = setTimeout(drawSig, 250); });
       show(); drawSig();
       el.querySelectorAll('[data-tpk]').forEach(b => b.onclick = () => editTpl(b.dataset.tpk));
