@@ -1289,7 +1289,7 @@ function pickItem(opts, cb) {
       const words = q.value.toLowerCase().split(/\s+/).filter(Boolean);
       const list = pool.filter(i => (!cat || (cat === '__svc' ? i.service : cat === '__part' ? !i.service : catParent(i.category || (i.service ? 'Other services' : 'Other parts')) === cat)) &&
         words.every(w => [i.name, i.sku, i.category, i.descr, ...(i.fits || [])].join(' ').toLowerCase().includes(w))).sort((a, b) => (a.category || '').localeCompare(b.category || '') || a.name.localeCompare(b.name));
-      el.querySelector('#pkL').innerHTML = list.length ? list.slice(0, 150).map(i => `<button type="button" class="item" data-p="${i.id}"><div class="main"><div class="t">${esc(i.name)}</div><div class="s">${esc(i.category || '—')}${i.sku ? ' · ' + esc(i.sku) : ''}${i.service ? ' · Service' : ' · Stock ' + stockQty(i.id)}</div></div><div class="r amt">${fmt(i.price)}</div></button>`).join('') + (list.length > 150 ? `<div class="empty">${list.length - 150} more — type to narrow the search</div>` : '') : '<div class="empty">Nothing found.</div>';
+      el.querySelector('#pkL').innerHTML = list.length ? list.slice(0, 150).map(i => `<button type="button" class="item" data-p="${i.id}">${window.prodIco ? prodIco(i) : ''}<div class="main"><div class="t">${esc(i.name)}</div><div class="s">${esc(i.category || '—')}${i.sku ? ' · ' + esc(i.sku) : ''}${i.service ? ' · Service' : ' · Stock ' + stockQty(i.id)}</div></div><div class="r amt">${fmt(i.price)}</div></button>`).join('') + (list.length > 150 ? `<div class="empty">${list.length - 150} more — type to narrow the search</div>` : '') : '<div class="empty">Nothing found.</div>';
       el.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { const it = itemById(b.dataset.p); closeSheet(() => cb(it)); });
     };
     q.oninput = draw; draw();
@@ -2403,9 +2403,9 @@ function treadmillParts(m, onPick) {
 }
 
 function itemRow(i) {
-  if (i.service) return `<button type="button" class="item" data-item="${i.id}"><div class="main"><div class="t">${esc(i.name)}</div><div class="s">${esc([i.sku, i.category].filter(Boolean).join(' · ') || 'Service')} · ${fmt(i.price)}</div></div><div class="r"><span class="badge b-blue">Service</span></div></button>`;
+  if (i.service) return `<button type="button" class="item" data-item="${i.id}">${window.prodIco ? prodIco(i) : ''}<div class="main"><div class="t">${esc(i.name)}</div><div class="s">${esc([i.sku, i.category].filter(Boolean).join(' · ') || 'Service')} · ${fmt(i.price)}</div></div><div class="r"><span class="badge b-blue">Service</span></div></button>`;
   const q = stockQty(i.id); const low = isLow(i);
-  return `<button type="button" class="item" data-item="${i.id}"><div class="main"><div class="t">${esc(i.name)}</div><div class="s">${esc([i.sku, i.category].filter(Boolean).join(' · ') || '—')} · ${fmt(i.price)}${(i.fits || []).length ? ` · fits ${i.fits.length} model${i.fits.length > 1 ? 's' : ''}` : ''}</div></div><div class="r"><div class="amt" style="color:${q <= 0 && (num(i.minQty) > 0 || stockIn(i.id) > 0) ? 'var(--red)' : low ? 'var(--yellow)' : 'var(--text)'}">${q}</div><div class="s">${esc(i.unit || 'pcs')}</div></div></button>`;
+  return `<button type="button" class="item" data-item="${i.id}">${window.prodIco ? prodIco(i) : ''}<div class="main"><div class="t">${esc(i.name)}</div><div class="s">${esc([i.sku, i.category].filter(Boolean).join(' · ') || '—')} · ${fmt(i.price)}${(i.fits || []).length ? ` · fits ${i.fits.length} model${i.fits.length > 1 ? 's' : ''}` : ''}</div></div><div class="r"><div class="amt" style="color:${q <= 0 && (num(i.minQty) > 0 || stockIn(i.id) > 0) ? 'var(--red)' : low ? 'var(--yellow)' : 'var(--text)'}">${q}</div><div class="s">${esc(i.unit || 'pcs')}</div></div></button>`;
 }
 const categories = () => catTree(Array.from(new Set(db.items.map(i => i.category).filter(Boolean))).sort()).map(t => t.name);
 function viewStock() {
@@ -2447,6 +2447,7 @@ function editItem(id, after, prefill) {
         <label class="f"><span>Part code / SKU</span><input class="in" name="sku" value="${esc(i.sku)}"></label>
         <label class="f"><span>Category</span><select class="in" name="category" id="iCat">${catOptions(S().stockCats, i.category)}</select></label>
       </div>
+      <div class="f"><span>Symbol</span><input type="hidden" name="icon" value="${esc(i.icon || '')}"><div id="iIco"></div></div>
       <label class="f"><span>Description (optional – copied into invoice / quote lines)</span><textarea class="in" name="descr" rows="2" placeholder="e.g. Includes removal of old belt, fitting, alignment and test run">${esc(i.descr || '')}</textarea></label>
       <div class="row3">
         <label class="f"><span>Cost (QAR)</span><input class="in" type="number" step="0.01" min="0" inputmode="decimal" name="cost" value="${i.cost ?? ''}"></label>
@@ -2461,6 +2462,7 @@ function editItem(id, after, prefill) {
     </form>`, el => {
     bindCatSelect(el.querySelector('#iCat'), 'stockCats');
     let service = !!i.service;
+    if (window.FitxIco) setTimeout(() => FitxIco.picker(el, i));
     const setKind = () => {
       el.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', (b.dataset.k === 'service') === service));
       el.querySelectorAll('.stockOnly').forEach(x => x.classList.toggle('hidden', service));
@@ -2473,7 +2475,7 @@ function editItem(id, after, prefill) {
     el.querySelector('#iForm').onsubmit = e => {
       e.preventDefault(); const f = formData(e.target);
       if (f.category === NEWCAT) f.category = '';
-      const data = {name: f.name.trim(), sku: f.sku.trim(), descr: (f.descr || '').trim(), category: f.category.trim(), cost: r2(f.cost), price: r2(f.price), unit: f.unit.trim() || (service ? 'job' : 'pcs'), minQty: service ? 0 : num(f.minQty), service};
+      const data = {name: f.name.trim(), sku: f.sku.trim(), descr: (f.descr || '').trim(), category: f.category.trim(), cost: r2(f.cost), price: r2(f.price), unit: f.unit.trim() || (service ? 'job' : 'pcs'), minQty: service ? 0 : num(f.minQty), service, icon: f.icon || ''};
       let saved;
       if (id) { Object.assign(i, data); saved = i; }
       else {
@@ -2492,6 +2494,7 @@ function viewItem(id) {
   db.purchases.forEach(p => (p.lines || []).forEach(l => { if (l.itemId === id) purs.push({date: p.date, qty: num(l.qty), note: 'Purchase ' + p.number + ' · ' + ((supById(p.supplierId) || {}).name || '') + ' @ ' + fmt(l.cost)}); }));
   const hist = db.moves.filter(m => m.itemId === id).map(m => ({date: m.date, qty: num(m.qty), note: m.note, mid: m.id})).concat(sales, purs).sort((a, b) => b.date.localeCompare(a.date));
   openSheet(i.name, `
+    ${window.prodIco ? `<div style="display:flex;align-items:center;gap:12px;margin:0 2px 12px">${prodIco(i, 'big')}<div class="hint">${esc(i.category || (i.service ? 'Service' : 'Spare part'))}</div></div>` : ''}
     <div class="grid2" style="margin-bottom:12px">
       <div class="stat hl"><div class="k">${i.service ? 'Type' : 'In stock'}</div><div class="v">${i.service ? 'Service' : stockQty(id) + ' ' + esc(i.unit || '')}</div></div>
       <div class="stat"><div class="k">Sell / cost</div><div class="v">${fmt(i.price)} <span class="hint">/ ${fmt(i.cost)}</span></div></div>
@@ -3581,6 +3584,7 @@ render();
 <script src="stamp.js"></script>
 <script src="advance.js"></script>
 <script src="porders.js"></script>
+<script src="prodicons.js"></script>
 <script src="cloud.js"></script>
 </body>
 </html>
