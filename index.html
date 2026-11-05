@@ -494,13 +494,10 @@ textarea.in{min-height:80px;resize:vertical}
 
 #printArea{display:none}
 @media print{
-  /* margin 0 removes the browser's date / title / URL / page-number headers & footers; the 10mm page margin comes from #printArea padding + repeating table spacers */
-  @page{size:A4;margin:0}
+  /* real 12mm page margin (printers can't print to the paper edge). Empty margin boxes switch off the browser's own
+     date / title / web address / page-number headers and footers (Chrome 131+), without cutting the page content. */
+  @page{size:A4;margin:12mm;@top-left{content:""}@top-center{content:""}@top-right{content:""}@bottom-left{content:""}@bottom-center{content:""}@bottom-right{content:""}}
   html,body{margin:0!important}
-  #printArea{padding:0 10mm!important}
-  #printArea table.pwrap{width:100%;border-collapse:collapse}
-  #printArea table.pwrap>thead>tr>td,#printArea table.pwrap>tfoot>tr>td{padding:0;border:0;height:10mm}
-  #printArea table.pwrap>tbody>tr>td{padding:0;border:0}
   body{background:#fff;padding:0!important}
   body>*:not(#printArea){display:none!important}
   #printArea{display:block!important}
@@ -3171,7 +3168,7 @@ function reportPaper(title, arTitle, sub, body) {
   </div>`;
 }
 function printHTML(html, name) {
-  $('#printArea').innerHTML = `<table class="pwrap"><thead><tr><td></td></tr></thead><tfoot><tr><td></td></tr></tfoot><tbody><tr><td>${html}</td></tr></tbody></table>`;
+  $('#printArea').innerHTML = html;
   const old = document.title; document.title = name;
   setTimeout(() => { window.print(); document.title = old; }, 150);
 }
