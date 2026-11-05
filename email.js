@@ -25,7 +25,11 @@
     wcr: ['Work completion report', 'Work completion report {number}{re} | {company}', 'Dear {contact},\n\nWe are pleased to confirm that the work{for} has been completed. Please find attached work completion report {number}.\n\nThank you for your business. Please let us know if you need anything else.'],
     service: ['Service reminder', 'Service reminder – {equipment} | {company}', 'Dear {contact},\n\nIt has been {period} since we serviced your {equipment} (invoice {number} on {date}).\n\nRegular servicing keeps your equipment safe and smooth and avoids costly breakdowns. Shall we book your next service visit? Simply reply to this email or call us on {phone}.'],
     advice: ['Supplier payment advice', 'Payment advice – {ref} | {company}', 'Dear {supplier},\n\nWe have paid {amount} on {date} by {method} against your invoice {ref} (our reference {number}).\n\n{balance_line}\n\nKindly confirm receipt.'],
-    payslip: ['Payslip', 'Payslip {month} | {company}', 'Dear {employee},\n\nPlease find attached your payslip for {month}. Net pay: {net}.\n\nPlease let us know if you have any questions.']
+    payslip: ['Payslip', 'Payslip {month} | {company}', 'Dear {employee},\n\nPlease find attached your payslip for {month}. Net pay: {net}.\n\nPlease let us know if you have any questions.'],
+    so: ['Sales order', 'Sales order {number}{re} | {company}', 'Dear {contact},\n\nThank you for your order. Please find attached our sales order {number} confirming the work and prices{for}.\n\nPlanned delivery: {due}. Please check the details and let us know if anything needs to change.'],
+    proforma: ['Proforma invoice', 'Proforma invoice {number} – {pct}% advance | {company}', 'Dear {contact},\n\nPlease find attached proforma invoice {number}{for}. To confirm the order and schedule the work, we kindly request an advance payment of {pct}%: {advance}.\n\nThe balance will be invoiced when the work is completed.'],
+    advrcpt: ['Advance receipt', 'Advance received – {number} | {company}', 'Dear {contact},\n\nThank you. We have received your advance payment of {amount} on {date} by {method} against {number}.\n\nThis advance will be deducted from the final invoice when the work is completed.'],
+    po: ['Purchase order', 'Purchase order {number} | {company}', 'Dear {supplier},\n\nPlease find attached our purchase order {number}. Kindly confirm the order, prices and delivery date ({due}).\n\nPlease quote our order number on your invoice and delivery note.']
   };
   const tpl = k => { const t = (M().tpl || {})[k] || {}; return {subject: t.subject || TPL[k][1], body: t.body || TPL[k][2]}; };
   function fill(text, v) { return String(text).replace(/\{(\w+)\}/g, (m0, k) => v[k] !== undefined && v[k] !== null ? String(v[k]) : m0).replace(/\n{3,}/g, '\n\n').trim(); }
@@ -526,7 +530,11 @@ reply(200, array('ok' => true, 'to' => $to, 'saved_to_sent' => $saved, 'note' =>
     wcr: ['customer', 'contact', 'number', 'date', 'for', 're'],
     service: ['customer', 'contact', 'equipment', 'period', 'number', 'date'],
     advice: ['supplier', 'number', 'ref', 'amount', 'date', 'method', 'balance_line'],
-    payslip: ['employee', 'month', 'net']
+    payslip: ['employee', 'month', 'net'],
+    so: ['customer', 'contact', 'number', 'date', 'due', 'total', 'for', 're'],
+    proforma: ['customer', 'contact', 'number', 'pct', 'advance', 'total', 'for'],
+    advrcpt: ['customer', 'contact', 'number', 'amount', 'date', 'method'],
+    po: ['supplier', 'number', 'date', 'due', 'total']
   };
   function editTpl(k) {
     const t = tpl(k);
@@ -693,5 +701,5 @@ reply(200, array('ok' => true, 'to' => $to, 'saved_to_sent' => $saved, 'note' =>
     if (sales) { sales.insertAdjacentHTML('beforeend', `<button type="button" class="item rcard" id="mPayRem"><span class="ic">${ICON.clock || ICON.mail}</span><div class="main"><div class="t">Payment reminders${n ? ` <span class="badge b-red">${n} overdue</span>` : ''}</div><div class="s">Email statements to customers with overdue invoices</div></div></button>`); document.getElementById('mPayRem').onclick = viewPaymentReminders; }
     if (bus) { bus.insertAdjacentHTML('beforeend', `<button type="button" class="item rcard" id="mMail"><span class="ic">${ICON.mail}</span><div class="main"><div class="t">Email settings</div><div class="s">${direct() ? 'Sending from ' + esc(fromAddr()) + ' (Bluehost)' : 'Bluehost sending, email drafts, logo signature'}</div></div></button>`); document.getElementById('mMail').onclick = () => settings(); }
   };
-  window.FitxMail = {compose, settings, pdfPreview, sigHTML, htmlBody, specDoc, specReminder, specReceipt, specStatement, specAdvice, specService, specPayslip, specReport, viewPaymentReminders, emailHTML, receiptHTML, direct, TPL};
+  window.FitxMail = {baseVars, custVars, compose, settings, pdfPreview, sigHTML, htmlBody, specDoc, specReminder, specReceipt, specStatement, specAdvice, specService, specPayslip, specReport, viewPaymentReminders, emailHTML, receiptHTML, direct, TPL};
 })();

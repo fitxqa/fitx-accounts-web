@@ -1325,6 +1325,7 @@ function editDoc(type, id, fromDoc) {
     // new doc, or converting a quote into an invoice: use that type's default terms
     if (!fromDoc || fromDoc.type !== type || draft.terms === undefined) draft.terms = defTerms;
     draft.type = type;
+    delete draft.advances; delete draft.so; delete draft.advPct;
   } else if (draft.terms === undefined) draft.terms = defTerms;
   if (!draft.lines.length) draft.lines.push({itemId: '', desc: '', qty: 1, price: 0});
   if ((draft.equipment || []).length) {
@@ -1549,7 +1550,7 @@ function editDoc(type, id, fromDoc) {
       else {
         saved = Object.assign({}, draft, {id: uid(), number: nextNumber(type), created: String(Date.now()), payments: [], status: type === 'QUO' ? 'Open' : undefined});
         delete saved.cancelled;
-        if (fromDoc && type === 'INV' && fromDoc.type === 'QUO') { saved.fromQuote = fromDoc.number; }
+        if (fromDoc && type === 'INV' && fromDoc.type === 'QUO') { saved.fromQuote = fromDoc.number; if (window.FitxAdv) FitxAdv.apply(saved, fromDoc.id); }
         if (fromDoc && fromDoc.type === 'INV') saved.payments = [];
         bumpNumber(type);
         db.docs.push(saved);
@@ -1781,17 +1782,19 @@ function docHTML(d, layout) {
   const s = S(); const c = custById(d.customerId) || {};
   const isInv = d.type === 'INV';
   const lay = layout || docLayout(d);
-  const [st] = status(d);
-  const stampColor = st === 'Paid' ? '#1a9e5f' : st.startsWith('Overdue') ? '#d62828' : st === 'Cancelled' ? '#777' : '#ff6a00';
+  let [st] = status(d);
+  if (d._pro) st = d._advPaid >= d._advReq - 0.004 ? 'Advance paid' : 'Advance due';
+  if (d._so) st = d.status === 'Converted' ? 'Invoiced' : 'Confirmed';
+  const stampColor = st === 'Paid' || st === 'Advance paid' ? '#1a9e5f' : st.startsWith('Overdue') ? '#d62828' : st === 'Cancelled' ? '#777' : '#ff6a00';
   const brand = `<div class="pbrand">${s.logo ? `<img class="logoimg" src="${s.logo}" alt="${esc(s.name)}">` : '<div class="plogo">Fit<span>X</span></div>'}<div class="pname">${esc(s.name)}</div></div>`;
   const cashInv = isInv && d.payType === 'cash', creditInv = isInv && d.payType === 'credit';
-  const title = cashInv ? 'CASH INVOICE' : creditInv ? 'CREDIT INVOICE' : isInv ? 'INVOICE' : 'QUOTATION';
-  const arTitle = cashInv ? 'فاتورة نقدية' : creditInv ? 'فاتورة آجلة' : isInv ? 'فاتورة' : 'عرض سعر';
+  const title = d._so ? 'SALES ORDER' : d._pro ? 'PROFORMA INVOICE' : cashInv ? 'CASH INVOICE' : creditInv ? 'CREDIT INVOICE' : isInv ? 'INVOICE' : 'QUOTATION';
+  const arTitle = d._so ? 'أمر بيع' : d._pro ? 'فاتورة مبدئية' : cashInv ? 'فاتورة نقدية' : creditInv ? 'فاتورة آجلة' : isInv ? 'فاتورة' : 'عرض سعر';
   const cashMethod = cashInv ? ((d.payments || []).find(p => p.auto) || {}).method || d.cashMethod || 'Cash' : '';
-  const dueTxt = cashInv ? `Payment: <b>${esc(cashMethod)}</b>` : `${isInv ? 'Due' : 'Valid until'}: ${dfmt(d.due)}${creditInv && num(d.creditDays) ? ` (${num(d.creditDays)} days credit)` : ''}`;
+  const dueTxt = d._so ? `Delivery: ${d.due ? dfmt(d.due) : 'to be agreed'}${d._custRef ? '<br>Your ref: <b>' + esc(d._custRef) + '</b>' : ''}` : cashInv ? `Payment: <b>${esc(cashMethod)}</b>` : `${isInv ? 'Due' : 'Valid until'}: ${dfmt(d.due)}${creditInv && num(d.creditDays) ? ` (${num(d.creditDays)} days credit)` : ''}`;
   const coLines = `${esc(s.address)}<br>Tel: ${esc(s.phone)} · ${esc(s.email)}<br>${esc(s.web)}${s.cr ? '<br>CR No. ' + esc(s.cr) : ''}`;
   const custLines = `<b>${esc(c.name || '')}</b>${c.contact ? '<br>Attn: ' + esc(c.contact) : ''}${addrText(c) ? '<br>' + esc(addrText(c)) : ''}${c.phone ? '<br>Tel: ' + esc(c.phone) : ''}${c.email ? '<br>' + esc(c.email) : ''}`;
-  const detLines = `${isInv ? 'Invoice' : 'Quotation'} No: <b>${esc(d.number)}</b><br>Date: ${dfmt(d.date)}<br>${dueTxt}${d.fromQuote ? '<br>Ref quote: ' + esc(d.fromQuote) : ''}${d.jobType ? '<br>Service: ' + esc(d.jobType) : ''}${d.subject ? '<br>Re: ' + esc(d.subject) : ''}`;
+  const detLines = `${d._so ? 'Order' : d._pro ? 'Proforma' : isInv ? 'Invoice' : 'Quotation'} No: <b>${esc(d.number)}</b><br>Date: ${dfmt(d.date)}<br>${dueTxt}${d.fromQuote ? '<br>Ref quote: ' + esc(d.fromQuote) : ''}${d.jobType ? '<br>Service: ' + esc(d.jobType) : ''}${d.subject ? '<br>Re: ' + esc(d.subject) : ''}`;
   const nos = lineNos(d.lines);
   const rows = (d.lines || []).map((l, i) => { const sub = nos[i].includes('.'), free = sub && !num(l.price); return `<tr${sub ? ' class="sub"' : ''}><td>${nos[i]}</td><td>${esc(l.desc)}${lineEq(l) ? `<div class="leq">${esc(eqText(l))}</div>` : ''}${l.note ? `<div class="lnote">${esc(l.note)}</div>` : ''}</td><td class="n">${l.qty}</td><td class="n">${free ? '' : fmt(l.price)}</td><td class="n">${free ? '' : fmt(num(l.qty) * num(l.price))}</td></tr>`; }).join('');
   const oldEq = (d.equipment || []).filter(e => e.brand || e.model || e.sn || e.name);
@@ -1801,22 +1804,23 @@ function docHTML(d, layout) {
       <div><span>Subtotal</span><span>${fmt(subTotal(d))}</span></div>
       ${num(d.discount) ? `<div><span>Discount</span><span>− ${fmt(d.discount)}</span></div>` : ''}
       <div class="g"><span>Total (QAR)</span><span>${fmt(docTotal(d))}</span></div>
-      ${isInv && docPaid(d) ? `<div><span>Paid</span><span>${fmt(docPaid(d))}</span></div><div><b>Balance due</b><b>${fmt(docBal(d))}</b></div>` : ''}
+      ${isInv && docPaid(d) ? (() => { const adv = (d.payments || []).filter(p => p.adv).reduce((a, p) => a + num(p.amount), 0), oth = r2(docPaid(d) - adv); return `${adv ? `<div><span>Less: advance received</span><span>− ${fmt(adv)}</span></div>` : ''}${oth > 0.004 ? `<div><span>Paid</span><span>${fmt(oth)}</span></div>` : ''}<div><b>Balance due</b><b>${fmt(docBal(d))}</b></div>`; })() : ''}
+      ${d._pro ? `<div><span>Advance required (${d._advPct}%)</span><span>${fmt(d._advReq)}</span></div>${d._advPaid ? `<div><span>Advance received</span><span>− ${fmt(d._advPaid)}</span></div>` : ''}<div><b>Advance due now</b><b>${fmt(Math.max(0, d._advReq - d._advPaid))}</b></div>` : ''}
     </div>`;
-  const pay = isInv && s.payNote && !d.cancelled && docBal(d) > 0.004 ? `<div class="pay"><b>Payment</b><br>${esc(s.payNote)}</div>` : '';
+  const pay = s.payNote && ((isInv && !d.cancelled && docBal(d) > 0.004) || (d._pro && d._advReq - d._advPaid > 0.004)) ? `<div class="pay"><b>Payment</b><br>${esc(s.payNote)}</div>` : '';
   const notes = d.notes ? `<div class="notes">${esc(d.notes)}</div>` : '';
   // company stamp (per document "with / without", default from settings)
   const withStamp = d.stamp !== undefined ? !!d.stamp : s.stampOn !== false;
   const stampBlk = withStamp ? `<div class="pstamp"><div class="pstin"><img src="${s.stampImg || window.FITX_STAMP_DATA || 'icons/stamp.png'}" alt="Company stamp"><div class="pstl">For ${esc(s.name)}<br><span>Authorised signature &amp; stamp</span></div></div></div>` : '';
   const terms = stampBlk + (() => { const t = d.terms !== undefined ? d.terms : (isInv ? s.invTerms : s.quoTerms); return t ? `<div class="terms"><b>Terms & Conditions</b> <span dir="rtl" lang="ar" style="color:#888">· الشروط والأحكام</span><div>${esc(t)}</div></div>` : ''; })();
-  const amountDue = isInv ? (st === 'Cancelled' ? 0 : docBal(d)) : docTotal(d);
+  const amountDue = d._pro ? Math.max(0, d._advReq - d._advPaid) : isInv ? (st === 'Cancelled' ? 0 : docBal(d)) : docTotal(d);
 
   if (lay === 'modern') return `<div class="paper lay-modern">
     <div class="mh">${brand}<div class="mtitle"><h2>${title}</h2><div class="ar" dir="rtl" lang="ar">${arTitle}</div><div class="mno"># ${esc(d.number)}</div></div></div>
     <div class="mstrip">
       <div><span class="lbl">${isInv ? 'Bill to' : 'Prepared for'}</span>${custLines}</div>
       <div><span class="lbl">Details</span>Date: ${dfmt(d.date)}<br>${dueTxt}${d.fromQuote ? '<br>Ref: ' + esc(d.fromQuote) : ''}${d.jobType ? '<br>' + esc(d.jobType) : ''}${d.subject ? '<br>Re: ' + esc(d.subject) : ''}</div>
-      <div class="mdue"><span class="lbl">${isInv ? 'Amount due' : 'Quoted total'}</span><div class="big">QAR ${fmt(amountDue)}</div><span class="stamp" style="margin-top:8px;font-size:10px;color:${stampColor};border-color:${stampColor}">${esc(st.toUpperCase())}</span></div>
+      <div class="mdue"><span class="lbl">${d._pro ? 'Advance due' : d._so ? 'Order total' : isInv ? 'Amount due' : 'Quoted total'}</span><div class="big">QAR ${fmt(amountDue)}</div><span class="stamp" style="margin-top:8px;font-size:10px;color:${stampColor};border-color:${stampColor}">${esc(st.toUpperCase())}</span></div>
     </div>
     ${table}
     <div class="mbot"><div>${pay}${notes}</div>${totals}</div>
@@ -2889,7 +2893,7 @@ function acct(f, t) {
     const c = a.byCust[cn] = a.byCust[cn] || {count: 0, total: 0}; c.count++; c.total += docTotal(d);
   });
   a.grossSales = a.servGross + a.partsGross; a.revenue = a.servRev + a.partsRev; a.discount = a.grossSales - a.revenue;
-  activeInvoices().forEach(d => (d.payments || []).forEach(p => { if (p.date >= f && p.date <= t) { a.collected += num(p.amount); addTo(a.inByMethod, p.method || 'Other', num(p.amount)); } }));
+  activeInvoices().forEach(d => (d.payments || []).forEach(p => { if (!p.adv && p.date >= f && p.date <= t) { a.collected += num(p.amount); addTo(a.inByMethod, p.method || 'Other', num(p.amount)); } }));
   db.purchases.forEach(p => {
     if (p.date >= f && p.date <= t) {
       const tot = purTotal(p); a.purTot += tot;
@@ -2962,8 +2966,9 @@ function custLedger(cid, f, t) {
   const ev = [];
   activeInvoices().filter(d => d.customerId === cid).forEach(d => {
     ev.push({date: d.date, sort: d.date + '0' + d.created, ref: d.number, desc: (d.jobType ? d.jobType + ' · ' : '') + (d.subject || 'Invoice'), dr: docTotal(d), cr: 0});
-    (d.payments || []).forEach((p, i) => ev.push({date: p.date, sort: p.date + '1' + d.created + i, ref: d.number, desc: 'Payment · ' + (p.method || '') + (p.note ? ' · ' + p.note : ''), dr: 0, cr: num(p.amount)}));
+    (d.payments || []).forEach((p, i) => { if (!p.adv) ev.push({date: p.date, sort: p.date + '1' + d.created + i, ref: d.number, desc: 'Payment · ' + (p.method || '') + (p.note ? ' · ' + p.note : ''), dr: 0, cr: num(p.amount)}); });
   });
+  db.docs.filter(q => q.type === 'QUO' && q.customerId === cid).forEach(q => (q.advances || []).forEach((x, i) => ev.push({date: x.date, sort: x.date + '1' + q.created + 'a' + i, ref: String(q.number).replace(/^[A-Za-z]+/, 'PRO'), desc: 'Advance received · ' + (x.method || ''), dr: 0, cr: num(x.amount)})));
   return ledgerFrom(ev, f, t);
 }
 function supLedger(sid, f, t) {
@@ -2984,7 +2989,8 @@ function ledgerFrom(ev, f, t) {
 }
 function cashBook(f, t) {
   const ev = [];
-  activeInvoices().forEach(d => (d.payments || []).forEach(p => { if (p.date >= f && p.date <= t) ev.push({date: p.date, desc: 'Received · ' + ((custById(d.customerId) || {}).name || '') + ' · ' + d.number, method: p.method || '', inA: num(p.amount), outA: 0}); }));
+  db.docs.forEach(q => { if (q.type === 'QUO') (q.advances || []).forEach(x => { if (x.date >= f && x.date <= t) ev.push({date: x.date, desc: 'Advance received · ' + ((custById(q.customerId) || {}).name || '') + ' · ' + String(q.number).replace(/^[A-Za-z]+/, 'PRO'), method: x.method || '', inA: num(x.amount), outA: 0}); }); });
+  activeInvoices().forEach(d => (d.payments || []).forEach(p => { if (!p.adv && p.date >= f && p.date <= t) ev.push({date: p.date, desc: 'Received · ' + ((custById(d.customerId) || {}).name || '') + ' · ' + d.number, method: p.method || '', inA: num(p.amount), outA: 0}); }));
   db.purchases.forEach(p => (p.payments || []).forEach(x => { if (x.date >= f && x.date <= t) ev.push({date: x.date, desc: 'Paid supplier · ' + ((supById(p.supplierId) || {}).name || '') + ' · ' + p.number, method: x.method || '', inA: 0, outA: num(x.amount)}); }));
   db.expenses.forEach(x => { if (x.date >= f && x.date <= t) ev.push({date: x.date, desc: 'Expense · ' + (x.category || '') + (x.desc ? ' · ' + x.desc : ''), method: x.method || '', inA: 0, outA: num(x.amount)}); });
   ev.sort((a, b) => a.date.localeCompare(b.date));
@@ -3568,6 +3574,8 @@ render();
 <script src="reminders.js"></script>
 <script src="email.js"></script>
 <script src="stamp.js"></script>
+<script src="advance.js"></script>
+<script src="porders.js"></script>
 <script src="cloud.js"></script>
 </body>
 </html>
