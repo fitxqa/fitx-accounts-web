@@ -232,6 +232,14 @@ textarea.in{min-height:80px;resize:vertical}
 .newgrid .item svg{width:20px;height:20px;color:var(--orange-d);flex-shrink:0}
 
 /* doc lines editor */
+.itype{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.itype button{border:1.5px solid var(--line2);background:var(--card);border-radius:12px;padding:10px;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--text);min-height:56px}
+.itype button b{font-size:14px}
+.itype button small{font-size:11.5px;color:var(--muted)}
+.itype button.on{border-color:var(--orange);background:var(--orange-l);box-shadow:inset 0 0 0 1px var(--orange)}
+.itype button.on b{color:var(--orange-d)}
+.ptag{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.3px;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:1px}
+.ptag.cash{background:#e3f6ec;color:#1a7f45}.ptag.credit{background:#fff1e7;color:#c24e00}
 .line{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-bottom:10px;box-shadow:var(--sh)}
 .line .lt{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;color:var(--muted);font-size:12px;font-weight:700}
 .line .lt button{background:none;border:0;color:var(--red);font-size:13px;min-height:36px;font-weight:600}
@@ -1096,7 +1104,7 @@ function salesRow(d) {
   else act = `<button type="button" class="lnk desk" data-act="print">Print</button>`;
   return `<div class="trow cols" data-doc="${d.id}" role="button" tabindex="0">
     <div class="desk">${dfmt(d.date)}</div><div class="desk">${esc(d.number)}</div>
-    <div style="min-width:0"><div class="c1">${esc(c.name || 'No customer')}</div><div class="c2">${d.jobType ? esc(d.jobType) : esc(d.subject || '')}<span class="mob">${d.jobType || d.subject ? ' · ' : ''}${esc(d.number)} · ${dfmt(d.date)}</span></div></div>
+    <div style="min-width:0"><div class="c1">${esc(c.name || 'No customer')}${isInv && d.payType ? `<span class="ptag ${d.payType}">${d.payType === 'cash' ? 'CASH' : 'CREDIT'}</span>` : ''}</div><div class="c2">${d.jobType ? esc(d.jobType) : esc(d.subject || '')}<span class="mob">${d.jobType || d.subject ? ' · ' : ''}${esc(d.number)} · ${dfmt(d.date)}</span></div></div>
     <div class="desk">${dfmt(d.due)}</div>
     <div class="desk cA">${isInv ? fmt(bal) : '—'}</div>
     <div class="desk cA">${fmt(docTotal(d))}</div>
@@ -1119,7 +1127,7 @@ const SALES_HEAD = `<div class="trow cols th"><div>Date</div><div>No.</div><div>
 function viewSales() {
   const T = state.salesType;
   setTop('Sales', T === 'INV' ? '+ Invoice' : '+ Quotation', () => editDoc(T));
-  const filters = T === 'INV' ? ['All', 'Unpaid', 'Overdue', 'Not due', 'Paid', 'Paid30', 'Cancelled'] : ['All', 'Open', 'Accepted', 'Converted', 'Declined'];
+  const filters = T === 'INV' ? ['All', 'Cash', 'Credit', 'Unpaid', 'Overdue', 'Not due', 'Paid', 'Paid30', 'Cancelled'] : ['All', 'Open', 'Accepted', 'Converted', 'Declined'];
   if (!filters.includes(state.salesFilter)) state.salesFilter = 'All';
   const FL = {Paid30: 'Paid last 30 days'};
   $('#main').innerHTML = subnav('sales') + moneyBar(salesBarData(), T + ':' + state.salesFilter) + `
@@ -1141,6 +1149,8 @@ function viewSales() {
       if (f === 'Not due') return !d.cancelled && docBal(d) > 0.004 && !(d.due && d.due < t);
       if (f === 'Paid30') return !d.cancelled && (d.payments || []).some(p => p.date >= d30);
       if (f === 'Open') return st === 'Open';
+      if (f === 'Cash') return d.payType === 'cash';
+      if (f === 'Credit') return d.payType !== 'cash';
       return st === f;
     });
     list.sort((a, b) => (b.date + b.created).localeCompare(a.date + a.created));
@@ -1295,6 +1305,13 @@ function brandList() {
   return Array.from(set).sort((a, b) => a.localeCompare(b));
 }
 
+// cash invoice: keep one automatic payment for whatever the other payments do not cover, dated on the invoice date
+function applyPayType(d) {
+  d.payments = (d.payments || []).filter(p => !p.auto);
+  if (d.payType !== 'cash' || d.cancelled) return;
+  const left = r2(docTotal(d) - d.payments.reduce((s, p) => s + num(p.amount), 0));
+  if (left > 0.004) d.payments.unshift({amount: left, date: d.date, method: d.cashMethod || 'Cash', acc: d.cashAcc || '', note: 'Cash invoice', auto: true});
+}
 function editDoc(type, id, fromDoc) {
   const existing = id ? docById(id) : null;
   const base = existing || fromDoc;
@@ -1331,9 +1348,12 @@ function editDoc(type, id, fromDoc) {
   const html = `
     <form id="docForm" autocomplete="off">
       <label class="f"><span>Customer</span><div style="display:flex;gap:8px"><select class="in" name="customerId" id="dCust">${customerOptions(draft.customerId)}</select><button type="button" class="btn" id="dNewCust" aria-label="Add new customer">+ New</button></div></label>
+      ${type === 'INV' ? `<div class="itype" id="dType" role="radiogroup" aria-label="Invoice type"><button type="button" data-pt="cash"><b>Cash invoice</b><small>Paid now</small></button><button type="button" data-pt="credit"><b>Credit invoice</b><small>Pay later</small></button></div>
+      <div class="row" id="dCashBox"><label class="f"><span>Paid by</span><select class="in" name="cashMethod" id="dCashM">${['Cash', 'Fawran', 'Card', 'Bank transfer', 'Cheque'].map(m => `<option ${m === (draft.cashMethod || 'Cash') ? 'selected' : ''}>${m}</option>`).join('')}</select></label><label class="f"><span>Received into</span><select class="in" name="cashAcc">${window.bankAccOptions ? bankAccOptions(draft.cashAcc || '') : '<option value="">Automatic</option>'}</select></label></div>` : ''}
       <div class="row">
         <label class="f"><span>Date</span><input class="in" type="date" name="date" value="${esc(draft.date)}" required></label>
-        <label class="f"><span>${type === 'INV' ? 'Due date' : 'Valid until'}</span><input class="in" type="date" name="due" value="${esc(draft.due)}"></label>
+        ${type === 'INV' ? `<label class="f" id="dTermsBox"><span>Credit terms</span><select class="in" name="creditDays" id="dDays">${[[0, 'Due on receipt'], [7, '7 days'], [15, '15 days'], [30, '30 days'], [45, '45 days'], [60, '60 days'], [90, '90 days']].map(([v, l]) => `<option value="${v}" ${String(v) === String(draft.creditDays !== undefined ? draft.creditDays : '') ? 'selected' : ''}>${l}</option>`).join('')}<option value="" ${draft.creditDays === undefined || draft.creditDays === '' ? 'selected' : ''}>Custom date</option></select></label>` : ''}
+        <label class="f" id="dDueBox"><span>${type === 'INV' ? 'Due date' : 'Valid until'}</span><input class="in" type="date" name="due" value="${esc(draft.due)}"></label>
       </div>
       <label class="f"><span>Job type (for reports)</span><select class="in" name="jobType" id="dJob">${catOptions(S().jobTypes, draft.jobType || '')}</select></label>
       <label class="f"><span>Subject (optional)</span><input class="in" name="subject" value="${esc(draft.subject)}" placeholder="e.g. Treadmill not starting – repair"></label>
@@ -1476,10 +1496,34 @@ function editDoc(type, id, fromDoc) {
     });
     drawLines();
     if (type === 'INV' && window.bindRemind) bindRemind(el, draft);
+    if (type === 'INV') {
+      // cash invoice = paid now (payment recorded on save); credit invoice = pay later by the due date
+      if (!existing && !draft.payType) { const c0 = custById(draft.customerId); draft.payType = (c0 && c0.invType) || S().invTypeDefault || 'credit'; if (draft.payType === 'credit' && draft.creditDays === undefined) draft.creditDays = c0 && c0.creditDays !== undefined && c0.creditDays !== '' ? num(c0.creditDays) : num(S().dueDays) || 15; }
+      const dateI = el.querySelector('[name=date]'), dueI = el.querySelector('[name=due]'), daysS = el.querySelector('#dDays');
+      const applyDays = () => { if (daysS.value !== '') dueI.value = addDays(dateI.value || today(), num(daysS.value)); };
+      const showType = () => {
+        const pt = draft.payType || 'credit';
+        el.querySelectorAll('[data-pt]').forEach(b => b.classList.toggle('on', b.dataset.pt === pt));
+        el.querySelector('#dCashBox').classList.toggle('hidden', pt !== 'cash');
+        el.querySelector('#dTermsBox').classList.toggle('hidden', pt === 'cash');
+        el.querySelector('#dDueBox').classList.toggle('hidden', pt === 'cash');
+      };
+      el.querySelectorAll('[data-pt]').forEach(b => b.onclick = () => { draft.payType = b.dataset.pt; if (draft.payType === 'credit') applyDays(); showType(); });
+      daysS.onchange = applyDays; dateI.addEventListener('change', applyDays);
+      if (!existing) applyDays();
+      el.querySelector('#dCust').addEventListener('change', ev => {
+        const c = custById(ev.target.value); if (!c || existing) return;
+        if (c.invType) draft.payType = c.invType;
+        if (c.creditDays !== undefined && c.creditDays !== '') { daysS.value = String(num(c.creditDays)); applyDays(); }
+        showType();
+      });
+      showType();
+    }
     el.querySelector('#docForm').onsubmit = e => {
       e.preventDefault();
       const f = formData(e.target);
       draft.customerId = f.customerId; draft.date = f.date; draft.due = f.due; draft.subject = f.subject.trim();
+      if (type === 'INV') { draft.cashMethod = f.cashMethod || 'Cash'; draft.cashAcc = f.cashAcc || ''; draft.creditDays = f.creditDays === '' || f.creditDays === undefined ? '' : num(f.creditDays); if (draft.payType === 'cash') draft.due = draft.date; }
       draft.notes = f.notes; draft.discount = num(f.discount); draft.terms = f.terms.trim();
       draft.jobType = f.jobType === NEWCAT ? '' : (f.jobType || '');
       if (R.on) {
@@ -1506,9 +1550,11 @@ function editDoc(type, id, fromDoc) {
         saved = Object.assign({}, draft, {id: uid(), number: nextNumber(type), created: String(Date.now()), payments: [], status: type === 'QUO' ? 'Open' : undefined});
         delete saved.cancelled;
         if (fromDoc && type === 'INV' && fromDoc.type === 'QUO') { saved.fromQuote = fromDoc.number; }
+        if (fromDoc && fromDoc.type === 'INV') saved.payments = [];
         bumpNumber(type);
         db.docs.push(saved);
       }
+      if (type === 'INV') applyPayType(saved);
       save();
       closeSheet(() => { if (fromDoc && fromDoc.type === 'QUO' && type === 'INV') { const q = docById(fromDoc.id); if (q) { q.status = 'Converted'; q.convertedTo = saved.number; save(); } } viewDoc(saved.id); toast(`${label} ${saved.number} saved` + (R.on ? (type === 'QUO' ? ' · inspection report ready' : ' · work completion report ready') : '')); });
     };
@@ -1738,10 +1784,14 @@ function docHTML(d, layout) {
   const [st] = status(d);
   const stampColor = st === 'Paid' ? '#1a9e5f' : st.startsWith('Overdue') ? '#d62828' : st === 'Cancelled' ? '#777' : '#ff6a00';
   const brand = `<div class="pbrand">${s.logo ? `<img class="logoimg" src="${s.logo}" alt="${esc(s.name)}">` : '<div class="plogo">Fit<span>X</span></div>'}<div class="pname">${esc(s.name)}</div></div>`;
-  const title = isInv ? 'INVOICE' : 'QUOTATION', arTitle = isInv ? 'فاتورة' : 'عرض سعر';
+  const cashInv = isInv && d.payType === 'cash', creditInv = isInv && d.payType === 'credit';
+  const title = cashInv ? 'CASH INVOICE' : creditInv ? 'CREDIT INVOICE' : isInv ? 'INVOICE' : 'QUOTATION';
+  const arTitle = cashInv ? 'فاتورة نقدية' : creditInv ? 'فاتورة آجلة' : isInv ? 'فاتورة' : 'عرض سعر';
+  const cashMethod = cashInv ? ((d.payments || []).find(p => p.auto) || {}).method || d.cashMethod || 'Cash' : '';
+  const dueTxt = cashInv ? `Payment: <b>${esc(cashMethod)}</b>` : `${isInv ? 'Due' : 'Valid until'}: ${dfmt(d.due)}${creditInv && num(d.creditDays) ? ` (${num(d.creditDays)} days credit)` : ''}`;
   const coLines = `${esc(s.address)}<br>Tel: ${esc(s.phone)} · ${esc(s.email)}<br>${esc(s.web)}${s.cr ? '<br>CR No. ' + esc(s.cr) : ''}`;
   const custLines = `<b>${esc(c.name || '')}</b>${c.contact ? '<br>Attn: ' + esc(c.contact) : ''}${addrText(c) ? '<br>' + esc(addrText(c)) : ''}${c.phone ? '<br>Tel: ' + esc(c.phone) : ''}${c.email ? '<br>' + esc(c.email) : ''}`;
-  const detLines = `${isInv ? 'Invoice' : 'Quotation'} No: <b>${esc(d.number)}</b><br>Date: ${dfmt(d.date)}<br>${isInv ? 'Due' : 'Valid until'}: ${dfmt(d.due)}${d.fromQuote ? '<br>Ref quote: ' + esc(d.fromQuote) : ''}${d.jobType ? '<br>Service: ' + esc(d.jobType) : ''}${d.subject ? '<br>Re: ' + esc(d.subject) : ''}`;
+  const detLines = `${isInv ? 'Invoice' : 'Quotation'} No: <b>${esc(d.number)}</b><br>Date: ${dfmt(d.date)}<br>${dueTxt}${d.fromQuote ? '<br>Ref quote: ' + esc(d.fromQuote) : ''}${d.jobType ? '<br>Service: ' + esc(d.jobType) : ''}${d.subject ? '<br>Re: ' + esc(d.subject) : ''}`;
   const nos = lineNos(d.lines);
   const rows = (d.lines || []).map((l, i) => { const sub = nos[i].includes('.'), free = sub && !num(l.price); return `<tr${sub ? ' class="sub"' : ''}><td>${nos[i]}</td><td>${esc(l.desc)}${lineEq(l) ? `<div class="leq">${esc(eqText(l))}</div>` : ''}${l.note ? `<div class="lnote">${esc(l.note)}</div>` : ''}</td><td class="n">${l.qty}</td><td class="n">${free ? '' : fmt(l.price)}</td><td class="n">${free ? '' : fmt(num(l.qty) * num(l.price))}</td></tr>`; }).join('');
   const oldEq = (d.equipment || []).filter(e => e.brand || e.model || e.sn || e.name);
@@ -1753,7 +1803,7 @@ function docHTML(d, layout) {
       <div class="g"><span>Total (QAR)</span><span>${fmt(docTotal(d))}</span></div>
       ${isInv && docPaid(d) ? `<div><span>Paid</span><span>${fmt(docPaid(d))}</span></div><div><b>Balance due</b><b>${fmt(docBal(d))}</b></div>` : ''}
     </div>`;
-  const pay = isInv && s.payNote ? `<div class="pay"><b>Payment</b><br>${esc(s.payNote)}</div>` : '';
+  const pay = isInv && s.payNote && !d.cancelled && docBal(d) > 0.004 ? `<div class="pay"><b>Payment</b><br>${esc(s.payNote)}</div>` : '';
   const notes = d.notes ? `<div class="notes">${esc(d.notes)}</div>` : '';
   // company stamp (per document "with / without", default from settings)
   const withStamp = d.stamp !== undefined ? !!d.stamp : s.stampOn !== false;
@@ -1765,7 +1815,7 @@ function docHTML(d, layout) {
     <div class="mh">${brand}<div class="mtitle"><h2>${title}</h2><div class="ar" dir="rtl" lang="ar">${arTitle}</div><div class="mno"># ${esc(d.number)}</div></div></div>
     <div class="mstrip">
       <div><span class="lbl">${isInv ? 'Bill to' : 'Prepared for'}</span>${custLines}</div>
-      <div><span class="lbl">Details</span>Date: ${dfmt(d.date)}<br>${isInv ? 'Due' : 'Valid until'}: ${dfmt(d.due)}${d.fromQuote ? '<br>Ref: ' + esc(d.fromQuote) : ''}${d.jobType ? '<br>' + esc(d.jobType) : ''}${d.subject ? '<br>Re: ' + esc(d.subject) : ''}</div>
+      <div><span class="lbl">Details</span>Date: ${dfmt(d.date)}<br>${dueTxt}${d.fromQuote ? '<br>Ref: ' + esc(d.fromQuote) : ''}${d.jobType ? '<br>' + esc(d.jobType) : ''}${d.subject ? '<br>Re: ' + esc(d.subject) : ''}</div>
       <div class="mdue"><span class="lbl">${isInv ? 'Amount due' : 'Quoted total'}</span><div class="big">QAR ${fmt(amountDue)}</div><span class="stamp" style="margin-top:8px;font-size:10px;color:${stampColor};border-color:${stampColor}">${esc(st.toUpperCase())}</span></div>
     </div>
     ${table}
@@ -1775,7 +1825,7 @@ function docHTML(d, layout) {
   </div>`;
 
   const statusTag = `<span class="stamp" style="font-size:10px;color:${stampColor};border-color:${stampColor}">${esc(st.toUpperCase())}</span>`;
-  const shortDet = `Date: ${dfmt(d.date)}<br>${isInv ? 'Due' : 'Valid until'}: ${dfmt(d.due)}${d.fromQuote ? '<br>Ref quote: ' + esc(d.fromQuote) : ''}${d.jobType ? '<br>Service: ' + esc(d.jobType) : ''}${d.subject ? '<br>Re: ' + esc(d.subject) : ''}`;
+  const shortDet = `Date: ${dfmt(d.date)}<br>${dueTxt}${d.fromQuote ? '<br>Ref quote: ' + esc(d.fromQuote) : ''}${d.jobType ? '<br>Service: ' + esc(d.jobType) : ''}${d.subject ? '<br>Re: ' + esc(d.subject) : ''}`;
 
   if (lay === 'exec') return `<div class="paper lay-exec">
     <div class="eh">${brand}<div class="eco">${coLines}</div></div>
@@ -2129,6 +2179,7 @@ function editCustomer(id, after) {
       <label class="f"><span>Area / place</span><input class="in" name="area" value="${esc(c.area)}" placeholder="e.g. The Pearl, Lusail, Al Sadd"></label>
       <label class="f"><span>Google Maps link (optional)</span><input class="in" name="maps" type="url" value="${esc(c.maps)}" placeholder="Paste a pin link for exact location"></label>
       <label class="f"><span>Notes</span><textarea class="in" name="notes">${esc(c.notes)}</textarea></label>
+      <div class="row"><label class="f"><span>Usual invoice</span><select class="in" name="invType"><option value="">Company default</option><option value="credit" ${c.invType === 'credit' ? 'selected' : ''}>Credit (pay later)</option><option value="cash" ${c.invType === 'cash' ? 'selected' : ''}>Cash (pay now)</option></select></label><label class="f"><span>Credit days</span><input class="in" name="creditDays" type="number" min="0" step="1" inputmode="numeric" value="${c.creditDays !== undefined ? esc(c.creditDays) : ''}" placeholder="e.g. 30"></label></div>
       <label class="f" style="display:flex;gap:10px;align-items:center"><input type="checkbox" name="noRemind" ${c.noRemind ? 'checked' : ''} style="width:20px;height:20px;flex-shrink:0"><span style="margin:0;color:var(--text)">No service reminders for this customer</span></label>
       <button class="btn pri full" type="submit">Save customer</button>
     </form>`, el => {
