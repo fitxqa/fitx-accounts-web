@@ -1,5 +1,5 @@
 /* FitX Accounts — sales orders, proforma invoices and customer advances (all built on the quotation).
-   Flow: Quotation → Sales order (customer confirms) → Proforma (request e.g. 50% advance) → advance received
+   Flow: Quotation → Proforma (request e.g. 50% advance) → advance received
          → Invoice (advance deducted automatically).
    Accounting: advance received  Dr Bank/Cash, Cr 2200 Customer advances (liability, not income)
                on the invoice      Dr 2200 Customer advances, Cr 1200 Receivables  (payment method "Advance")
@@ -120,7 +120,7 @@
   }
   const flow = (q, now) => {
     const inv = q.status === 'Converted';
-    const st = [['quo', 'Quotation', true], ['so', 'Sales order', !!q.so], ['pro', 'Advance', advPaid(q) > 0], ['inv', 'Invoice', inv]];
+    const st = [['quo', 'Quotation', true], ['pro', 'Advance', advPaid(q) > 0], ['inv', 'Invoice', inv]];
     return `<div class="flowrow">${st.map(([k, l, done], i) => `${i ? '›' : ''}<span class="${k === now ? 'now' : done ? 'done' : ''}">${done && k !== now ? '✓ ' : ''}${l}</span>`).join(' ')}</div>`;
   };
 
@@ -175,7 +175,7 @@
         <tr><td><b>Amount received</b></td><td style="font-size:18px;font-weight:800;color:#ff6a00">${money(x.amount)}</td></tr>
         <tr><td><b>Payment method</b></td><td>${esc(x.method || '')}${x.note ? ' · ' + esc(x.note) : ''}</td></tr>
         <tr><td><b>Date</b></td><td>${dfmt(x.date)}</td></tr>
-        <tr><td><b>Against</b></td><td>Proforma ${esc(proNo(q))}${q.so ? ' · Sales order ' + esc(q.so.no) : ''} · order total ${money(docTotal(q))}</td></tr>
+        <tr><td><b>Against</b></td><td>Proforma ${esc(proNo(q))} · order total ${money(docTotal(q))}</td></tr>
         <tr><td><b>Total advance received</b></td><td>${money(advPaid(q))} of ${money(advReq(q))} requested (${advPct(q)}%)</td></tr>
       </tbody></table>
       <p style="margin-top:22px;font-size:12px">This advance will be deducted from the final invoice.</p>`);
@@ -196,8 +196,7 @@
     if (q.type === 'INV') return;
     const anchor = el.querySelector('#aEdit'); if (!anchor) return;
     const box = anchor.parentElement;
-    box.insertAdjacentHTML('afterbegin', `<button type="button" class="btn ${q.so ? '' : 'pri'}" id="aSO">${q.so ? 'Sales order ' + esc(q.so.no) : 'Confirm sales order'}</button><button type="button" class="btn" id="aPro">Proforma &amp; advance${advPaid(q) ? ' ✓' : ''}</button>`);
-    el.querySelector('#aSO').onclick = () => q.so ? closeSheet(() => salesOrder(id)) : editSO(id, x => { while (sheets.length) closeTopSheet(); salesOrder(x); });
+    box.insertAdjacentHTML('afterbegin', `<button type="button" class="btn" id="aPro">Proforma &amp; advance${advPaid(q) ? ' ✓' : ''}</button>`);
     el.querySelector('#aPro').onclick = () => closeSheet(() => proforma(id));
     if (advPaid(q)) box.insertAdjacentHTML('afterend', `<p class="hint" style="margin:-6px 2px 12px">Advance received ${money(advPaid(q))} of ${money(advReq(q))} (${advPct(q)}%)${available(q) > 0.004 ? ' – deducted automatically on the invoice' : ''}.</p>`);
     const del = el.querySelector('#aDel');
@@ -219,9 +218,6 @@
     $$('#main [data-sf]').forEach(b => b.onclick = () => { state.soFilter = b.dataset.sf; render(); });
     $$('#main [data-so]').forEach(b => b.onclick = () => salesOrder(b.dataset.so));
   }
-  window.FITX_VIEWS = Object.assign(window.FITX_VIEWS || {}, {sorders: viewSalesOrders});
-  if (typeof NAV_GROUP !== 'undefined') NAV_GROUP.sorders = 'sales';
-  if (typeof SUBNAV !== 'undefined' && !SUBNAV.sales.some(x => x[0] === 'sorders')) SUBNAV.sales.splice(2, 0, ['sorders', 'Sales orders']);
 
   window.FitxAdv = {apply, proforma, salesOrder, editSO, proNo, advPaid, advReq, available, proDoc, soDoc};
 })();
