@@ -523,10 +523,12 @@ textarea.in{min-height:80px;resize:vertical}
   <button type="button" class="si" data-tab="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Dashboard</button>
   <div class="sg">Sales</div>
   <button type="button" class="si" data-tab="sales"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h8M9 17h6"/></svg>Invoices & quotes</button>
+  <button type="button" class="si" data-tab="sorders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 5H5v16h14V5h-4"/><path d="M9 3h6v4H9zM8 13l3 3 5-6"/></svg>Sales orders</button>
   <button type="button" class="si" data-tab="customers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 11a3 3 0 1 0 0-6M22 21c0-3-2-5-4-5.5"/></svg>Customers</button>
   <button type="button" class="si" data-tab="stock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8M12 13v8"/></svg>Products & services</button>
   <div class="sg">Expenses</div>
   <button type="button" class="si" data-tab="expenses"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h3"/></svg>Expenses & bills</button>
+  <button type="button" class="si" data-tab="porders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 4h2l2.5 11h11L21 7H6.5"/><circle cx="9" cy="19" r="1.6"/><circle cx="18" cy="19" r="1.6"/></svg>Purchase orders</button>
   <button type="button" class="si" data-tab="suppliers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 6h12v10H2zM14 10h4l4 4v2h-8z"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>Suppliers</button>
   <div class="sg">Business</div>
   <button type="button" class="si" data-tab="reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Reports</button>
@@ -951,11 +953,11 @@ function salesBarData() {
 /* "+ New" menu */
 function newMenu() {
   const G = [
-    ['Customers', [['inv', ICON.inv, 'Invoice'], ['rcv', ICON.pay, 'Receive payment'], ['quo', ICON.quo, 'Quotation'], ['cus', ICON.user, 'Customer']]],
-    ['Suppliers', [['exp', ICON.exp, 'Expense'], ['bill', ICON.box, 'Bill (parts purchase)'], ['paybill', ICON.cash, 'Pay bills'], ['sup', ICON.truck, 'Supplier']]],
+    ['Customers', [['inv', ICON.inv, 'Invoice'], ['rcv', ICON.pay, 'Receive payment'], ['quo', ICON.quo, 'Quotation'], ['so', ICON.conv, 'Sales order'], ['cus', ICON.user, 'Customer']]],
+    ['Suppliers', [['exp', ICON.exp, 'Expense'], ['po', ICON.quo, 'Purchase order'], ['bill', ICON.box, 'Bill (parts purchase)'], ['paybill', ICON.cash, 'Pay bills'], ['sup', ICON.truck, 'Supplier']]],
     ['Other', [['item', ICON.wrench, 'Spare part / service'], ['tm', ICON.box, 'Find part by treadmill'], ['rep', ICON.chart, 'Reports'], ['bak', ICON.drive, 'Backup to Google Drive']]]
   ];
-  const ACT = {inv: () => editDoc('INV'), rcv: () => receivePayment(), quo: () => editDoc('QUO'), cus: () => editCustomer(), exp: () => editExpense(), bill: () => editPurchase(),
+  const ACT = {inv: () => editDoc('INV'), rcv: () => receivePayment(), quo: () => editDoc('QUO'), so: () => goTab('sorders'), po: () => window.FitxPO && FitxPO.edit(), cus: () => editCustomer(), exp: () => editExpense(), bill: () => editPurchase(),
     paybill: () => paySupplier(), sup: () => editSupplier(null, () => render()), item: () => editItem(), tm: () => treadmillFinder(), rep: () => goTab('reports'), bak: () => { backupToDrive(); render(); }};
   openSheet('New', `<div class="newgrid">${G.map(([h, items]) => `<div><h4>${h}</h4><div class="list">${items.map(([k, ic, l]) => `<button type="button" class="item" data-nk="${k}">${ic}<div class="main">${l}</div></button>`).join('')}</div></div>`).join('')}</div>`, el => {
     el.querySelectorAll('[data-nk]').forEach(b => b.onclick = () => closeSheet(ACT[b.dataset.nk]));
@@ -2146,9 +2148,11 @@ function viewMore() {
     <div class="sec"><h2>Sales</h2></div><div class="list">
       ${row('mCus', ICON.user, 'Customers', `${db.customers.length} customers · ${fmt(receivables())} owed to you`)}
       ${row('mStock', ICON.box, 'Products & services', 'Spare parts stock and service rates')}
+      ${row('mSO', ICON.conv, 'Sales orders', 'Confirmed orders, proforma & 50% advances')}
       ${row('mRcv', ICON.pay, 'Receive payment', 'Record money received against invoices')}
     </div>
     <div class="sec"><h2>Expenses</h2></div><div class="list">
+      ${row('mPO', ICON.quo, 'Purchase orders', 'Orders sent to suppliers → bills')}
       ${row('mBills', ICON.inv, 'Bills (parts purchases)', `${fmt(payables())} owed to suppliers`)}
       ${row('mSup', ICON.truck, 'Suppliers', `${db.suppliers.length} suppliers`)}
     </div>
@@ -2159,7 +2163,7 @@ function viewMore() {
     </div>
     <p class="hint" style="text-align:center;margin-top:24px">All data is stored on this phone. Back up regularly.</p>`;
   const go = (t, extra) => () => { if (extra) extra(); goTab(t); };
-  $('#mCus').onclick = go('customers'); $('#mStock').onclick = go('stock'); $('#mRcv').onclick = () => receivePayment();
+  $('#mCus').onclick = go('customers'); $('#mStock').onclick = go('stock'); $('#mRcv').onclick = () => receivePayment(); $('#mSO').onclick = go('sorders'); $('#mPO').onclick = go('porders');
   $('#mBills').onclick = go('expenses', () => { state.expTab = 'bills'; }); $('#mSup').onclick = go('suppliers');
   $('#mRep').onclick = go('reports'); $('#mSet').onclick = viewSettings; $('#mBak').onclick = viewBackup;
 }
