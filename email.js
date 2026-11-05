@@ -197,6 +197,7 @@ ${sigHTML(logoSrc)}
     catch (e) { throw new Error('Could not reach your mail script (' + M().cpUrl + '). Check the internet connection.'); }
     let j = null; try { j = await res.json(); } catch (e) {}
     if (!res.ok || !j || !j.ok) throw new Error((j && j.error) || 'Mail server error ' + res.status);
+    if (j.note) setTimeout(() => toast(j.note), 1500);
   }
   function logSent(sp, to) {
     const r = sp.rec; if (r) { r.mails = r.mails || []; r.mails.push({date: today(), at: Date.now(), to: to.join(', '), kind: sp.kind}); if (r.mails.length > 30) r.mails.splice(0, r.mails.length - 30); }
@@ -427,7 +428,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') reply(200, array('ok' => true, 'msg' 
 
 $in = json_decode(file_get_contents('php://input'), true);
 if (!is_array($in) || !isset($in['key']) || !hash_equals($KEY, (string)$in['key'])) reply(403, array('ok' => false, 'error' => 'Wrong key. In the app, create the mail script again and upload the new file.'));
-if (isset($in['action']) && $in['action'] === 'ping') reply(200, array('ok' => true, 'php' => PHP_VERSION, 'from' => $FROM, 'mode' => $MODE, 'sent_copy' => ($MODE === 'smtp' || ($IMAP_PASS !== '' && function_exists('imap_open')))));
+if (isset($in['action']) && $in['action'] === 'ping') reply(200, array('ok' => true, 'php' => PHP_VERSION, 'from' => $FROM, 'mode' => $MODE, 'sent_copy' => ($MODE === 'smtp' || ($IMAP_PASS !== '' && function_exists('imap_open') && !file_exists(__DIR__ . '/.fitx-mail-sent-off'))), 'sent_copy_off' => file_exists(__DIR__ . '/.fitx-mail-sent-off')));
 
 function clean_list($v) { $out = array(); foreach ((array)$v as $a) { $a = trim(str_replace(array("\r", "\n"), '', (string)$a)); if (filter_var($a, FILTER_VALIDATE_EMAIL)) $out[] = $a; } return $out; }
 function hdr($s) { return '=?UTF-8?B?' . base64_encode(str_replace(array("\r", "\n"), ' ', (string)$s)) . '?='; }
@@ -492,20 +493,26 @@ if ($MODE === 'smtp') {
   reply(200, array('ok' => true, 'to' => $to, 'saved_to_sent' => true));
 }
 
-$imapOk = ($IMAP_PASS !== '' && function_exists('imap_open'));
+// copy to "Sent" logs in ONCE per email; after a failed login it stops trying for good (no lock-outs)
+$LOCK = __DIR__ . '/.fitx-mail-sent-off';
+$imapOk = ($IMAP_PASS !== '' && function_exists('imap_open') && !file_exists($LOCK));
 $send = $headers; if ($copy && !$imapOk) $send[] = "Bcc: $FROM";
 if (!mail(implode(', ', $to), $subject, $body, implode("\r\n", $send), '-f' . $FROM)) reply(500, array('ok' => false, 'error' => 'The mail server did not accept the email. Check that ' . $FROM . ' exists in cPanel → Email Accounts.'));
-$saved = false;
+$saved = false; $note = '';
 if ($copy && $imapOk) {
   $msg = 'Date: ' . date('r') . $e . 'To: ' . implode(', ', $to) . $e . "Subject: $subject" . $e . implode($e, $headers) . $e . $e . $body;
-  foreach (array('INBOX.Sent', 'Sent', 'INBOX.Sent Items') as $box) {
-    $mb = '{localhost:993/imap/ssl/novalidate-cert}' . $box;
-    $im = @imap_open($mb, $FROM, $IMAP_PASS, 0, 1);
-    if ($im) { $saved = @imap_append($im, $mb, $msg, '\\Seen'); @imap_close($im); if ($saved) break; }
+  $srv = '{localhost:993/imap/ssl/novalidate-cert}';
+  $im = @imap_open($srv, $FROM, $IMAP_PASS, OP_HALFOPEN, 0);
+  if (!$im) {
+    @file_put_contents($LOCK, date('c') . ' login failed – copies to Sent switched off');
+    $note = 'Email sent, but the password in the mail script is wrong, so no copy was saved in Sent. Copies to Sent are now switched off – create the script again with the right password (or no password).';
+  } else {
+    foreach (array('INBOX.Sent', 'Sent', 'INBOX.Sent Items') as $box) { if (@imap_append($im, $srv . $box, $msg, '\\Seen')) { $saved = true; break; } }
+    @imap_close($im);
   }
   @imap_errors(); @imap_alerts();
 }
-reply(200, array('ok' => true, 'to' => $to, 'saved_to_sent' => $saved));
+reply(200, array('ok' => true, 'to' => $to, 'saved_to_sent' => $saved, 'note' => $note));
 `;
   }
 
