@@ -1267,24 +1267,26 @@ function groupedItemOptions(list, sel) {
   return Object.keys(groups).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b)).map(g =>
     `<optgroup label="${esc(g)} (${groups[g].length})">${groups[g].sort((a, b) => a.name.localeCompare(b.name)).map(i => `<option value="${i.id}" ${i.id === sel ? 'selected' : ''}>${esc(i.name)}${i.sku ? ' · ' + esc(i.sku) : ''}</option>`).join('')}</optgroup>`).join('');
 }
-function itemOptions(sel) {
-  return `<option value="">Type your own (no item)</option><option value="${NEWITEM}">+ Add new item / service…</option>` + groupedItemOptions(db.items, sel);
+function itemOptions(sel, kind) {
+  // kind 'service' → only services, 'part' → only spare parts (the selected item always stays in the list)
+  const list = kind ? db.items.filter(i => i.id === sel || (kind === 'service' ? i.service : !i.service)) : db.items;
+  return `<option value="">Type your own (no item)</option><option value="${NEWITEM}">+ Add new ${kind === 'service' ? 'service' : kind === 'part' ? 'spare part' : 'item / service'}…</option>` + groupedItemOptions(list, sel);
 }
 /* searchable picker: type part of a name, code, category or treadmill model; filter by main category */
 function pickItem(opts, cb) {
-  const pool = db.items.filter(i => !opts.partsOnly || !i.service);
+  const pool = db.items.filter(i => opts.servicesOnly ? i.service : (!opts.partsOnly || !i.service));
   const mains = Array.from(new Set(pool.map(i => catParent(i.category || (i.service ? 'Other services' : 'Other parts')))));
   const svcMains = mains.filter(m => pool.filter(i => catParent(i.category || '') === m).every(i => i.service)).sort();
   const partMains = mains.filter(m => !svcMains.includes(m)).sort();
   let cat = '';
-  openSheet(opts.partsOnly ? 'Pick a spare part' : 'Pick a service or part', `
+  openSheet(opts.partsOnly ? 'Pick a spare part' : opts.servicesOnly ? 'Pick a service / labour' : 'Pick a service or part', `
     <input class="search" id="pkQ" placeholder="Search name, code, category or treadmill model" aria-label="Search items">
     <div class="chips" id="pkC" style="flex-wrap:wrap"></div>
     <div class="list" id="pkL"></div>`, el => {
     const q = el.querySelector('#pkQ'); setTimeout(() => q.focus(), 150);
     const chip = (v, l) => `<button type="button" data-c="${esc(v)}" class="${cat === v ? 'on' : ''}">${esc(l)}</button>`;
     const draw = () => {
-      el.querySelector('#pkC').innerHTML = chip('', 'All') + (opts.partsOnly ? '' : chip('__svc', 'All services')) + chip('__part', 'All parts') + svcMains.map(m => chip(m, m)).join('') + partMains.map(m => chip(m, m)).join('');
+      el.querySelector('#pkC').innerHTML = chip('', 'All') + (opts.partsOnly || opts.servicesOnly ? '' : chip('__svc', 'All services') + chip('__part', 'All parts')) + svcMains.map(m => chip(m, m)).join('') + partMains.map(m => chip(m, m)).join('');
       el.querySelectorAll('#pkC [data-c]').forEach(b => b.onclick = () => { cat = b.dataset.c; draw(); });
       const words = q.value.toLowerCase().split(/\s+/).filter(Boolean);
       const list = pool.filter(i => (!cat || (cat === '__svc' ? i.service : cat === '__part' ? !i.service : catParent(i.category || (i.service ? 'Other services' : 'Other parts')) === cat)) &&
@@ -1410,7 +1412,7 @@ function editDoc(type, id, fromDoc) {
         return `
         <div class="line" data-i="${i}">
           <div class="lt"><span>Line ${nos[i]}</span>${mains > 1 ? `<button type="button" class="ldel">Remove</button>` : ''}</div>
-          <div style="display:flex;gap:8px;margin-bottom:8px"><select class="in litem" aria-label="Item or service">${itemOptions(l.itemId)}</select><button type="button" class="btn lpick" aria-label="Search items">${ICON.search || '&#128269;'}</button><button type="button" class="btn lnew" aria-label="Add new item">+ New</button></div>
+          <div style="display:flex;gap:8px;margin-bottom:8px"><select class="in litem" aria-label="Item or service">${itemOptions(l.itemId, lineKind(l))}</select><button type="button" class="btn lpick" aria-label="Search items">${ICON.search || '&#128269;'}</button><button type="button" class="btn lnew" aria-label="Add new item">+ New</button></div>
           <button type="button" class="lnk ltm" style="margin:-2px 0 8px">${ICON.wrench.replace('<svg ', '<svg width="14" height="14" style="vertical-align:-2px" ')} Pick part by treadmill model</button>
           <div class="kind" role="radiogroup" aria-label="Line type"><button type="button" data-kind="service" class="${lineKind(l) === 'service' ? 'on' : ''}">Maintenance / labour</button><button type="button" data-kind="part" class="${lineKind(l) === 'part' ? 'on' : ''}">Spare part</button></div>
           <input class="in ldesc" aria-label="Description" placeholder="Description (e.g. Labour – service visit)" value="${esc(l.desc)}" style="margin-bottom:8px">
@@ -1473,7 +1475,7 @@ function editDoc(type, id, fromDoc) {
       l.kind = it.service ? 'service' : 'part'; l.cost = it.service ? 0 : num(it.cost);
       if (!num(l.qty)) l.qty = 1;
       drawLines(); toast((it.service ? 'Service' : 'Item') + ' added');
-    }, {name: l.itemId ? '' : (l.desc || '').trim(), price: num(l.price) || ''});
+    }, {name: l.itemId ? '' : (l.desc || '').trim(), price: num(l.price) || '', service: lineKind(l) === 'service', unit: lineKind(l) === 'service' ? 'job' : 'pcs'});
     linesEl.addEventListener('click', e => {
       const sp = e.target.closest('.spick');
       if (sp) { const l = draft.lines[+sp.closest('[data-i]').dataset.i]; pickItem({partsOnly: false}, it => { l.itemId = it.id; l.desc = it.name + (it.sku ? ' (' + it.sku + ')' : ''); l.price = it.price; l.kind = it.service ? 'service' : 'part'; l.cost = it.service ? 0 : num(it.cost); if (!num(l.qty)) l.qty = 1; drawLines(); }); return; }
@@ -1481,11 +1483,11 @@ function editDoc(type, id, fromDoc) {
       if (sd) { draft.lines.splice(+sd.closest('[data-i]').dataset.i, 1); drawLines(); return; }
       const sb = e.target.closest('.lsub');
       if (sb) { let j = +sb.closest('.line').dataset.i + 1; while (j < draft.lines.length && draft.lines[j].sub) j++; draft.lines.splice(j, 0, {itemId: '', desc: '', qty: 1, price: 0, sub: true}); drawLines(); const inp = linesEl.querySelector(`.sline[data-i="${j}"] .ldesc`); if (inp) inp.focus(); return; }
-      const pk = e.target.closest('.lpick'); if (pk) { const row = pk.closest('[data-i]'); pickItem({partsOnly: false}, it => { const sel = row.querySelector('.litem'); sel.value = it.id; sel.dispatchEvent(new Event('change', {bubbles: true})); }); return; }
+      const pk = e.target.closest('.lpick'); if (pk) { const row = pk.closest('[data-i]'), k = lineKind(draft.lines[+row.dataset.i]); pickItem({partsOnly: k === 'part', servicesOnly: k === 'service'}, it => { const sel = row.querySelector('.litem'); sel.value = it.id; sel.dispatchEvent(new Event('change', {bubbles: true})); }); return; }
       const tb = e.target.closest('.ltm');
       if (tb) { const l = draft.lines[+tb.closest('.line').dataset.i]; treadmillFinder(it => { l.itemId = it.id; l.desc = it.name + (it.sku ? ' (' + it.sku + ')' : ''); l.price = it.price; l.kind = 'part'; l.cost = num(it.cost); if (!num(l.qty)) l.qty = 1; drawLines(); toast('Part added'); }); return; }
       const kb = e.target.closest('[data-kind]');
-      if (kb) { const l = draft.lines[+kb.closest('.line').dataset.i]; l.kind = kb.dataset.kind; kb.parentNode.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === kb)); return; }
+      if (kb) { const row = kb.closest('.line'), l = draft.lines[+row.dataset.i]; l.kind = kb.dataset.kind; kb.parentNode.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === kb)); row.querySelector('.litem').innerHTML = itemOptions(l.itemId, l.kind); return; }
       const nb = e.target.closest('.lnew');
       if (nb) { quickItem(draft.lines[+nb.closest('.line').dataset.i]); return; }
       if (!e.target.classList.contains('ldel')) return;
