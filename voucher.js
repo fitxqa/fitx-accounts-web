@@ -7,6 +7,12 @@
   const on = () => S().rcptStyle === 'voucher';
   let HEAD = 'icons/voucher-head.png';
   fetch(HEAD).then(r => r.blob()).then(b => new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(b); })).then(u => { HEAD = u; }).catch(() => {});
+  /* blue ball-pen handwriting for the filled-in values */
+  const INK = '#1d3aa8', PEN = "'FitxPen','Caveat','Segoe Print','Bradley Hand',cursive";
+  const ff = document.createElement('style');
+  ff.textContent = "@font-face{font-family:'FitxPen';src:url('fonts/caveat-latin-600-normal.woff2') format('woff2');font-weight:400 800;font-display:block}";
+  document.head.appendChild(ff);
+  if (document.fonts && document.fonts.load) document.fonts.load("20px FitxPen").catch(() => {});
   const stamp = () => S().stampImg || window.FITX_STAMP_DATA || 'icons/stamp.png';
 
   /* ---------- amount in words (Qatari Riyals & Dirhams) ---------- */
@@ -53,19 +59,20 @@
       .vpaper .vbody{padding:14px 22px 14px;font-size:12px}
       .vpaper .vr{display:flex;align-items:flex-end;gap:8px;margin-bottom:11px}
       .vpaper .vr>b,.vpaper .vl{font-weight:600;white-space:nowrap}
-      .vpaper .vv{flex:1;border-bottom:1px solid #000;min-height:17px;padding:0 4px 1px;font-weight:700;font-size:12.5px;color:#0d1b3d}
+      .vpaper .vv{flex:1;border-bottom:1px solid #000;min-height:17px;padding:0 6px 0;font-family:${PEN};font-weight:600;font-size:18px;line-height:1.05;color:${INK};letter-spacing:.2px}
+      .vpaper .vv *{font-family:inherit!important;color:inherit!important;font-weight:inherit!important}
       .vpaper .vck{display:inline-flex;align-items:center;gap:6px;margin-right:16px}
-      .vpaper .vck i{display:inline-flex;width:17px;height:17px;border:1.3px solid #000;align-items:center;justify-content:center;font-style:normal;font-weight:800;color:${OR};font-size:14px;line-height:1}
+      .vpaper .vck i{display:inline-flex;width:17px;height:17px;border:1.3px solid #000;align-items:center;justify-content:center;font-style:normal;font-family:${PEN};font-weight:700;color:${INK};font-size:21px;line-height:1;overflow:visible}
       .vpaper table.vt{width:100%;border-collapse:collapse;margin:4px 0 12px}
       .vpaper table.vt th{font-weight:600;text-align:left;border:1px solid #000;padding:5px 8px;font-size:12px;background:#fff!important;color:#111!important;text-transform:none;letter-spacing:0}
-      .vpaper table.vt td{border:1px solid #000;padding:5px 8px;height:16px;font-size:11.5px;font-weight:600;color:#0d1b3d;vertical-align:top}
+      .vpaper table.vt td{border:1px solid #000;padding:3px 8px;height:18px;font-family:${PEN};font-size:17px;line-height:1.1;font-weight:600;color:${INK};vertical-align:middle}
       .vpaper table.vt .n{text-align:right;white-space:nowrap}
       .vpaper table.vt th.n{text-align:center}
       .vpaper .vbot{display:flex;gap:26px;align-items:stretch;margin-top:4px}
       .vpaper table.vs{border-collapse:collapse;width:48%}
       .vpaper table.vs td{border:1px solid #000;padding:6px 8px;font-size:12px}
       .vpaper table.vs td:first-child{font-weight:600;white-space:nowrap;width:40%}
-      .vpaper table.vs td:last-child{font-weight:800;color:#0d1b3d;text-align:right}
+      .vpaper table.vs td:last-child{font-family:${PEN};font-size:19px;font-weight:700;color:${INK}!important;text-align:right;padding:2px 10px}
       .vpaper .vsig{flex:1;display:flex;flex-direction:column;justify-content:space-between;position:relative}
       .vpaper .vsig .vr{margin-bottom:6px}
       .vpaper .vstamp{position:absolute;right:6px;bottom:-6px;width:88px;opacity:.92;pointer-events:none}
