@@ -168,6 +168,7 @@
   }
   const rcNo = (q, i) => 'ADV-' + String(q.number || '').replace(/^[A-Za-z]+-?/, '') + '-' + (i + 1);
   function receiptHTML(q, i) {
+    if (window.FitxVoucher && FitxVoucher.on()) return FitxVoucher.forAdvance(q, i);
     const x = q.advances[i], c = custById(q.customerId) || {};
     return reportPaper('Advance receipt', 'إيصال دفعة مقدمة', rcNo(q, i) + ' · ' + dfmt(x.date), `
       <table class="eqt"><tbody>

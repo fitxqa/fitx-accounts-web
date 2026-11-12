@@ -95,6 +95,7 @@ ${sigHTML(logoSrc)}
 
   /* ---------- PDFs that are not invoices ---------- */
   function receiptHTML(d, i) {
+    if (window.FitxVoucher && FitxVoucher.on()) return FitxVoucher.forInvoice(d, i);
     const p = d.payments[i], c = custById(d.customerId) || {}, bal = docBal(d);
     return reportPaper('Payment receipt', 'إيصال استلام', receiptNo(d, i) + ' · ' + dfmt(p.date), `
       <table class="eqt"><tbody>
