@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   const S_ = ' › ';
-  const CATALOG_VER = 2; // raise when new catalog items are added, so every device adds them once
+  const CATALOG_VER = 3; // raise when new catalog items are added, so every device adds them once
   // [main category, sub-category, unit, [names…]]
   const SERVICES = [
     ['Gym Equipment Service', 'Treadmill', 'job', ['Treadmill preventive maintenance', 'Treadmill repair – diagnosis & fault finding', 'Running belt replacement (labour)', 'Running belt alignment & tensioning', 'Deck lubrication', 'Drive belt replacement (labour)', 'Motor brush replacement (labour)', 'Roller replacement (labour)', 'Incline motor repair', 'Speed & incline calibration']],
@@ -28,7 +28,10 @@
     ['Welding & Fabrication', 'Fabrication', 'job', ['Bracket fabrication', 'Custom part fabrication', 'Frame modification']],
     ['Upholstery', 'Pads & seats', 'job', ['Seat pad re-upholstery', 'Back pad re-upholstery', 'Bench re-upholstery', 'Foam replacement', 'Vinyl / leather cover replacement', 'Grip / handle cover replacement']],
     ['Refurbishing & Painting', 'Refurbishing', 'job', ['Full equipment refurbishment', 'Rust removal & treatment', 'Chrome / metal polishing', 'Decal & label replacement', 'Deep cleaning & sanitising']],
-    ['Refurbishing & Painting', 'Painting', 'job', ['Frame powder coating', 'Frame spray painting', 'Touch-up painting']]
+    ['Refurbishing & Painting', 'Painting', 'job', ['Frame powder coating', 'Frame spray painting', 'Touch-up painting']],
+    ['Flooring Installation', 'Rubber flooring', 'm²', ['Rubber flooring installation (per m²)', 'Interlocking rubber tile installation (per m²)', 'Rubber roll flooring installation – glued (per m²)', 'Old flooring removal & disposal (per m²)', 'Floor surface preparation & levelling (per m²)', 'Floor screed / self-levelling compound (per m²)', 'Rubber floor deep cleaning & sealing (per m²)', 'Artificial turf / sled track installation (per m²)']],
+    ['Flooring Installation', 'Rubber flooring', 'm', ['Edge ramp / transition strip installation (per m)', 'Skirting / wall trim installation (per m)']],
+    ['Flooring Installation', 'Rubber flooring', 'job', ['Flooring site measurement & survey', 'Flooring repair / tile replacement']]
   ];
   const PARTS = [
     ['Electronic Components', 'Boards', 'pcs', ['Motor control board (MCB)', 'Lower control board', 'Console / display board', 'Power supply board', 'Inverter board', 'Heart rate receiver board']],
@@ -53,7 +56,16 @@
     ['Fabrication Materials', 'Welding consumables', 'pcs', ['Welding rods / wire', 'Grinding & cutting discs']],
     ['Paint & Finishing', 'Coatings', 'kg', ['Powder coat']],
     ['Paint & Finishing', 'Coatings', 'pcs', ['Spray paint (can)', 'Primer', 'Rust converter']],
-    ['Paint & Finishing', 'Finishing', 'pcs', ['Decal / sticker set', 'Polish & cleaning chemicals']]
+    ['Paint & Finishing', 'Finishing', 'pcs', ['Decal / sticker set', 'Polish & cleaning chemicals']],
+    ['Rubber Flooring', 'Interlocking tiles', 'm²', ['Interlocking rubber tile 10 mm', 'Interlocking rubber tile 15 mm', 'Interlocking rubber tile 20 mm', 'Interlocking rubber tile 25 mm', 'Interlocking rubber tile 30 mm', 'Interlocking EPDM speckled tile 15 mm', 'Interlocking EPDM speckled tile 20 mm', 'Interlocking EVA foam mat 20 mm']],
+    ['Rubber Flooring', 'Rubber tiles (1 × 1 m)', 'm²', ['Rubber gym tile 15 mm', 'Rubber gym tile 20 mm', 'Rubber gym tile 25 mm', 'Rubber gym tile 30 mm', 'Heavy-duty rubber tile 40 mm (free-weight area)', 'Heavy-duty rubber tile 50 mm (lifting / drop zone)', 'EPDM speckled rubber tile 15 mm', 'EPDM speckled rubber tile 20 mm']],
+    ['Rubber Flooring', 'Rubber rolls', 'm²', ['Rubber flooring roll 4 mm', 'Rubber flooring roll 6 mm', 'Rubber flooring roll 8 mm', 'Rubber flooring roll 10 mm', 'Rubber flooring roll 12 mm', 'EPDM speckled rubber roll 6 mm', 'EPDM speckled rubber roll 8 mm']],
+    ['Rubber Flooring', 'Turf & special', 'm²', ['Artificial turf / sled track', 'Lifting platform rubber insert', 'Acoustic underlay (shock & sound)']],
+    ['Rubber Flooring', 'Accessories', 'm', ['Interlocking edge ramp (bevel strip)', 'Rubber edge ramp / transition strip', 'Aluminium threshold / transition strip', 'Rubber skirting / wall trim']],
+    ['Rubber Flooring', 'Accessories', 'pcs', ['Interlocking corner piece', 'Rubber tile connector / dowel pin', 'Deadlift platform (2 × 2 m)']],
+    ['Rubber Flooring', 'Accessories', 'kg', ['PU flooring adhesive']],
+    ['Rubber Flooring', 'Accessories', 'roll', ['Double-sided flooring tape', 'Floor protection film']],
+    ['Rubber Flooring', 'Accessories', 'litre', ['Rubber floor cleaner / sealer']]
   ];
   // treadmill-database categories move under one main category
   const TM_MOVE = {'Running belts': 'Belts & Bearings › Running belts', 'Drive belts': 'Belts & Bearings › Drive belts', 'Bearings': 'Belts & Bearings › Bearings'};

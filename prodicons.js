@@ -66,11 +66,19 @@
     sparkle: ['Refurbish / clean / polish', '<path d="M11 3l1.8 5.2L18 10l-5.2 1.8L11 17l-1.8-5.2L4 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>'],
     code: ['Software / firmware', '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M9.5 8.5l-2 2 2 2M14.5 8.5l2 2-2 2M8 21h8M12 17v4"/>'],
     console: ['Console / display', '<rect x="3" y="5" width="18" height="11" rx="2"/><rect x="6" y="8" width="7" height="4" rx=".5"/><path d="M16 8.5h2M16 11.5h2M9 20h6M12 16v4"/>'],
+    tiles: ['Rubber flooring / interlocking tiles', '<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M12 3v3.5a1.5 1.5 0 0 1 0 3V14.5a1.5 1.5 0 0 0 0 3V21M3 12h3.5a1.5 1.5 0 0 1 3 0h5a1.5 1.5 0 0 0 3 0H21"/>'],
+    floorroll: ['Rubber roll flooring', '<circle cx="6.5" cy="9" r="3.5"/><circle cx="6.5" cy="9" r="1"/><path d="M6.5 12.5H21v5H6.5a4 4 0 0 1-4-4V9"/>'],
+    ramp: ['Edge ramp / trim', '<path d="M2 18h20l-7-7H2z"/><path d="M2 14h16"/>'],
+    turf: ['Turf / sled track', '<path d="M2 20h20M5 20c0-4 .8-7 2-9M9 20c0-5-1-8-3-11M12 20c0-5 1-9 3.5-12M16 20c0-4-1-6.5-2.5-8M19.5 20c0-3 .2-5.5 1.5-7.5"/>'],
     part: ['Spare part', '<path d="M12 2l8.7 5v10L12 22l-8.7-5V7z"/><path d="M12 22V12M20.7 7L12 12 3.3 7"/>']
   };
   /* ordered rules: first match on the item name wins, then on its category */
   const RULES = [
     [/air bike|fan bike|assault bike/, 'bike'],
+    [/edge ramp|\bramp\b|bevel|threshold|transition strip|skirting|wall trim/, 'ramp'],
+    [/flooring roll|rubber roll|roll flooring|underlay/, 'floorroll'],
+    [/turf|sled track/, 'turf'],
+    [/interlock|rubber tile|gym tile|epdm|eva foam mat|flooring|\bfloor\b|deadlift platform|lifting platform/, 'tiles'],
     [/software|firmware|calibration|program/, 'code'],
     [/heart rate|pulse|hr grip|chest strap/, 'heart'],
     [/emergency|safety key|e-stop|estop/, 'estop'],

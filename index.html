@@ -1427,6 +1427,7 @@ function editDoc(type, id, fromDoc) {
             <label><span class="hint">Price</span><input class="in lprice" type="number" step="0.01" min="0" inputmode="decimal" value="${l.price || ''}" placeholder="0.00"></label>
             <div><span class="hint">Amount</span><div class="amt lamt">${fmt(num(l.qty) * num(l.price))}</div></div>
           </div>
+          ${window.roomBtn ? roomBtn(l) : ''}
           <div class="lwarn">${lineWarn(l)}</div>
           ${R.on ? (type === 'QUO' ? `<div class="lrep">
             <label><span class="hint">Condition</span><select class="in lcond">${COND.map(c => `<option ${(l.cond || '') === c ? 'selected' : ''} value="${c}">${c || '— Not inspected —'}</option>`).join('')}</select></label>
@@ -1477,6 +1478,8 @@ function editDoc(type, id, fromDoc) {
       drawLines(); toast((it.service ? 'Service' : 'Item') + ' added');
     }, {name: l.itemId ? '' : (l.desc || '').trim(), price: num(l.price) || '', service: lineKind(l) === 'service', unit: lineKind(l) === 'service' ? 'job' : 'pcs'});
     linesEl.addEventListener('click', e => {
+      const rb = e.target.closest('.lroom');
+      if (rb) { const l = draft.lines[+rb.closest('[data-i]').dataset.i]; roomSize(l, () => drawLines()); return; }
       const sp = e.target.closest('.spick');
       if (sp) { const l = draft.lines[+sp.closest('[data-i]').dataset.i]; pickItem({partsOnly: false}, it => { l.itemId = it.id; l.desc = it.name + (it.sku ? ' (' + it.sku + ')' : ''); l.price = it.price; l.kind = it.service ? 'service' : 'part'; l.cost = it.service ? 0 : num(it.cost); if (!num(l.qty)) l.qty = 1; drawLines(); }); return; }
       const sd = e.target.closest('.sdel');
@@ -1543,6 +1546,8 @@ function editDoc(type, id, fromDoc) {
         const cost = kind !== 'part' ? 0 : (l.cost !== undefined && l.cost !== '' ? r2(l.cost) : (it ? r2(it.cost) : 0));
         const out = {itemId: l.itemId || '', desc: (l.desc || '').trim(), qty: num(l.qty), price: r2(l.price), kind, cost};
         if (l.sub) out.sub = true;
+        const un = window.lineUnit ? lineUnit(l) : ''; if (un) out.unit = un;
+        if (l.dims && l.dims.length) { out.dims = l.dims; if (l.waste) out.waste = num(l.waste); }
         const b = (l.brand || '').trim(), m = (l.model || '').trim(), sn = (l.sn || '').trim().toUpperCase();
         if (b) out.brand = b; if (m) out.model = m; if (sn) out.sn = sn;
         ['cond', 'find', 'done', 'rem', 'note'].forEach(k => { const v = (l[k] || '').trim(); if (v) out[k] = v; });
@@ -1803,7 +1808,7 @@ function docHTML(d, layout) {
   const custLines = `<b>${esc(c.name || '')}</b>${c.contact ? '<br>Attn: ' + esc(c.contact) : ''}${addrText(c) ? '<br>' + esc(addrText(c)) : ''}${c.phone ? '<br>Tel: ' + esc(c.phone) : ''}${c.email ? '<br>' + esc(c.email) : ''}`;
   const detLines = `${d._so ? 'Order' : d._pro ? 'Proforma' : isInv ? 'Invoice' : 'Quotation'} No: <b>${esc(d.number)}</b><br>Date: ${dfmt(d.date)}<br>${dueTxt}${d.fromQuote ? '<br>Ref quote: ' + esc(d.fromQuote) : ''}${d.jobType ? '<br>Service: ' + esc(d.jobType) : ''}${d.subject ? '<br>Re: ' + esc(d.subject) : ''}`;
   const nos = lineNos(d.lines);
-  const rows = (d.lines || []).map((l, i) => { const sub = nos[i].includes('.'), free = sub && !num(l.price); return `<tr${sub ? ' class="sub"' : ''}><td>${nos[i]}</td><td>${esc(l.desc)}${lineEq(l) ? `<div class="leq">${esc(eqText(l))}</div>` : ''}${l.note ? `<div class="lnote">${esc(l.note)}</div>` : ''}</td><td class="n">${l.qty}</td><td class="n">${free ? '' : fmt(l.price)}</td><td class="n">${free ? '' : fmt(num(l.qty) * num(l.price))}</td></tr>`; }).join('');
+  const rows = (d.lines || []).map((l, i) => { const sub = nos[i].includes('.'), free = sub && !num(l.price); return `<tr${sub ? ' class="sub"' : ''}><td>${nos[i]}</td><td>${esc(l.desc)}${lineEq(l) ? `<div class="leq">${esc(eqText(l))}</div>` : ''}${l.note ? `<div class="lnote">${esc(l.note)}</div>` : ''}${window.dimsHTML ? dimsHTML(l) : ''}</td><td class="n">${l.qty}${window.unitSfx ? unitSfx(l) : ''}</td><td class="n">${free ? '' : fmt(l.price)}</td><td class="n">${free ? '' : fmt(num(l.qty) * num(l.price))}</td></tr>`; }).join('');
   const oldEq = (d.equipment || []).filter(e => e.brand || e.model || e.sn || e.name);
   const eqTable = oldEq.length ? `<table class="eqt"><thead><tr><th>#</th><th>Equipment</th><th>Brand</th><th>Model</th><th>Serial No.</th></tr></thead><tbody>${oldEq.map((e, k) => `<tr><td>${k + 1}</td><td>${esc(e.name || '')}</td><td>${esc(e.brand || '')}</td><td>${esc(e.model || '')}</td><td style="white-space:nowrap"><b>${esc(e.sn || '')}</b></td></tr>`).join('')}</tbody></table>` : '';
   const table = `${eqTable}<table><thead><tr><th>#</th><th>Description</th><th class="n">Qty</th><th class="n">Unit price</th><th class="n">Amount</th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -1914,7 +1919,7 @@ function waDoc(d) {
   const c = custById(d.customerId) || {}; const s = S(); const isInv = d.type === 'INV';
   let m = `Dear ${c.name || 'Customer'},\n\n${isInv ? 'Invoice' : 'Quotation'} *${d.number}* dated ${dfmt(d.date)}${d.subject ? '\nRe: ' + d.subject : ''}\n\n`;
   if ((d.equipment || []).length) m += '*Equipment*\n' + (d.equipment || []).map(e => `• ${[e.name, e.brand, e.model].filter(Boolean).join(' ')}${e.sn ? ' — SN: ' + e.sn : ''}`).join('\n') + '\n\n';
-  m += (d.lines || []).map((l, i) => `${l.sub && i ? '    ◦' : '•'} ${l.desc} — ${l.qty}${l.sub && i && !num(l.price) ? '' : ' × ' + fmt(l.price)}${lineEq(l) ? '\n   ' + eqText(l) : ''}${l.note ? '\n   ' + l.note.replace(/\n/g, '\n   ') : ''}`).join('\n');
+  m += (d.lines || []).map((l, i) => `${l.sub && i ? '    ◦' : '•'} ${l.desc} — ${l.qty}${window.unitSfx ? unitSfx(l) : ''}${l.sub && i && !num(l.price) ? '' : ' × ' + fmt(l.price)}${lineEq(l) ? '\n   ' + eqText(l) : ''}${l.note ? '\n   ' + l.note.replace(/\n/g, '\n   ') : ''}${window.dimsText ? dimsText(l) : ''}`).join('\n');
   m += `\n\n*Total: ${money(docTotal(d))}*`;
   if (isInv) {
     if (docPaid(d)) m += `\nPaid: ${money(docPaid(d))}\n*Balance: ${money(docBal(d))}*`;
@@ -2455,7 +2460,7 @@ function editItem(id, after, prefill) {
       <div class="row3">
         <label class="f"><span>Cost (QAR)</span><input class="in" type="number" step="0.01" min="0" inputmode="decimal" name="cost" value="${i.cost ?? ''}"></label>
         <label class="f"><span>Sell price</span><input class="in" type="number" step="0.01" min="0" inputmode="decimal" name="price" value="${i.price ?? ''}"></label>
-        <label class="f"><span>Unit</span><input class="in" name="unit" value="${esc(i.unit)}"></label>
+        <label class="f"><span>Unit</span><input class="in" name="unit" list="unitList" value="${esc(i.unit)}" placeholder="pcs, m², m, roll…"></label>
       </div>
       <div class="row stockOnly">
         ${id ? '' : `<label class="f"><span>Opening quantity</span><input class="in" type="number" step="any" min="0" inputmode="decimal" name="openQty" value="0"></label>`}
@@ -3589,6 +3594,7 @@ render();
 <script src="porders.js"></script>
 <script src="prodicons.js"></script>
 <script src="voucher.js"></script>
+<script src="units.js"></script>
 <script src="cloud.js"></script>
 </body>
 </html>
