@@ -28,7 +28,7 @@
     e: ['Expenses', go('expenses', () => { state.expTab = 'exp'; })],
     s: ['Suppliers', go('suppliers')],
     d: ['Products & services', go('stock')],
-    u: ['Customers', go('customers')],
+    o: ['Customers', go('customers')],
     b: ['Bank', go('banking')],
     a: ['Accounting', go('ledger')],
     y: ['Payroll', go('payroll')],
@@ -38,7 +38,7 @@
     k: ['Settings & backup', () => { closeAll(); goTab('more'); viewSettings(); }],
     n: ['Create new (item, customer, supplier…)', createNew]
   };
-  const LIST = [['Ctrl + Q', 'q'], ['Ctrl + I', 'i'], ['Ctrl + E', 'e'], ['Ctrl + S', 's'], ['Ctrl + D', 'd'], ['Ctrl + U', 'u'], ['Ctrl + B', 'b'], ['Ctrl + A', 'a'], ['Ctrl + Y', 'y'], ['Ctrl + T', 't'], ['Ctrl + M', 'm'], ['Ctrl + R', 'r'], ['Ctrl + K', 'k'], ['Ctrl + N', 'n']];
+  const LIST = [['Ctrl + Q', 'q'], ['Ctrl + I', 'i'], ['Ctrl + E', 'e'], ['Ctrl + S', 's'], ['Ctrl + D', 'd'], ['Ctrl + O', 'o'], ['Ctrl + B', 'b'], ['Ctrl + A', 'a'], ['Ctrl + Y', 'y'], ['Ctrl + T', 't'], ['Ctrl + M', 'm'], ['Ctrl + R', 'r'], ['Ctrl + K', 'k'], ['Ctrl + N', 'n']];
 
   function help() {
     openSheet('Keyboard shortcuts', `<div class="list">${LIST.map(([k, c]) => `<div class="item"><div class="main"><div class="t">${KEYS[c][0]}</div></div><kbd class="kbd">${k}</kbd></div>`).join('')}
