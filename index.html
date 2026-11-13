@@ -2169,12 +2169,13 @@ function viewMore() {
       ${row('mRep', ICON.chart, 'Reports', 'P&L, ageing, statements, cash book, Excel export')}
       ${row('mSet', ICON.edit, 'Company settings', 'Logo, contact details, numbering, terms, categories')}
       ${row('mBak', ICON.drive, 'Backup & restore', lb ? 'Last backup ' + dfmt(lb) : 'No backup yet — back up to Google Drive')}
+      ${row('mKeys', ICON.edit, 'Keyboard shortcuts', 'Ctrl+Q quotations, Ctrl+I invoices, Ctrl+N new… (computer)')}
     </div>
     <p class="hint" style="text-align:center;margin-top:24px">All data is stored on this phone. Back up regularly.</p>`;
   const go = (t, extra) => () => { if (extra) extra(); goTab(t); };
   $('#mCus').onclick = go('customers'); $('#mStock').onclick = go('stock'); $('#mRcv').onclick = () => receivePayment(); $('#mPO').onclick = go('porders');
   $('#mBills').onclick = go('expenses', () => { state.expTab = 'bills'; }); $('#mSup').onclick = go('suppliers');
-  $('#mRep').onclick = go('reports'); $('#mSet').onclick = viewSettings; $('#mBak').onclick = viewBackup;
+  $('#mRep').onclick = go('reports'); $('#mSet').onclick = viewSettings; $('#mBak').onclick = viewBackup; $('#mKeys').onclick = () => window.FitxKeys && FitxKeys.help();
 }
 
 function editCustomer(id, after) {
@@ -3595,6 +3596,7 @@ render();
 <script src="prodicons.js"></script>
 <script src="voucher.js"></script>
 <script src="units.js"></script>
+<script src="shortcuts.js"></script>
 <script src="cloud.js"></script>
 </body>
 </html>
