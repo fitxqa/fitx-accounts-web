@@ -95,7 +95,7 @@
     if (key !== 'expCats') return;
     db.accounts.forEach(a => { if (a.sub === 'cat' && a.cat) { const n = swap(a.cat); if (n !== a.cat) { a.cat = n; a.name = n.split(' › ').pop(); } } });
   };
-  window.FitxLedger = {accById, bankAccounts, moneyAcc};
+  window.FitxLedger = {accById, bankAccounts, moneyAcc, nextJournalNo, ensureAccounts};
 
   // options for "Deposit to / Paid from" selects in payment & expense forms
   window.bankAccOptions = function (sel) {
