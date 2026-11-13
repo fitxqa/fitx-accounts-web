@@ -44,6 +44,7 @@
     openSheet('Keyboard shortcuts', `<div class="list">${LIST.map(([k, c]) => `<div class="item"><div class="main"><div class="t">${KEYS[c][0]}</div></div><kbd class="kbd">${k}</kbd></div>`).join('')}
       <div class="item"><div class="main"><div class="t">Quit application</div></div><kbd class="kbd">Ctrl + Shift + Q</kbd></div>
       <div class="item"><div class="main"><div class="t">Next / previous section</div></div><kbd class="kbd">Tab · Shift + Tab</kbd></div>
+      <div class="item"><div class="main"><div class="t">Next / previous page in the section</div></div><kbd class="kbd">Ctrl + Tab · Ctrl + . / ,</kbd></div>
       <div class="item"><div class="main"><div class="t">Close the open screen</div></div><kbd class="kbd">Esc</kbd></div>
       <div class="item"><div class="main"><div class="t">Show this list</div></div><kbd class="kbd">Ctrl + /</kbd></div></div>
       <p class="hint" style="margin:12px 4px">On a Mac use ⌘ instead of Ctrl. Ctrl+Q opens Quotations, so quitting is Ctrl+Shift+Q. If your browser takes a key for itself (Ctrl+N new window, Ctrl+T new tab), use <b>Alt</b> with the same letter, e.g. Alt+N. Ctrl+A still selects text while you are typing in a box.</p>`);
@@ -60,6 +61,26 @@
     let i = list.indexOf(state.tab); if (i < 0) i = dir > 0 ? -1 : 0;
     goTab(list[(i + dir + list.length) % list.length]);
   }
+  /* Ctrl+Tab / Ctrl+Shift+Tab: next / previous page inside the section (e.g. Invoices › Quotations › Customers › Products).
+     Browsers keep Ctrl+Tab for their own tabs, so Ctrl+. / Ctrl+, do the same there. */
+  function stepPage(dir) {
+    if (typeof sheets !== 'undefined' && sheets.length) return false;
+    let bar = null;
+    for (const sel of ['.subnav', '.ltab', '.chips']) { bar = document.querySelector('#main ' + sel); if (bar && bar.querySelectorAll('button').length > 1) break; bar = null; }
+    if (!bar) return false;
+    const bs = Array.from(bar.querySelectorAll('button'));
+    let i = bs.findIndex(b => b.classList.contains('on')); if (i < 0) i = dir > 0 ? -1 : 0;
+    bs[(i + dir + bs.length) % bs.length].click();
+    return true;
+  }
+  document.addEventListener('keydown', e => {
+    if (e.defaultPrevented || document.querySelector('.cl-wrap')) return;
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && (e.key === 'Tab' || e.key === '.' || e.key === ',')) {
+      const dir = e.key === ',' || (e.key === 'Tab' && e.shiftKey) ? -1 : 1;
+      if (stepPage(dir)) e.preventDefault();
+    }
+  });
   document.addEventListener('keydown', e => {
     if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
     if (document.querySelector('.cl-wrap') || (typeof sheets !== 'undefined' && sheets.length)) return;
