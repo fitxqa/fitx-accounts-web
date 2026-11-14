@@ -813,6 +813,7 @@ const NEWCAT = '__new__';
 /* ---------- categories with sub-categories: a sub-category is stored as "Parent › Child" ---------- */
 const CSEP = ' › ';
 const NEWSUB = '__newsub__';
+const EDITCAT = '__editcat__';
 const catParent = c => String(c || '').split(CSEP)[0];
 const catLeaf = c => { const p = String(c || '').split(CSEP); return p[p.length - 1]; };
 const isSubCat = c => String(c || '').includes(CSEP);
@@ -832,7 +833,7 @@ function catOptions(list, sel) {
   const all = sel && !catFlat(list).includes(sel) ? [...list, sel] : list;
   return `<option value="">— None —</option>` + catTree(all).map(t => `<option value="${esc(t.name)}" ${t.name === sel ? 'selected' : ''}>${esc(t.name)}</option>` +
     t.subs.map(c => `<option value="${esc(c)}" ${c === sel ? 'selected' : ''}>\u00a0\u00a0\u00a0\u21b3 ${esc(catLeaf(c))}</option>`).join('')).join('') +
-    `<option value="${NEWCAT}">+ Add new category…</option><option value="${NEWSUB}">+ Add sub-category…</option>`;
+    `<option value="${NEWCAT}">+ Add new category…</option><option value="${NEWSUB}">+ Add sub-category…</option><option value="${EDITCAT}">✎ Edit / delete categories…</option>`;
 }
 // dialog: name + optional parent
 function askCategory(key, parent, cb, title) {
@@ -856,6 +857,11 @@ function askCategory(key, parent, cb, title) {
 function bindCatSelect(sel, key) {
   let prev = sel.value;
   sel.addEventListener('change', () => {
+    if (sel.value === EDITCAT) {
+      sel.value = prev;
+      manageCats(key, key === 'expCats' ? 'Expense categories' : key === 'jobTypes' ? 'Job types' : 'Product categories', () => { sel.innerHTML = catOptions(S()[key], S()[key].includes(prev) ? prev : ''); prev = sel.value; });
+      return;
+    }
     if (sel.value !== NEWCAT && sel.value !== NEWSUB) { prev = sel.value; return; }
     const sub = sel.value === NEWSUB;
     sel.value = prev;
@@ -3480,12 +3486,14 @@ const CAT_USE = {
   expCats: {get: () => db.expenses, f: 'category'},
   jobTypes: {get: () => db.docs, f: 'jobType'}
 };
-function manageCats(key, title) {
+function manageCats(key, title, onDone) {
+  if (typeof onDone !== 'function') onDone = null;
   openSheet(title, `<div class="btns" style="margin-bottom:12px"><button type="button" class="btn pri" id="cAdd">+ Main category</button><button type="button" class="btn" id="cAddSub">+ Sub-category</button></div><div id="cl"></div>
     <p class="hint" style="margin-top:10px">Renaming updates every record that uses the category. Removing a category doesn’t change records already using it.</p>`, el => {
     const U = CAT_USE[key];
     const count = c => U ? U.get().filter(r => inCat(r[U.f], c)).length : 0;
     const draw = () => {
+      if (onDone) setTimeout(onDone);
       const tree = catTree(S()[key]);
       el.querySelector('#cl').innerHTML = tree.length ? tree.map(t => `<div class="list" style="margin-bottom:10px">
         <div class="item"><div class="main"><div class="t" style="font-weight:800">${esc(t.name)}</div><div class="s">${t.subs.length ? t.subs.length + ' sub-categor' + (t.subs.length > 1 ? 'ies' : 'y') + ' · ' : ''}${count(t.name)} in use</div></div>
