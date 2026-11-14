@@ -293,6 +293,7 @@
      A username is a login made by the owner (no email needed). It signs in with a private alias e-mail
      <username>@users.fitx.qa (or <username>.r2@… after a password reset). logins/<username> = {email, uid, cid, role, name, disabled}. */
   const ALIAS = 'users.fitx.qa';
+  const OWNER_EMAILS = ['fitxqa@gmail.com'];
   const cleanUser = u => String(u || '').trim().toLowerCase().replace(/\s+/g, '.').replace(/[^a-z0-9._-]/g, '');
   async function loginEmail(v) {
     v = String(v || '').trim();
@@ -458,7 +459,19 @@
             if (f.name) await cred.user.updateProfile({displayName: f.name.trim()});
           } else await auth.signInWithEmailAndPassword(await loginEmail(f.email), f.pw);
           lsSet(LS_OFFLINE, null);
-        } catch (err) { er.textContent = authErr(err); btn.disabled = false; }
+        } catch (err) {
+          er.textContent = authErr(err); btn.disabled = false;
+          // the owner's very first sign-in on the cloud: offer to set up the owner account (only for the owner email)
+          if (mode !== 'up' && OWNER_EMAILS.includes(String(f.email).trim().toLowerCase()) && /invalid|not-found|wrong/.test(err.code || '') && !w.querySelector('#clOwnerUp')) {
+            er.insertAdjacentHTML('afterend', `<div id="clOwnerUp" class="card" style="margin-top:10px;border:1.5px solid #ff6a00"><b>First time on the cloud?</b><p class="hint" style="margin:4px 0 10px">If you have never signed in with ${esc(f.email.trim())} before, set it up now with the password you typed. If you have, tap <b>Forgot password</b> instead.</p><button type="button" class="btn pri full" id="clOwnerGo">Set up owner account</button></div>`);
+            w.querySelector('#clOwnerGo').onclick = async () => {
+              const pw = w.querySelector('[name=pw]').value;
+              if (pw.length < 6) { er.textContent = 'Password must be at least 6 characters.'; return; }
+              try { await auth.createUserWithEmailAndPassword(f.email.trim(), pw); lsSet(LS_OFFLINE, null); }
+              catch (e2) { er.textContent = e2.code === 'auth/email-already-in-use' ? 'This email is already set up – the password is wrong. Tap “Forgot password” to get a reset link by email.' : authErr(e2); }
+            };
+          }
+        }
       };
     });
   }
