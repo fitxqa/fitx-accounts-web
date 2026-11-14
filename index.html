@@ -49,7 +49,7 @@ nav.tabs .plus{width:46px;height:46px;border-radius:50%;background:var(--orange)
 nav.tabs .plus svg{width:24px;height:24px}
 
 /* sidebar (tablets / large screens) */
-@media (min-width:900px){
+@media (min-width:768px){
   aside.side{display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0;width:var(--side);background:var(--ink);color:#d7d7d7;z-index:40;padding:14px 10px;overflow-y:auto}
   aside.side .slogo{padding:6px 10px 16px}
   aside.side .slogo .logo{color:#fff;font-size:28px}
@@ -68,14 +68,37 @@ nav.tabs .plus svg{width:24px;height:24px}
   nav.tabs{display:none}
   main{padding:20px 24px 60px}
   .sheet{left:var(--side)!important}
+  body,aside.side,.sheet{transition:padding-left .18s ease,width .18s ease,left .18s ease}
+  aside.side .stog{position:absolute;top:16px;right:8px;width:30px;height:30px;border-radius:8px;border:0;background:#1d1d1d;color:#bbb;display:flex;align-items:center;justify-content:center;padding:0}
+  aside.side .stog:hover{background:#2a2a2a;color:#fff}
+  aside.side .stog svg{width:18px;height:18px}
+  aside.side .slogo{position:relative;padding-right:40px}
+  /* minimal (icons only) */
+  body.side-mini{--side:68px}
+  body.side-mini aside.side{padding:12px 8px;overflow-x:hidden}
+  body.side-mini aside.side .slogo{padding:4px 0 12px;text-align:center}
+  body.side-mini aside.side .slogo .logo{font-size:0}
+  body.side-mini aside.side .slogo .logo span{font-size:30px}
+  body.side-mini aside.side .slogo small{display:none}
+  body.side-mini aside.side .stog{position:static;margin:0 auto 10px;width:40px}
+  body.side-mini aside.side .snew{font-size:0;gap:0;width:44px;height:44px;padding:0;margin:0 auto 10px;border-radius:50%}
+  body.side-mini aside.side .snew svg{width:22px;height:22px}
+  body.side-mini aside.side button.si{font-size:0;gap:0;justify-content:center;padding:11px 0;width:48px;margin:1px auto}
+  body.side-mini aside.side button.si svg{width:22px;height:22px}
+  body.side-mini aside.side button.si.on{box-shadow:inset 3px 0 0 var(--orange)}
+  body.side-mini aside.side .sg{font-size:0;padding:0;margin:8px 10px;border-top:1px solid #2c2c2c}
+  body.side-mini aside.side .sfoot{display:none}
+  .stip{position:fixed;z-index:200;background:#111;color:#fff;font-size:12.5px;font-weight:600;padding:6px 10px;border-radius:7px;pointer-events:none;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 }
+/* very large screens: a little more room */
+@media (min-width:1600px){main{max-width:1320px}}
 
 /* sub navigation (Sales: Invoices · Quotations · Customers · Products & services) */
 .subnav{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);margin:-14px -14px 14px;padding:0 10px;background:#fff;scrollbar-width:none}
 .subnav::-webkit-scrollbar{display:none}
 .subnav button{flex-shrink:0;background:none;border:0;padding:12px 10px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;font-size:14px}
 .subnav button.on{color:var(--text);border-bottom-color:var(--orange)}
-@media (min-width:900px){.subnav{margin:-20px -24px 18px;padding:0 18px}}
+@media (min-width:768px){.subnav{margin:-20px -24px 18px;padding:0 18px}}
 
 /* ===== cards ===== */
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:12px;box-shadow:var(--sh)}
@@ -173,7 +196,7 @@ button.item:active{background:#f6f7f9}
 .trow .cD{display:none}
 .lnk{background:none;border:1px solid var(--line2);border-radius:999px;color:var(--orange-d);font-weight:700;font-size:12.5px;padding:6px 12px;min-height:34px}
 .lnk.pri{background:var(--orange);color:#fff;border-color:var(--orange)}
-@media (min-width:760px){
+@media (min-width:900px){
   .tlist .th{display:grid;background:#f8f9fb;font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:10px 14px;border-bottom:1px solid var(--line);cursor:default;min-height:0}
   .trow.cols{grid-template-columns:88px 112px minmax(100px,1fr) 92px 92px 92px 124px 140px;gap:2px 8px}
   .tlist{overflow-x:auto}
@@ -183,7 +206,7 @@ button.item:active{background:#f6f7f9}
   .trow .mob{display:none}
   .trow.ccols{grid-template-columns:minmax(160px,1.4fr) 140px minmax(120px,1fr) 130px 160px}
 }
-@media (max-width:759px){.trow .desk{display:none}.trow .cX:not(:has(.lnk:not(.desk))){display:none}}
+@media (max-width:899px){.trow .desk{display:none}.trow .cX:not(:has(.lnk:not(.desk))){display:none}}
 
 .seg{display:flex;background:#e9ebef;border-radius:999px;padding:4px;margin-bottom:12px}
 .seg button{flex:1;background:none;border:0;border-radius:999px;padding:9px;color:var(--muted);font-weight:700;min-height:40px}
@@ -521,7 +544,7 @@ textarea.in{min-height:80px;resize:vertical}
 <body>
 
 <aside class="side" id="side">
-  <div class="slogo"><div class="logo">Fit<span>X</span></div><small>SPORTS EQUIPMENT SERVICES</small></div>
+  <div class="slogo"><div class="logo">Fit<span>X</span></div><small>SPORTS EQUIPMENT SERVICES</small><button type="button" class="stog" id="sideTog" aria-label="Expand menu" title="Expand / collapse menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h16"/></svg></button></div>
   <button type="button" class="snew" data-new="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New</button>
   <button type="button" class="si" data-tab="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Dashboard</button>
   <div class="sg">Sales</div>
@@ -892,6 +915,24 @@ const catCell = r => r.level ? `<span style="padding-left:16px;color:#555">\u21b
 /* ---------- NAVIGATION SHELL (sidebar on tablets, bottom bar on phones) ---------- */
 const NAV_GROUP = {home: 'home', sales: 'sales', customers: 'sales', stock: 'sales', expenses: 'expenses', suppliers: 'expenses', reports: 'more', more: 'more'};
 function goTab(t) { state.tab = t; state.q = ''; render(); window.scrollTo(0, 0); }
+/* left menu: minimal (icons only) by default, expand with the ☰ button; remembered per device */
+(function () {
+  let mini = true; try { mini = localStorage.getItem('fitx_side_mini') !== '0'; } catch (e) {}
+  const apply = () => { document.body.classList.toggle('side-mini', mini); const t = $('#sideTog'); if (t) t.setAttribute('aria-label', mini ? 'Expand menu' : 'Collapse menu'); };
+  apply();
+  $('#sideTog').addEventListener('click', e => { e.stopPropagation(); mini = !mini; try { localStorage.setItem('fitx_side_mini', mini ? '1' : '0'); } catch (er) {} apply(); hideTip(); });
+  // name tooltip next to each icon while the menu is minimal
+  let tip = null;
+  const hideTip = () => { if (tip) { tip.remove(); tip = null; } };
+  const side = $('#side');
+  side.querySelectorAll('button.si, .snew').forEach(b => { const t = b.textContent.trim(); if (t) b.setAttribute('aria-label', t); });
+  side.addEventListener('mouseover', e => {
+    const b = e.target.closest('button.si, .snew'); if (!b || !document.body.classList.contains('side-mini')) return hideTip();
+    hideTip(); tip = document.createElement('div'); tip.className = 'stip'; tip.textContent = b.getAttribute('aria-label') || b.textContent.trim();
+    document.body.appendChild(tip); const r = b.getBoundingClientRect(); tip.style.left = (r.right + 10) + 'px'; tip.style.top = (r.top + r.height / 2 - tip.offsetHeight / 2) + 'px';
+  });
+  side.addEventListener('mouseleave', hideTip); side.addEventListener('click', hideTip);
+})();
 [$('#tabs'), $('#side')].forEach(nav => nav.addEventListener('click', e => {
   const n = e.target.closest('[data-new]'); if (n) { newMenu(); return; }
   const b = e.target.closest('button[data-tab]'); if (!b) return;
