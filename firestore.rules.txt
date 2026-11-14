@@ -1,0 +1,65 @@
+rules_version = '2';
+// FitX Accounts — paste into Firebase console → Firestore Database → Rules → Publish
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function myEmail() { return request.auth.token.email.lower(); }
+    function memberDoc(cid) { return /databases/$(database)/documents/companies/$(cid)/members/$(request.auth.uid); }
+    function isMember(cid) { return signedIn() && exists(memberDoc(cid)); }
+    function roleOf(cid) { return get(memberDoc(cid)).data.role; }
+    function isOwner(cid) { return isMember(cid) && roleOf(cid) == 'owner'; }
+    function fullAccess(cid) { return isMember(cid) && roleOf(cid) in ['owner', 'accountant']; }
+    function inviteFor(cid, role) {
+      let p = /databases/$(database)/documents/invites/$(myEmail());
+      return exists(p) && get(p).data.cid == cid && get(p).data.role == role;
+    }
+
+    // which company each user belongs to
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // staff usernames made by the owner: username -> alias login email (no passwords stored)
+    match /logins/{username} {
+      allow get: if true;
+      allow list: if signedIn() && isOwner(resource.data.cid);
+      allow create: if signedIn() && isOwner(request.resource.data.cid);
+      allow update, delete: if signedIn() && isOwner(resource.data.cid);
+    }
+
+    // staff invitations, keyed by lower-case email
+    match /invites/{email} {
+      allow get: if signedIn() && (myEmail() == email || isOwner(resource.data.cid));
+      allow list: if signedIn() && isOwner(resource.data.cid);
+      allow create, update: if signedIn() && isOwner(request.resource.data.cid);
+      allow delete: if signedIn() && (myEmail() == email || isOwner(resource.data.cid));
+    }
+
+    match /companies/{cid} {
+      allow create: if signedIn() && request.resource.data.owner == request.auth.uid;
+      allow read: if isMember(cid);
+      allow update: if isOwner(cid);
+
+      match /members/{uid} {
+        allow read: if isMember(cid);
+        allow create: if signedIn() && uid == request.auth.uid && (
+            (request.resource.data.role == 'owner' && get(/databases/$(database)/documents/companies/$(cid)).data.owner == request.auth.uid)
+            || inviteFor(cid, request.resource.data.role))
+          || isOwner(cid);
+        allow update, delete: if isOwner(cid);
+      }
+
+      // company settings (owner / accountant) and invoice number counters (everyone)
+      match /meta/{doc} {
+        allow read: if isMember(cid);
+        allow write: if fullAccess(cid) || (doc == 'counters' && isMember(cid));
+      }
+
+      // every other collection: one document per record
+      match /{col}/{id} {
+        allow read: if !(col in ['members', 'meta']) && (fullAccess(cid) || (isMember(cid) && col in ['customers', 'items', 'docs', 'moves', 'treadmills']));
+        allow write: if !(col in ['members', 'meta']) && (fullAccess(cid) || (isMember(cid) && col in ['customers', 'items', 'docs', 'moves']));
+      }
+    }
+  }
+}

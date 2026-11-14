@@ -278,8 +278,10 @@
       'auth/invalid-email': 'That email address is not valid.',
       'auth/user-not-found': 'No account with that email. Tap “Create account”.',
       'auth/wrong-password': 'Wrong password.',
-      'auth/invalid-credential': 'Email or password is wrong.',
-      'auth/invalid-login-credentials': 'Email or password is wrong.',
+      'auth/invalid-credential': 'Username / email or password is wrong.',
+      'fitx/disabled': 'This user is disabled. Ask the owner.',
+      'auth/requires-recent-login': 'Please sign out and sign in again, then change the password.',
+      'auth/invalid-login-credentials': 'Username / email or password is wrong.',
       'auth/email-already-in-use': 'An account with this email already exists. Tap “Sign in”.',
       'auth/weak-password': 'Password must be at least 6 characters.',
       'auth/network-request-failed': 'No internet connection.',
@@ -287,13 +289,148 @@
       'auth/operation-not-allowed': 'Email sign-in is not turned on in Firebase (Authentication → Email/Password).'
     })[c] || (e && e.message) || 'Something went wrong.';
   }
+  /* ---------- staff usernames ----------
+     A username is a login made by the owner (no email needed). It signs in with a private alias e-mail
+     <username>@users.fitx.qa (or <username>.r2@… after a password reset). logins/<username> = {email, uid, cid, role, name, disabled}. */
+  const ALIAS = 'users.fitx.qa';
+  const cleanUser = u => String(u || '').trim().toLowerCase().replace(/\s+/g, '.').replace(/[^a-z0-9._-]/g, '');
+  async function loginEmail(v) {
+    v = String(v || '').trim();
+    if (v.includes('@')) return v;
+    const u = cleanUser(v);
+    try {
+      const d = await fs.collection('logins').doc(u).get();
+      if (d.exists) { if (d.data().disabled) { const e = new Error('This user is disabled. Ask the owner.'); e.code = 'fitx/disabled'; throw e; } return d.data().email; }
+    } catch (e) { if (e.code === 'fitx/disabled') throw e; }
+    return u + '@' + ALIAS;
+  }
+  const shownLogin = em => { const m = String(em || '').match(new RegExp('^([^@]+?)(?:\\.r\\d+)?@' + ALIAS.replace(/\./g, '\\.') + '$')); return m ? m[1] : em; };
+  C.shownLogin = shownLogin;
+  // a second Firebase app signs up new logins without signing the owner out
+  async function secondary() {
+    const app = firebase.apps.find(a => a.name === 'fitx-admin') || firebase.initializeApp(CFG, 'fitx-admin');
+    try { await app.auth().setPersistence(firebase.auth.Auth.Persistence.NONE); } catch (e) {}
+    return app;
+  }
+  async function makeLogin(username, password, name) {
+    const app = await secondary(); let cred = null, email = '';
+    for (let n = 1; n <= 30 && !cred; n++) {
+      email = username + (n === 1 ? '' : '.r' + n) + '@' + ALIAS;
+      try { cred = await app.auth().createUserWithEmailAndPassword(email, password); }
+      catch (e) { if (e.code !== 'auth/email-already-in-use') throw e; }
+    }
+    if (!cred) throw new Error('Could not create this login – try another username.');
+    try { if (name) await cred.user.updateProfile({displayName: name}); } catch (e) {}
+    await app.firestore().collection('users').doc(cred.user.uid).set({cid: C.cid, email, username});
+    await app.auth().signOut();
+    return {uid: cred.user.uid, email};
+  }
+  const genPw = () => { const a = 'abcdefghjkmnpqrstuvwxyz', d = '23456789'; let s = ''; for (let i = 0; i < 4; i++) s += a[Math.floor(Math.random() * a.length)]; s = s[0].toUpperCase() + s.slice(1); for (let i = 0; i < 4; i++) s += d[Math.floor(Math.random() * d.length)]; return s; };
+  function rulesHelp(e) {
+    if (!/permission|insufficient/i.test((e && (e.message || e.code)) || '')) return false;
+    openSheet('One-time setup needed', `<p>To use usernames, Firebase needs the updated FitX security rules (one time only):</p>
+      <ol class="hint" style="padding-left:18px;line-height:1.6"><li>Open <b>console.firebase.google.com</b> → project <b>fitx-accounts</b></li><li><b>Firestore Database → Rules</b></li><li>Delete everything, paste the new rules, tap <b>Publish</b></li></ol>
+      <button type="button" class="btn pri full" id="ruCopy">Copy the new rules</button>`, el => {
+      el.querySelector('#ruCopy').onclick = async () => { try { const t = await (await fetch('firestore.rules.txt', {cache: 'no-store'})).text(); await navigator.clipboard.writeText(t); toast('Rules copied – paste them in Firebase'); } catch (er) { toast('Copy failed: ' + er.message); } };
+    });
+    return true;
+  }
+  function shareLogin(name, username, pw, title) {
+    const msg = `${title || 'Your FitX Accounts login'} (${S().name})\n\nUsername: ${username}\nPassword: ${pw}\n\nApp: https://fitxqa.github.io/fitx-accounts-web/download/FitX-Accounts.apk\nWeb: https://fitxqa.github.io/fitx-accounts-web/\n\nChange your password after signing in: Menu → Cloud & team → Change my password.`;
+    openSheet('Login details', `<div class="card" style="font-size:15px;line-height:1.8">${name ? `<b>${esc(name)}</b><br>` : ''}Username: <b>${esc(username)}</b><br>Password: <b style="font-family:ui-monospace,monospace;font-size:17px">${esc(pw)}</b></div>
+      <p class="hint">Give these to ${esc(name || 'the employee')}. The password is not shown again.</p>
+      <div class="btns"><button type="button" class="btn pri" id="lgWa">${ICON.wa || ''}Send by WhatsApp</button><button type="button" class="btn" id="lgCopy">Copy</button></div>`, el => {
+      el.querySelector('#lgWa').onclick = () => openLink('https://wa.me/?text=' + encodeURIComponent(msg));
+      el.querySelector('#lgCopy').onclick = async () => { try { await navigator.clipboard.writeText(msg); toast('Copied'); } catch (e) { toast('Copy failed'); } };
+    });
+  }
+  function addUser(after) {
+    const pw0 = genPw();
+    openSheet('Add user', `<form id="auForm" autocomplete="off">
+      <label class="f"><span>Full name</span><input class="in" name="name" required placeholder="e.g. Ravi Kumar"></label>
+      <label class="f"><span>Username (to sign in)</span><input class="in" name="username" required autocapitalize="none" spellcheck="false" placeholder="e.g. ravi"></label>
+      <label class="f"><span>Password</span><div style="display:flex;gap:8px"><input class="in" name="pw" required minlength="6" value="${pw0}" style="font-family:ui-monospace,monospace"><button type="button" class="btn" id="auGen">New</button></div></label>
+      <label class="f"><span>Role</span><select class="in" name="role">${Object.entries(ROLES).filter(([k]) => k !== 'owner').map(([k, r]) => `<option value="${k}">${r.label} — ${r.desc}</option>`).join('')}<option value="owner">Owner — ${ROLES.owner.desc}</option></select></label>
+      <div class="cl-err" id="auErr" role="alert"></div>
+      <button class="btn pri full" type="submit">Create user</button></form>`, el => {
+      const un = el.querySelector('[name=username]');
+      el.querySelector('[name=name]').addEventListener('input', e => { if (!un.dataset.touched) un.value = cleanUser(e.target.value.split(' ')[0]); });
+      un.addEventListener('input', () => { un.dataset.touched = 1; });
+      el.querySelector('#auGen').onclick = () => { el.querySelector('[name=pw]').value = genPw(); };
+      el.querySelector('#auForm').onsubmit = async ev => {
+        ev.preventDefault(); const f = formData(ev.target), er = el.querySelector('#auErr'), btn = ev.target.querySelector('[type=submit]');
+        const u = cleanUser(f.username); er.textContent = '';
+        if (u.length < 3) { er.textContent = 'Username: at least 3 letters or numbers.'; return; }
+        if (f.pw.length < 6) { er.textContent = 'Password: at least 6 characters.'; return; }
+        btn.disabled = true; btn.textContent = 'Creating…';
+        try {
+          const ex = await fs.collection('logins').doc(u).get();
+          if (ex.exists) { er.textContent = 'This username is taken – choose another.'; btn.disabled = false; btn.textContent = 'Create user'; return; }
+          const lg = await makeLogin(u, f.pw, f.name.trim());
+          await fs.collection('companies').doc(C.cid).collection('members').doc(lg.uid).set({role: f.role, email: lg.email, username: u, name: f.name.trim(), joined: firebase.firestore.FieldValue.serverTimestamp()});
+          await fs.collection('logins').doc(u).set({email: lg.email, uid: lg.uid, cid: C.cid, role: f.role, name: f.name.trim(), disabled: false});
+          closeSheet(() => { if (after) after(); shareLogin(f.name.trim(), u, f.pw, 'Your FitX Accounts login'); });
+        } catch (e) {
+          btn.disabled = false; btn.textContent = 'Create user';
+          if (!rulesHelp(e)) er.textContent = e.code ? authErr(e) : fbErr(e);
+        }
+      };
+    });
+  }
+  async function resetUser(m, after) {
+    const pw0 = genPw();
+    openSheet('Reset password – ' + (m.name || m.username), `<form id="rpForm">
+      <p class="hint" style="margin-top:0">Sets a new password for <b>${esc(m.username)}</b>. Their phone is signed out and they sign in again with the new password.</p>
+      <label class="f"><span>New password</span><div style="display:flex;gap:8px"><input class="in" name="pw" required minlength="6" value="${pw0}" style="font-family:ui-monospace,monospace"><button type="button" class="btn" id="rpGen">New</button></div></label>
+      <div class="cl-err" id="rpErr" role="alert"></div>
+      <button class="btn pri full" type="submit">Reset password</button></form>`, el => {
+      el.querySelector('#rpGen').onclick = () => { el.querySelector('[name=pw]').value = genPw(); };
+      el.querySelector('#rpForm').onsubmit = async ev => {
+        ev.preventDefault(); const pw = formData(ev.target).pw, er = el.querySelector('#rpErr'), btn = ev.target.querySelector('[type=submit]');
+        if (pw.length < 6) { er.textContent = 'Password: at least 6 characters.'; return; }
+        btn.disabled = true; btn.textContent = 'Saving…';
+        try {
+          const lg = await makeLogin(m.username, pw, m.name);
+          const base = fs.collection('companies').doc(C.cid).collection('members');
+          await base.doc(lg.uid).set({role: m.role, email: lg.email, username: m.username, name: m.name || '', joined: firebase.firestore.FieldValue.serverTimestamp()});
+          if (m.uid && m.uid !== lg.uid) { try { await base.doc(m.uid).delete(); } catch (e) {} }
+          await fs.collection('logins').doc(m.username).set({email: lg.email, uid: lg.uid, cid: C.cid, role: m.role, name: m.name || '', disabled: false});
+          closeSheet(() => { if (after) after(); shareLogin(m.name, m.username, pw, 'Your new FitX Accounts password'); });
+        } catch (e) { btn.disabled = false; btn.textContent = 'Reset password'; if (!rulesHelp(e)) er.textContent = e.code ? authErr(e) : fbErr(e); }
+      };
+    });
+  }
+  function changeMyPassword() {
+    openSheet('Change my password', `<form id="cpForm" autocomplete="on">
+      <input type="text" name="u" autocomplete="username" value="${esc(C.user ? C.user.email : '')}" hidden>
+      <label class="f"><span>Current password</span><input class="in" type="password" name="cur" autocomplete="current-password" required></label>
+      <label class="f"><span>New password</span><input class="in" type="password" name="pw" autocomplete="new-password" minlength="6" required></label>
+      <label class="f"><span>New password again</span><input class="in" type="password" name="pw2" autocomplete="new-password" minlength="6" required></label>
+      <div class="cl-err" id="cpErr" role="alert"></div>
+      <button class="btn pri full" type="submit">Change password</button></form>`, el => {
+      el.querySelector('#cpForm').onsubmit = async ev => {
+        ev.preventDefault(); const f = formData(ev.target), er = el.querySelector('#cpErr'), btn = ev.target.querySelector('[type=submit]');
+        er.textContent = '';
+        if (f.pw.length < 6) { er.textContent = 'At least 6 characters.'; return; }
+        if (f.pw !== f.pw2) { er.textContent = 'The two new passwords are different.'; return; }
+        btn.disabled = true;
+        try {
+          await C.user.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(C.user.email, f.cur));
+          await C.user.updatePassword(f.pw);
+          closeSheet(() => toast('Password changed'));
+        } catch (e) { btn.disabled = false; er.textContent = authErr(e); }
+      };
+    });
+  }
+  C.changeMyPassword = changeMyPassword;
+
   function loginScreen(mode) {
     mode = mode || 'in';
     showWrap(`
       <div class="cl-tabs" role="tablist"><button type="button" data-m="in" class="${mode === 'in' ? 'on' : ''}">Sign in</button><button type="button" data-m="up" class="${mode === 'up' ? 'on' : ''}">Create account</button></div>
       <form id="clForm" class="card" autocomplete="on">
         ${mode === 'up' ? '<label class="f"><span>Your name</span><input class="in" name="name" autocomplete="name" required></label>' : ''}
-        <label class="f"><span>Email</span><input class="in" name="email" type="email" autocomplete="email" inputmode="email" required></label>
+        <label class="f"><span>${mode === 'up' ? 'Email' : 'Username or email'}</span><input class="in" name="email" ${mode === 'up' ? 'type="email" inputmode="email"' : 'type="text" autocapitalize="none" spellcheck="false"'} autocomplete="username" required></label>
         <label class="f"><span>Password</span><input class="in" name="pw" type="password" autocomplete="${mode === 'up' ? 'new-password' : 'current-password'}" minlength="6" required></label>
         <div class="cl-err" id="clErr" role="alert"></div>
         <button class="btn pri full" type="submit">${mode === 'up' ? 'Create account' : 'Sign in'}</button>
@@ -307,6 +444,7 @@
       if (fp) fp.onclick = async () => {
         const em = w.querySelector('[name=email]').value.trim();
         if (!em) { w.querySelector('#clErr').textContent = 'Type your email first.'; return; }
+        if (!em.includes('@')) { w.querySelector('#clErr').textContent = 'Staff usernames: ask the owner to reset your password in Menu → Users & passwords.'; return; }
         try { await auth.sendPasswordResetEmail(em); w.querySelector('#clErr').textContent = 'Password reset email sent to ' + em; }
         catch (e) { w.querySelector('#clErr').textContent = authErr(e); }
       };
@@ -318,7 +456,7 @@
           if (mode === 'up') {
             const cred = await auth.createUserWithEmailAndPassword(f.email.trim(), f.pw);
             if (f.name) await cred.user.updateProfile({displayName: f.name.trim()});
-          } else await auth.signInWithEmailAndPassword(f.email.trim(), f.pw);
+          } else await auth.signInWithEmailAndPassword(await loginEmail(f.email), f.pw);
           lsSet(LS_OFFLINE, null);
         } catch (err) { er.textContent = authErr(err); btn.disabled = false; }
       };
@@ -326,6 +464,11 @@
   }
   async function companyScreen() {
     const em = (C.user.email || '').toLowerCase();
+    if (em.endsWith('@' + ALIAS)) {   // staff username without an active membership (disabled / password was reset)
+      showWrap(`<div class="card"><b>This login is not active</b><p class="hint">Username <b>${esc(shownLogin(em))}</b> has no access right now. If the owner reset your password, sign in with the new password. Otherwise ask the owner to enable you.</p></div>
+        <button type="button" class="btn pri full" id="clOut" style="margin-top:10px">Sign in again</button>`, w => { w.querySelector('#clOut').onclick = () => auth.signOut(); });
+      return;
+    }
     let inv = null;
     try { const s = await fs.collection('invites').doc(em).get(); if (s.exists) inv = s.data(); } catch (e) {}
     showWrap(`
@@ -375,35 +518,61 @@
     return `
       <div class="card">
         <div class="hint">Company</div><div style="font-weight:800;font-size:16px">${esc((C.company && C.company.name) || S().name)}</div>
-        <div style="margin-top:10px" class="hint">Signed in as</div><div><b>${esc(C.user.email)}</b> <span class="cl-role">${esc((ROLES[C.role] || {}).label || C.role)}</span></div>
+        <div style="margin-top:10px" class="hint">Signed in as</div><div><b>${esc(shownLogin(C.user.email))}</b> <span class="cl-role">${esc((ROLES[C.role] || {}).label || C.role)}</span></div>
         <div style="margin-top:12px" id="clStat">${statusHTML()}</div>
-        <div class="btns" style="margin-top:12px"><button type="button" class="btn" id="clSyncNow">Sync now</button><button type="button" class="btn danger" id="clSignOut">Sign out</button></div>
+        <div class="btns" style="margin-top:12px"><button type="button" class="btn" id="clSyncNow">Sync now</button><button type="button" class="btn" id="clMyPw">Change my password</button><button type="button" class="btn danger" id="clSignOut">Sign out</button></div>
       </div>
-      ${can('team') ? `<div class="sec"><h2>Team</h2></div><div class="list" id="clMembers"><div class="empty">Loading…</div></div>
-      <button type="button" class="btn pri full" id="clInvite" style="margin-top:10px">+ Invite staff</button>
+      ${can('team') ? `<div class="sec"><h2>Users &amp; passwords</h2></div><div class="list" id="clMembers"><div class="empty">Loading…</div></div>
+      <button type="button" class="btn pri full" id="clAddUser" style="margin-top:10px">+ Add user (username &amp; password)</button>
+      <button type="button" class="btn full" id="clInvite" style="margin-top:8px">Invite by email instead</button>
       <p class="hint" style="margin-top:8px">${Object.entries(ROLES).map(([k, r]) => `<b>${r.label}:</b> ${r.desc}`).join('<br>')}</p>` : ''}
       <div class="sec"><h2>Web version</h2></div>
-      <div class="card"><p class="hint" style="margin:0">Open the same accounts on a computer at your FitX website (e.g. <b>www.fitx.qa/accounts</b>) and sign in with the same email.</p></div>`;
+      <div class="card"><p class="hint" style="margin:0">Open the same accounts on a computer at <b>fitxqa.github.io/fitx-accounts-web</b> and sign in with the same username or email.</p></div>`;
   }
   async function loadMembers(el) {
     const box = el.querySelector('#clMembers'); if (!box) return;
     try {
       const base = fs.collection('companies').doc(C.cid);
-      const [ms, inv] = await Promise.all([base.collection('members').get(), fs.collection('invites').where('cid', '==', C.cid).get()]);
-      const rows = [];
-      ms.forEach(d => { const m = d.data(); rows.push(`<div class="item"><div class="main"><div class="t">${esc(m.name || m.email)}</div><div class="s">${esc(m.email)}</div></div>${d.id === C.user.uid ? `<span class="cl-role">${ROLES[m.role].label} · you</span>` : `<select class="in" data-mem="${d.id}" aria-label="Role for ${esc(m.email)}" style="width:auto;min-height:40px">${Object.entries(ROLES).map(([k, r]) => `<option value="${k}" ${k === m.role ? 'selected' : ''}>${r.label}</option>`).join('')}<option value="__remove">Remove</option></select>`}</div>`); });
-      inv.forEach(d => { const m = d.data(); rows.push(`<div class="item"><div class="main"><div class="t">${esc(d.id)}</div><div class="s">Invited · ${esc((ROLES[m.role] || {}).label || m.role)} · waiting to sign up</div></div><button type="button" class="btn danger" data-uninv="${esc(d.id)}">Cancel</button></div>`); });
-      box.innerHTML = rows.join('') || '<div class="empty">No members.</div>';
-      box.querySelectorAll('[data-mem]').forEach(s => s.onchange = async () => {
-        const ref = base.collection('members').doc(s.dataset.mem);
-        try {
-          if (s.value === '__remove') { if (!confirm('Remove this person from the company?')) { loadMembers(el); return; } await ref.delete(); toast('Removed'); }
-          else { await ref.update({role: s.value}); toast('Role updated'); }
-        } catch (e) { toast(e.message); }
-        loadMembers(el);
+      const [ms, inv, off] = await Promise.all([base.collection('members').get(), fs.collection('invites').where('cid', '==', C.cid).get(),
+        fs.collection('logins').where('cid', '==', C.cid).where('disabled', '==', true).get().catch(() => ({forEach() {}}))]);
+      const rows = [], mem = {};
+      ms.forEach(d => {
+        const m = Object.assign({uid: d.id}, d.data()); mem[d.id] = m;
+        const me = d.id === C.user.uid;
+        rows.push(`<div class="item" style="flex-wrap:wrap;gap:8px"><div class="main" style="min-width:150px"><div class="t">${esc(m.name || m.username || m.email)}${me ? ' <span class="cl-role">you</span>' : ''}</div><div class="s">${m.username ? 'Username: <b>' + esc(m.username) + '</b>' : esc(m.email)}</div></div>
+          ${me ? `<span class="cl-role">${(ROLES[m.role] || {}).label || m.role}</span>` : `<select class="in" data-mem="${d.id}" aria-label="Role for ${esc(m.name || m.email)}" style="width:auto;min-height:40px">${Object.entries(ROLES).map(([k, r]) => `<option value="${k}" ${k === m.role ? 'selected' : ''}>${r.label}</option>`).join('')}</select>
+          ${m.username ? `<button type="button" class="btn" data-reset="${d.id}">Reset password</button><button type="button" class="btn" data-off="${d.id}">Disable</button>` : ''}<button type="button" class="btn danger" data-rm="${d.id}" aria-label="Remove ${esc(m.name || m.email)}">${ICON.trash}</button>`}</div>`);
       });
-      box.querySelectorAll('[data-uninv]').forEach(b => b.onclick = async () => { try { await fs.collection('invites').doc(b.dataset.uninv).delete(); } catch (e) { toast(e.message); } loadMembers(el); });
-    } catch (e) { box.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+      off.forEach(d => { const m = d.data(); rows.push(`<div class="item" style="opacity:.7"><div class="main"><div class="t">${esc(m.name || d.id)}</div><div class="s">Username: <b>${esc(d.id)}</b> · <span style="color:var(--red)">disabled</span></div></div><button type="button" class="btn" data-on="${esc(d.id)}">Enable</button></div>`); });
+      inv.forEach(d => { const m = d.data(); rows.push(`<div class="item"><div class="main"><div class="t">${esc(d.id)}</div><div class="s">Invited · ${esc((ROLES[m.role] || {}).label || m.role)} · waiting to sign up</div></div><button type="button" class="btn danger" data-uninv="${esc(d.id)}">Cancel</button></div>`); });
+      box.innerHTML = rows.join('') || '<div class="empty">No users.</div>';
+      const again = () => loadMembers(el);
+      box.querySelectorAll('[data-mem]').forEach(s => s.onchange = async () => {
+        const m = mem[s.dataset.mem];
+        try { await base.collection('members').doc(m.uid).update({role: s.value}); if (m.username) await fs.collection('logins').doc(m.username).set({role: s.value}, {merge: true}).catch(() => {}); toast('Role updated'); } catch (e) { toast(fbErr(e)); }
+        again();
+      });
+      box.querySelectorAll('[data-reset]').forEach(b => b.onclick = () => resetUser(mem[b.dataset.reset], again));
+      box.querySelectorAll('[data-off]').forEach(b => b.onclick = async () => {
+        const m = mem[b.dataset.off]; if (!confirm(`Disable ${m.name || m.username}? They are signed out and cannot sign in until you enable them again.`)) return;
+        try { await fs.collection('logins').doc(m.username).set({disabled: true, uid: m.uid, role: m.role, name: m.name || '', cid: C.cid, email: m.email}, {merge: true}); await base.collection('members').doc(m.uid).delete(); toast('Disabled'); } catch (e) { if (!rulesHelp(e)) toast(fbErr(e)); }
+        again();
+      });
+      box.querySelectorAll('[data-on]').forEach(b => b.onclick = async () => {
+        try {
+          const d = await fs.collection('logins').doc(b.dataset.on).get(); const m = d.data();
+          await base.collection('members').doc(m.uid).set({role: m.role || 'technician', email: m.email, username: b.dataset.on, name: m.name || '', joined: firebase.firestore.FieldValue.serverTimestamp()});
+          await fs.collection('logins').doc(b.dataset.on).set({disabled: false}, {merge: true}); toast('Enabled');
+        } catch (e) { if (!rulesHelp(e)) toast(fbErr(e)); }
+        again();
+      });
+      box.querySelectorAll('[data-rm]').forEach(b => b.onclick = async () => {
+        const m = mem[b.dataset.rm]; if (!confirm(`Remove ${m.name || m.username || m.email} completely?${m.username ? ' The username can be used again later.' : ''}`)) return;
+        try { await base.collection('members').doc(m.uid).delete(); if (m.username) await fs.collection('logins').doc(m.username).delete().catch(() => {}); toast('Removed'); } catch (e) { toast(fbErr(e)); }
+        again();
+      });
+      box.querySelectorAll('[data-uninv]').forEach(b => b.onclick = async () => { try { await fs.collection('invites').doc(b.dataset.uninv).delete(); } catch (e) { toast(e.message); } again(); });
+    } catch (e) { box.innerHTML = `<div class="empty">${esc(fbErr(e))}</div>`; }
   }
   function bindCloudBody(el) {
     const on = (id, fn) => { const b = el.querySelector('#' + id); if (b) b.onclick = fn; };
@@ -411,6 +580,8 @@
     on('clSetup', () => { closeSheet(() => companyScreen()); });
     on('clSyncNow', async () => { await push(); toast(C.status === 'err' ? 'Sync problem: ' + C.error : 'Up to date'); refreshCloudSheet(); });
     on('clSignOut', () => C.signOut());
+    on('clMyPw', () => changeMyPassword());
+    on('clAddUser', () => addUser(() => loadMembers(cloudSheet)));
     on('clInvite', () => {
       openSheet('Invite staff', `
         <form id="clInvForm">
@@ -432,7 +603,7 @@
     loadMembers(el);
   }
   C.openCloud = function () {
-    cloudSheet = openSheet('Cloud & team', `<div id="clBody">${cloudBody()}</div>`, el => bindCloudBody(el));
+    cloudSheet = openSheet(C.role === 'owner' ? 'Cloud, users & passwords' : 'Cloud & team', `<div id="clBody">${cloudBody()}</div>`, el => bindCloudBody(el));
   };
 
   // Menu row
@@ -468,7 +639,7 @@
     const s = document.querySelector('#main .sec');
     if (!s) return;
     const sub = !C.enabled ? 'Not set up' : !C.user ? 'Sign in to sync phones, computers and staff' : !C.cid ? 'Set up your company' : `${(ROLES[C.role] || {}).label} · ${C.status === 'ok' ? 'synced' : C.status === 'err' ? 'sync problem' : 'syncing'}`;
-    s.insertAdjacentHTML('beforebegin', `<div class="list" style="margin-top:12px"><button type="button" class="item rcard" id="mCloud"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 18a5 5 0 1 1 1-9.9A6 6 0 0 1 19 10a4 4 0 0 1 0 8z"/></svg></span><div class="main"><div class="t">Cloud &amp; team</div><div class="s">${esc(sub)}</div></div></button></div>`);
+    s.insertAdjacentHTML('beforebegin', `<div class="list" style="margin-top:12px"><button type="button" class="item rcard" id="mCloud"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 18a5 5 0 1 1 1-9.9A6 6 0 0 1 19 10a4 4 0 0 1 0 8z"/></svg></span><div class="main"><div class="t">${C.role === 'owner' ? 'Cloud, users &amp; passwords' : 'Cloud &amp; my password'}</div><div class="s">${esc(sub)}</div></div></button></div>`);
     document.getElementById('mCloud').onclick = () => C.openCloud();
     if (C.role === 'technician') document.querySelectorAll('#main .sec').forEach(sec => {
       const l = sec.nextElementSibling;
