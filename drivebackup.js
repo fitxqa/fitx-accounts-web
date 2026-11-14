@@ -36,7 +36,7 @@ function doGet() { return out_({ok: true, app: 'FitX backup', folder: FOLDER}); 
 function doPost(e) {
   try {
     const b = JSON.parse(e.postData.contents);
-    if (b.key !== KEY) return out_({ok: false, error: 'Wrong key – copy the script again from the app'});
+    if (b.key !== KEY) return out_({ok: false, error: 'WRONGKEY'});
     const f = folder_();
     if (b.action === 'test') return out_({ok: true, folder: f.getName(), url: f.getUrl(), email: Session.getEffectiveUser().getEmail()});
     if (b.action === 'list') return out_({ok: true, url: f.getUrl(), files: files_(f).slice(0, 60).map(x => ({id: x.getId(), name: x.getName(), date: x.getDateCreated().toISOString(), size: x.getSize()}))});
@@ -59,6 +59,7 @@ function doPost(e) {
     const r = await fetch(url || g.url, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify(Object.assign({key: g.key}, body)), redirect: 'follow'});
     const t = await r.text();
     let j; try { j = JSON.parse(t); if (j && !j.ok && /DriveApp|permission|إذن|autoriz|authoriz/i.test(j.error || '')) j.error = 'The script is not allowed to use your Drive yet. In script.google.com choose “authorize” (or any function) at the top, tap ▶ Run → Review permissions → Allow, then test again.'; } catch (e) { throw new Error(/<html/i.test(t) ? 'Google returned a web page – check the Web app is deployed with access “Anyone”' : 'Unexpected answer from Google'); }
+    if (!j.ok && /^WRONGKEY$|Wrong key/.test(j.error || '')) j.error = 'The secret key in the app is different from KEY in your Google script. Open Google Drive settings and paste the KEY from the script (the text between the quotes on the line const KEY = …) into “Secret key”, then Test & save.';
     if (!j.ok) throw new Error(j.error || 'Google Drive error');
     return j;
   }
@@ -89,18 +90,23 @@ function doPost(e) {
         <b>4.</b> Tap <b>Deploy → New deployment</b> → type <b>Web app</b>. Execute as: <b>Me</b>. Who has access: <b>Anyone</b>. Tap <b>Deploy</b>.<br>
         <b>5.</b> Copy the <b>Web app URL</b> and paste it below.
       </div>
+      <label class="f"><span>Secret key (must be the same as <code>KEY</code> in the script)</span><input class="in" id="gdKey" value="${esc(g.key)}" autocapitalize="none" spellcheck="false" style="font-family:ui-monospace,monospace"></label>
       <label class="f"><span>Web app URL</span><input class="in" id="gdUrl" value="${esc(g.url || '')}" placeholder="https://script.google.com/macros/s/…/exec" autocapitalize="none" spellcheck="false"></label>
       <label style="display:flex;gap:10px;align-items:center;margin:4px 2px 12px"><input type="checkbox" id="gdAuto" ${g.auto !== false ? 'checked' : ''} style="width:22px;height:22px;accent-color:var(--orange)"><span>Back up automatically once a day</span></label>
       <div class="cl-err" id="gdErr" role="alert" style="color:var(--red);font-weight:600"></div>
       <button type="button" class="btn pri full" id="gdTest">Test &amp; save</button>
       <p class="hint" style="margin-top:10px">Changing the folder? Copy the script again, paste it over the old code and choose <b>Deploy → Manage deployments → Edit → New version</b>.</p>`, el => {
       el.querySelector('#gdCopy').onclick = async () => {
+        const kk = el.querySelector('#gdKey').value.trim(); if (kk.length >= 8 && kk !== g.key) { g.key = kk; save(); }
         const txt = script(g.key, el.querySelector('#gdFolder').value.trim(), g.keep);
         try { await navigator.clipboard.writeText(txt); toast('Script copied – paste it in script.google.com'); }
         catch (e) { openSheet('FitX script', `<textarea class="in" rows="16" readonly style="font-family:ui-monospace,monospace;font-size:11px">${esc(txt)}</textarea><p class="hint">Select all and copy.</p>`); }
       };
       el.querySelector('#gdTest').onclick = async ev => {
         const url = el.querySelector('#gdUrl').value.trim(), er = el.querySelector('#gdErr');
+        const k = el.querySelector('#gdKey').value.trim().replace(/^.*KEY\s*=\s*['"]?|['"]?\s*;.*$/g, '').replace(/^['"]|['"]$/g, '');
+        if (k.length < 8) { er.textContent = 'Secret key is missing.'; return; }
+        if (k !== g.key) { g.key = k; save(); }
         er.textContent = '';
         if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)) { er.textContent = 'Paste the Web app URL that starts with https://script.google.com/'; return; }
         ev.target.disabled = true; ev.target.textContent = 'Testing…';
