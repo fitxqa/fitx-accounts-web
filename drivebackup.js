@@ -15,6 +15,9 @@ const KEY = '${key}';          // must match the app – keep it secret
 const FOLDER = '${String(folder || 'FitX Backups').replace(/'/g, '')}'; // Drive folder path, e.g. 'FitX/Backups'
 const KEEP = ${Math.max(5, +keep || 90)};              // keep the newest backups, delete older ones
 
+// ▶ Choose "authorize" in the function list above and tap Run once, then Allow – this gives the script access to your Drive.
+function authorize() { const f = folder_(); Logger.log('OK – backups go to: ' + f.getUrl()); }
+
 function folder_() {
   let f = DriveApp.getRootFolder();
   FOLDER.split('/').map(s => s.trim()).filter(String).forEach(name => {
@@ -55,7 +58,7 @@ function doPost(e) {
     const g = G();
     const r = await fetch(url || g.url, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify(Object.assign({key: g.key}, body)), redirect: 'follow'});
     const t = await r.text();
-    let j; try { j = JSON.parse(t); } catch (e) { throw new Error(/<html/i.test(t) ? 'Google returned a web page – check the Web app is deployed with access “Anyone”' : 'Unexpected answer from Google'); }
+    let j; try { j = JSON.parse(t); if (j && !j.ok && /DriveApp|permission|إذن|autoriz|authoriz/i.test(j.error || '')) j.error = 'The script is not allowed to use your Drive yet. In script.google.com choose “authorize” (or any function) at the top, tap ▶ Run → Review permissions → Allow, then test again.'; } catch (e) { throw new Error(/<html/i.test(t) ? 'Google returned a web page – check the Web app is deployed with access “Anyone”' : 'Unexpected answer from Google'); }
     if (!j.ok) throw new Error(j.error || 'Google Drive error');
     return j;
   }
@@ -82,8 +85,8 @@ function doPost(e) {
       <div class="card" style="font-size:13.5px;line-height:1.55">
         <b>1.</b> Open <b>script.google.com</b> → <b>New project</b>.<br>
         <b>2.</b> Delete the sample code and paste the FitX script: <button type="button" class="btn" id="gdCopy" style="min-height:36px;margin:4px 0">Copy script</button><br>
-        <b>3.</b> Tap <b>Deploy → New deployment</b> → type <b>Web app</b>. Execute as: <b>Me</b>. Who has access: <b>Anyone</b>. Tap <b>Deploy</b>.<br>
-        <b>4.</b> Allow access to your Drive (if Google says “not verified”, tap <b>Advanced → Go to project</b>).<br>
+        <b>3.</b> Tap <b>Save</b> (💾). In the function list at the top choose <b>authorize</b> and tap <b>▶ Run</b> → <b>Review permissions</b> → choose fitxqa@gmail.com → <b>Allow</b> (if Google says “not verified”, tap <b>Advanced → Go to project</b>).<br>
+        <b>4.</b> Tap <b>Deploy → New deployment</b> → type <b>Web app</b>. Execute as: <b>Me</b>. Who has access: <b>Anyone</b>. Tap <b>Deploy</b>.<br>
         <b>5.</b> Copy the <b>Web app URL</b> and paste it below.
       </div>
       <label class="f"><span>Web app URL</span><input class="in" id="gdUrl" value="${esc(g.url || '')}" placeholder="https://script.google.com/macros/s/…/exec" autocapitalize="none" spellcheck="false"></label>
