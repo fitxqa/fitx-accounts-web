@@ -628,7 +628,7 @@ const QUO_TERMS = `1. This quotation is valid until the date shown. All prices a
 6. Spare parts carry the manufacturer's warranty; labour is warranted for 30 days.`;
 const STOCK_CATS = ['Belts', 'Bearings', 'Motors', 'Electronics / Boards', 'Cables', 'Rollers', 'Decks', 'Consoles', 'Lubricant', 'Accessories'];
 const JOB_TYPES = ['Repair / breakdown', 'Preventive maintenance', 'AMC contract', 'Installation / relocation', 'Spare parts supply', 'Inspection / assessment', 'Other'];
-const EXP_CATS = ['Spare parts purchase','Fuel / transport', 'Salaries', 'Rent', 'Tools & equipment', 'Marketing', 'Phone & internet', 'Utilities', 'Visa & government fees', 'Other'];
+const EXP_CATS = ['Spare parts purchase','Fuel / transport', 'Casual labour / daily wages', 'Rent', 'Tools & equipment', 'Marketing', 'Phone & internet', 'Utilities', 'Visa & government fees', 'Other'];
 const DEFAULT = () => ({
   settings: {
     name: 'FitX Sports Equipment Services', phone: '50107300', email: 'info@fitx.qa', web: 'www.fitx.qa',
@@ -2580,7 +2580,7 @@ function editExpense(id, after) {
         <label class="f"><span>Amount (QAR)</span><input class="in" type="number" step="0.01" min="0.01" inputmode="decimal" name="amount" value="${x.amount ?? ''}" required></label>
       </div>
       <label class="f"><span>Category</span><select class="in" name="category" id="xCat">${catOptions(S().expCats, x.category || S().expCats[0])}</select></label>
-      <p class="hint" style="margin-top:-6px">Buying spare parts for stock? Use More → Purchases instead, so stock and parts cost update and it isn’t counted twice.</p>
+      <p class="hint" style="margin-top:-6px" id="xCatHint"></p>
       <label class="f"><span>Description</span><input class="in" name="desc" value="${esc(x.desc)}" placeholder="e.g. Petrol – Lusail visit"></label>
       <label class="f"><span>Paid by</span><select class="in" name="method">${['Cash', 'Card', 'Bank transfer', 'Fawran', 'Cheque'].map(m => `<option ${x.method === m ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
       <label class="f"><span>Paid from</span><select class="in" name="acc">${window.bankAccOptions ? bankAccOptions(x.acc || '') : '<option value="">Automatic</option>'}</select></label>
@@ -2588,6 +2588,15 @@ function editExpense(id, after) {
       ${id ? `<button type="button" class="btn danger full" id="xDel" style="margin-top:8px">${ICON.trash}Delete</button>` : ''}
     </form>`, el => {
     bindCatSelect(el.querySelector('#xCat'), 'expCats');
+    // guidance so nothing is counted twice (stock purchases → Bills, staff salaries → Payroll)
+    const catHint = () => {
+      const c = el.querySelector('#xCat').value || '';
+      const h = el.querySelector('#xCatHint');
+      if (/salar|wage|payroll/i.test(c)) {
+        h.innerHTML = `<b style="color:var(--orange-d)">Staff in Payroll?</b> Pay their salary in <b>Payroll → pay run → Pay salaries</b> instead (choose “Petty cash” or “Cash” there if you pay in cash). Use this category only for casual / daily workers who are <b>not</b> in Payroll – otherwise the salary is counted twice.`;
+      } else h.textContent = 'Buying spare parts for stock? Use Expenses → Bills instead, so stock and parts cost update and it isn’t counted twice.';
+    };
+    el.querySelector('#xCat').addEventListener('change', catHint); catHint();
     el.querySelector('#xForm').onsubmit = e => {
       e.preventDefault(); const f = formData(e.target);
       const data = {date: f.date, amount: r2(f.amount), category: f.category || 'Other', desc: f.desc.trim(), method: f.method, acc: f.acc || ''};
