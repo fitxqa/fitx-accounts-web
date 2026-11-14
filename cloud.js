@@ -427,7 +427,7 @@
   function loginScreen(mode) {
     mode = mode || 'in';
     showWrap(`
-      <div class="cl-tabs" role="tablist"><button type="button" data-m="in" class="${mode === 'in' ? 'on' : ''}">Sign in</button><button type="button" data-m="up" class="${mode === 'up' ? 'on' : ''}">Create account</button></div>
+      ${mode === 'up' ? '<div class="cl-tabs" role="tablist"><button type="button" data-m="in">Sign in</button><button type="button" data-m="up" class="on">Create account</button></div>' : '<h2 style="text-align:center;margin:4px 0 14px">Sign in</h2>'}
       <form id="clForm" class="card" autocomplete="on">
         ${mode === 'up' ? '<label class="f"><span>Your name</span><input class="in" name="name" autocomplete="name" required></label>' : ''}
         <label class="f"><span>${mode === 'up' ? 'Email' : 'Username or email'}</span><input class="in" name="email" ${mode === 'up' ? 'type="email" inputmode="email"' : 'type="text" autocapitalize="none" spellcheck="false"'} autocomplete="username" required></label>
@@ -436,7 +436,7 @@
         <button class="btn pri full" type="submit">${mode === 'up' ? 'Create account' : 'Sign in'}</button>
         ${mode === 'in' ? '<button type="button" class="btn full" id="clForgot" style="margin-top:8px">Forgot password</button>' : ''}
       </form>
-      <p class="hint" style="text-align:center;margin:18px 6px 8px">Sign in to share your accounts between phones, computers and staff.</p>
+      <p class="hint" style="text-align:center;margin:18px 6px 8px">Use the username and password from your company owner.</p>
       <button type="button" class="btn full" id="clLocal">Use on this phone only (no cloud)</button>`, w => {
       w.querySelectorAll('[data-m]').forEach(b => b.onclick = () => loginScreen(b.dataset.m));
       w.querySelector('#clLocal').onclick = () => { lsSet(LS_OFFLINE, true); closeWrap(); toast('Working on this phone only. Turn on cloud in Menu → Cloud & team.'); };
@@ -524,7 +524,6 @@
       </div>
       ${can('team') ? `<div class="sec"><h2>Users &amp; passwords</h2></div><div class="list" id="clMembers"><div class="empty">Loading…</div></div>
       <button type="button" class="btn pri full" id="clAddUser" style="margin-top:10px">+ Add user (username &amp; password)</button>
-      <button type="button" class="btn full" id="clInvite" style="margin-top:8px">Invite by email instead</button>
       <p class="hint" style="margin-top:8px">${Object.entries(ROLES).map(([k, r]) => `<b>${r.label}:</b> ${r.desc}`).join('<br>')}</p>` : ''}
       <div class="sec"><h2>Web version</h2></div>
       <div class="card"><p class="hint" style="margin:0">Open the same accounts on a computer at <b>fitxqa.github.io/fitx-accounts-web</b> and sign in with the same username or email.</p></div>`;
