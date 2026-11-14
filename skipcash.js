@@ -29,7 +29,7 @@ $KEY_SECRET  = '${phpStr(o.keySecret)}';
 $WEBHOOK_KEY = '${phpStr(o.webhookKey)}';
 $COMPANY     = '${phpStr(S().name)}';
 $DATA        = __DIR__ . '/fitx-pay-data.php';   // payment log (not readable from the web)
-$ALLOWED_ORIGINS = array('https://fitxqa.github.io', 'https://appassets.androidplatform.net');
+$ALLOWED_ORIGINS = array('https://fitxqa.github.io', 'https://appassets.androidplatform.net', 'https://www.fitx.qa', 'https://fitx.qa');
 
 $origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
 if (in_array($origin, $ALLOWED_ORIGINS, true)) { header('Access-Control-Allow-Origin: ' . $origin); header('Vary: Origin'); }

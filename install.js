@@ -13,7 +13,7 @@
   const standalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
   let deferred = null;
 
-  if ('serviceWorker' in navigator) window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+  if ('serviceWorker' in navigator && !window.FITX_HOSTED) window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e; refresh(); });
   window.addEventListener('appinstalled', () => { deferred = null; refresh(); if (window.toast) toast('FitX Accounts installed'); });
 

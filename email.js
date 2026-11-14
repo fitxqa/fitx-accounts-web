@@ -420,7 +420,7 @@ $SMTP_PORT = ${Number(o.smtpPort) || 465};
 $SMTP_USER = '${phpStr(o.smtpUser)}';
 $SMTP_PASS = '${phpStr(o.smtpPass)}';
 $IMAP_PASS = '${phpStr(o.imapPass)}';   // optional (cPanel mode): keeps a copy of each email in "Sent"
-$ALLOWED_ORIGINS = array('https://fitxqa.github.io', 'https://appassets.androidplatform.net');
+$ALLOWED_ORIGINS = array('https://fitxqa.github.io', 'https://appassets.androidplatform.net', 'https://www.fitx.qa', 'https://fitx.qa');
 
 $origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
 if (in_array($origin, $ALLOWED_ORIGINS, true)) { header('Access-Control-Allow-Origin: ' . $origin); header('Vary: Origin'); }
