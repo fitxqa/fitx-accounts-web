@@ -12,6 +12,7 @@
   const DEFAULT_ACCOUNTS = [
     ['1000', 'Cash on hand', 'asset', 'cash'], ['1010', 'Petty cash', 'asset', 'cash'],
     ['1100', 'Bank – current account', 'asset', 'bank'],
+    ['1150', 'SkipCash (card payments clearing)', 'asset', 'bank'],
     ['1200', 'Accounts receivable (customers)', 'asset', 'ar'], ['1300', 'Inventory – spare parts', 'asset', 'inv'],
     ['1400', 'Prepaid expenses & deposits', 'asset', ''], ['1500', 'Tools & equipment', 'asset', 'fixed'], ['1510', 'Vehicles', 'asset', 'fixed'],
     ['2000', 'Accounts payable (suppliers)', 'liability', 'ap'], ['2100', 'Accrued expenses', 'liability', ''],

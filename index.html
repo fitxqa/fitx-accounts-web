@@ -1866,7 +1866,7 @@ function docHTML(d, layout) {
       ${isInv && docPaid(d) ? (() => { const adv = (d.payments || []).filter(p => p.adv).reduce((a, p) => a + num(p.amount), 0), oth = r2(docPaid(d) - adv); return `${adv ? `<div><span>Less: advance received</span><span>− ${fmt(adv)}</span></div>` : ''}${oth > 0.004 ? `<div><span>Paid</span><span>${fmt(oth)}</span></div>` : ''}<div><b>Balance due</b><b>${fmt(docBal(d))}</b></div>`; })() : ''}
       ${d._pro ? `<div><span>Advance required (${d._advPct}%)</span><span>${fmt(d._advReq)}</span></div>${d._advPaid ? `<div><span>Advance received</span><span>− ${fmt(d._advPaid)}</span></div>` : ''}<div><b>Advance due now</b><b>${fmt(Math.max(0, d._advReq - d._advPaid))}</b></div>` : ''}
     </div>`;
-  const pay = s.payNote && ((isInv && !d.cancelled && docBal(d) > 0.004) || (d._pro && d._advReq - d._advPaid > 0.004)) ? `<div class="pay"><b>Payment</b><br>${esc(s.payNote)}</div>` : '';
+  const pay = (s.payNote && ((isInv && !d.cancelled && docBal(d) > 0.004) || (d._pro && d._advReq - d._advPaid > 0.004)) ? `<div class="pay"><b>Payment</b><br>${esc(s.payNote)}</div>` : '') + (window.FitxSkip ? FitxSkip.payBlock(d) : '');
   const notes = d.notes ? `<div class="notes">${esc(d.notes)}</div>` : '';
   // company stamp (per document "with / without", default from settings)
   const withStamp = d.stamp !== undefined ? !!d.stamp : s.stampOn !== false;
@@ -3671,6 +3671,8 @@ render();
 <script src="receipts.js"></script>
 <script src="drivebackup.js"></script>
 <script src="security.js"></script>
+<script src="vendor/qrcode.min.js"></script>
+<script src="skipcash.js"></script>
 <script src="cloud.js"></script>
 </body>
 </html>
