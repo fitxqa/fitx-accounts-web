@@ -263,7 +263,7 @@ textarea.in{min-height:80px;resize:vertical}
 .itype button.on{border-color:var(--orange);background:var(--orange-l);box-shadow:inset 0 0 0 1px var(--orange)}
 .itype button.on b{color:var(--orange-d)}
 .ptag{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.3px;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:1px}
-.ptag.cash{background:#e3f6ec;color:#1a7f45}.ptag.credit{background:#fff1e7;color:#c24e00}
+.ptag.svc{background:#e8eefc;color:#2747a8}.ptag.cash{background:#e3f6ec;color:#1a7f45}.ptag.credit{background:#fff1e7;color:#c24e00}
 .line{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-bottom:10px;box-shadow:var(--sh)}
 .line.leqline{border:1.5px solid var(--orange);background:var(--orange-l)}
 .line.lunder{margin-left:14px;border-left:3px solid var(--orange)}
@@ -965,7 +965,7 @@ function render() {
   $('#sideFoot').innerHTML = `${esc(S().name)}<br>${lb ? 'Last backup ' + dfmt(lb) : 'No backup yet'}`;
 }
 const SUBNAV = {
-  sales: [['sales:INV', 'Invoices'], ['sales:QUO', 'Quotations'], ['customers', 'Customers'], ['stock', 'Products & services']],
+  sales: [['sales:INV', 'Invoices'], ['sales:QUO', 'Quotations'], ['sales:SQ', 'Service quotes'], ['customers', 'Customers'], ['stock', 'Products & services']],
   expenses: [['expenses:exp', 'Expenses'], ['expenses:bills', 'Bills'], ['suppliers', 'Suppliers']]
 };
 function subnav(group) {
@@ -1161,7 +1161,7 @@ function salesRow(d) {
   else act = `<button type="button" class="lnk desk" data-act="print">Print</button>`;
   return `<div class="trow cols" data-doc="${d.id}" role="button" tabindex="0">
     <div class="desk">${dfmt(d.date)}</div><div class="desk">${esc(d.number)}</div>
-    <div style="min-width:0"><div class="c1">${esc(c.name || 'No customer')}${isInv && d.payType ? `<span class="ptag ${d.payType}">${d.payType === 'cash' ? 'CASH' : 'CREDIT'}</span>` : ''}</div><div class="c2">${d.jobType ? esc(d.jobType) : esc(d.subject || '')}<span class="mob">${d.jobType || d.subject ? ' · ' : ''}${esc(d.number)} · ${dfmt(d.date)}</span></div></div>
+    <div style="min-width:0"><div class="c1">${esc(c.name || 'No customer')}${d.svc ? `<span class="ptag svc">${svcSell(d) ? 'SALE' : 'SERVICE'}</span>` : ''}${isInv && d.payType ? `<span class="ptag ${d.payType}">${d.payType === 'cash' ? 'CASH' : 'CREDIT'}</span>` : ''}</div><div class="c2">${d.jobType ? esc(d.jobType) : esc(d.subject || '')}<span class="mob">${d.jobType || d.subject ? ' · ' : ''}${esc(d.number)} · ${dfmt(d.date)}</span></div></div>
     <div class="desk">${dfmt(d.due)}</div>
     <div class="desk cA">${isInv ? fmt(bal) : '—'}</div>
     <div class="desk cA">${fmt(docTotal(d))}</div>
@@ -1182,8 +1182,8 @@ function bindSalesRows(root) {
 }
 const SALES_HEAD = `<div class="trow cols th"><div>Date</div><div>No.</div><div>Customer</div><div>Due date</div><div class="cA">Balance</div><div class="cA">Total</div><div>Status</div><div class="cX">Action</div></div>`;
 function viewSales() {
-  const T = state.salesType;
-  setTop('Sales', T === 'INV' ? '+ Invoice' : '+ Quotation', () => editDoc(T));
+  const T = state.salesType, DT = T === 'SQ' ? 'QUO' : T;
+  setTop('Sales', T === 'INV' ? '+ Invoice' : T === 'SQ' ? '+ Service quote' : '+ Quotation', () => T === 'SQ' ? newServiceQuote() : editDoc(T));
   const filters = T === 'INV' ? ['All', 'Cash', 'Credit', 'Unpaid', 'Overdue', 'Not due', 'Paid', 'Paid30', 'Cancelled'] : ['All', 'Open', 'Accepted', 'Converted', 'Declined'];
   if (!filters.includes(state.salesFilter)) state.salesFilter = 'All';
   const FL = {Paid30: 'Paid last 30 days'};
@@ -1196,7 +1196,7 @@ function viewSales() {
   $$('.chips button').forEach(b => b.onclick = () => { state.salesFilter = b.dataset.f; render(); });
   const draw = () => {
     const q = state.q.toLowerCase(); const t = today(), d30 = addDays(t, -30);
-    let list = db.docs.filter(d => d.type === T);
+    let list = db.docs.filter(d => d.type === DT && (T === 'SQ' ? d.svc : T === 'QUO' ? !d.svc : true));
     if (q) list = list.filter(d => [d.number, d.subject, d.jobType, (custById(d.customerId) || {}).name, ...docEquip(d).map(eqLabel)].join(' ').toLowerCase().includes(q));
     const f = state.salesFilter;
     if (f !== 'All') list = list.filter(d => {
@@ -1211,7 +1211,7 @@ function viewSales() {
       return st === f;
     });
     list.sort((a, b) => (b.date + b.created).localeCompare(a.date + a.created));
-    $('#docList').innerHTML = list.length ? SALES_HEAD + list.map(salesRow).join('') : `<div class="empty">${db.docs.some(d => d.type === T) ? 'Nothing matches.' : `No ${T === 'INV' ? 'invoices' : 'quotations'} yet. Tap <b>${T === 'INV' ? '+ Invoice' : '+ Quotation'}</b>.`}</div>`;
+    $('#docList').innerHTML = list.length ? SALES_HEAD + list.map(salesRow).join('') : `<div class="empty">${db.docs.some(d => d.type === DT && (T === 'SQ' ? d.svc : T === 'QUO' ? !d.svc : true)) ? 'Nothing matches.' : `No ${T === 'INV' ? 'invoices' : T === 'SQ' ? 'service quotes' : 'quotations'} yet. Tap <b>${T === 'INV' ? '+ Invoice' : T === 'SQ' ? '+ Service quote' : '+ Quotation'}</b>.`}</div>`;
     const tot = list.filter(d => !d.cancelled).reduce((s, d) => s + docTotal(d), 0);
     const bal = T === 'INV' ? list.filter(d => !d.cancelled).reduce((s, d) => s + Math.max(0, docBal(d)), 0) : 0;
     $('#docSum').textContent = list.length ? `${list.length} ${T === 'INV' ? 'invoice' : 'quotation'}${list.length > 1 ? 's' : ''} · Total ${money(tot)}${T === 'INV' ? ' · Balance ' + money(bal) : ''}` : '';
@@ -1298,6 +1298,8 @@ function allocPayment(kind, partyId, focusId) {
 const receivePayment = (cid, docId) => allocPayment('cust', cid, docId);
 const paySupplier = (sid, purId) => allocPayment('sup', sid, purId);
 
+const svcSell = d => !!(d && d.svc && (d.lines || []).some(l => l.kind === 'equip' && l.sell));
+function newServiceQuote(cid) { editDoc('QUO', null, {type: 'QUO', svc: true, customerId: cid || '', lines: [{kind: 'equip', itemId: '', desc: '', qty: 1, price: 0}], discount: 0, notes: '', subject: ''}); }
 function nextNumber(type) {
   const s = S(); const y = new Date().getFullYear();
   const n = type === 'INV' ? s.nextInv : s.nextQuo;
@@ -1423,7 +1425,7 @@ function editDoc(type, id, fromDoc) {
     if (isConv) draft.wcr.on = true;
   }
   const R = type === 'QUO' ? draft.insp : draft.wcr;
-  const label = type === 'INV' ? 'Invoice' : 'Quotation';
+  const label = draft.svc ? (type === 'INV' ? 'Service invoice' : 'Service quote') : type === 'INV' ? 'Invoice' : 'Quotation';
   const html = `
     <form id="docForm" autocomplete="off">
       <label class="f"><span>Customer</span><div style="display:flex;gap:8px"><select class="in" name="customerId" id="dCust">${customerOptions(draft.customerId)}</select><button type="button" class="btn" id="dNewCust" aria-label="Add new customer">+ New</button></div></label>
@@ -1453,8 +1455,9 @@ function editDoc(type, id, fromDoc) {
         </div>
       </div>
       <div class="sec"><h2>Items</h2></div>
+      <label class="rtog" style="margin:0 0 10px"><input type="checkbox" id="dSvc" ${draft.svc ? 'checked' : ''}><span><b>Service layout</b><small>Machine line first (description, brand, model, qty – no price), then the repair work, parts and sub items with prices</small></span></label>
       <div id="lines"></div>
-      <button type="button" class="btn full" id="addLine">+ Add line</button>
+      <div style="display:flex;gap:8px"><button type="button" class="btn pri" id="addEq" style="flex:1;${draft.svc ? '' : 'display:none'}">+ Add machine</button><button type="button" class="btn" style="flex:1" id="addLine">+ Add line</button></div>
       <div class="sec"><h2>Totals</h2></div>
       <label class="f"><span>Discount (QAR)</span><input class="in" type="number" step="0.01" min="0" inputmode="decimal" name="discount" id="dDisc" value="${draft.discount || ''}" placeholder="0.00"></label>
       <div class="tot" id="dTot"></div>
@@ -1484,7 +1487,7 @@ function editDoc(type, id, fromDoc) {
         if (l.sub) return '';
         if (lineKind(l) === 'equip') curEq = l.sell ? null : l;
         const under = lineKind(l) !== 'equip' && curEq;
-        const kindBtns = `<div class="kind" role="radiogroup" aria-label="Line type">${lineKind(l) === 'equip' ? `<button type="button" data-kind="equip" class="${lineKind(l) === 'equip' ? 'on' : ''}">Equipment</button>` : ''}<button type="button" data-kind="service" class="${lineKind(l) === 'service' ? 'on' : ''}">Maintenance / labour</button><button type="button" data-kind="part" class="${lineKind(l) === 'part' ? 'on' : ''}">Spare part</button></div>`;
+        const kindBtns = `<div class="kind" role="radiogroup" aria-label="Line type">${draft.svc || lineKind(l) === 'equip' ? `<button type="button" data-kind="equip" class="${lineKind(l) === 'equip' ? 'on' : ''}">Equipment</button>` : ''}<button type="button" data-kind="service" class="${lineKind(l) === 'service' ? 'on' : ''}">Maintenance / labour</button><button type="button" data-kind="part" class="${lineKind(l) === 'part' ? 'on' : ''}">Spare part</button></div>`;
         if (lineKind(l) === 'equip') return `
         <div class="line leqline" data-i="${i}">
           <div class="lt"><span>Equipment</span>${mains > 1 ? `<button type="button" class="ldel">Remove</button>` : ''}</div>
@@ -1615,6 +1618,13 @@ function editDoc(type, id, fromDoc) {
       draft.lines.splice(di, n); drawLines();
     });
     el.querySelector('#addLine').onclick = () => { draft.lines.push({itemId: '', desc: '', qty: 1, price: 0}); drawLines(); };
+    el.querySelector('#addEq').onclick = () => { draft.lines.push({kind: 'equip', itemId: '', desc: '', qty: 1, price: 0}); drawLines(); const c = linesEl.querySelectorAll('.leqline'); const last = c[c.length - 1]; if (last) { last.scrollIntoView({block: 'center'}); const i = last.querySelector('.ldesc'); if (i) i.focus(); } };
+    el.querySelector('#dSvc').onchange = e => {
+      draft.svc = e.target.checked; el.querySelector('#addEq').style.display = draft.svc ? '' : 'none';
+      if (draft.svc && !draft.lines.some(l => l.kind === 'equip')) { const blank = draft.lines.length === 1 && !(draft.lines[0].desc || '').trim() && !num(draft.lines[0].price); if (blank) draft.lines = []; draft.lines.unshift({kind: 'equip', itemId: '', desc: '', qty: 1, price: 0}); }
+      if (!draft.svc) draft.lines.forEach(l => { if (l.kind === 'equip') { l.kind = 'service'; if (!l.sell) l.price = 0; delete l.sell; } });
+      drawLines();
+    };
     el.querySelector('#dDisc').oninput = drawTot;
     bindCatSelect(el.querySelector('#dJob'), 'jobTypes');
     el.querySelector('#dTermsReset').onclick = () => { el.querySelector('#dTerms').value = defTerms; };
@@ -1919,13 +1929,14 @@ function docHTML(d, layout) {
   const stampColor = st === 'Paid' || st === 'Advance paid' ? '#1a9e5f' : st.startsWith('Overdue') ? '#d62828' : st === 'Cancelled' ? '#777' : '#ff6a00';
   const brand = `<div class="pbrand">${s.logo ? `<img class="logoimg" src="${s.logo}" alt="${esc(s.name)}">` : '<div class="plogo">Fit<span>X</span></div>'}<div class="pname">${esc(s.name)}</div></div>`;
   const cashInv = isInv && d.payType === 'cash', creditInv = isInv && d.payType === 'credit';
-  const title = d._so ? 'SALES ORDER' : d._pro ? 'PROFORMA INVOICE' : cashInv ? 'CASH INVOICE' : creditInv ? 'CREDIT INVOICE' : isInv ? 'INVOICE' : 'QUOTATION';
-  const arTitle = d._so ? 'أمر بيع' : d._pro ? 'فاتورة مبدئية' : cashInv ? 'فاتورة نقدية' : creditInv ? 'فاتورة آجلة' : isInv ? 'فاتورة' : 'عرض سعر';
+  const svcT = d.svc && !d._so && !d._pro && !svcSell(d);
+  const title = d._so ? 'SALES ORDER' : d._pro ? 'PROFORMA INVOICE' : svcT ? (isInv ? 'SERVICE INVOICE' : 'SERVICE QUOTATION') : cashInv ? 'CASH INVOICE' : creditInv ? 'CREDIT INVOICE' : isInv ? 'INVOICE' : 'QUOTATION';
+  const arTitle = d._so ? 'أمر بيع' : d._pro ? 'فاتورة مبدئية' : svcT ? (isInv ? 'فاتورة خدمة' : 'عرض سعر خدمة') : cashInv ? 'فاتورة نقدية' : creditInv ? 'فاتورة آجلة' : isInv ? 'فاتورة' : 'عرض سعر';
   const cashMethod = cashInv ? ((d.payments || []).find(p => p.auto) || {}).method || d.cashMethod || 'Cash' : '';
   const dueTxt = d._so ? `Delivery: ${d.due ? dfmt(d.due) : 'to be agreed'}${d._custRef ? '<br>Your ref: <b>' + esc(d._custRef) + '</b>' : ''}` : cashInv ? `Payment: <b>${esc(cashMethod)}</b>` : `${isInv ? 'Due' : 'Valid until'}: ${dfmt(d.due)}${creditInv && num(d.creditDays) ? ` (${num(d.creditDays)} days credit)` : ''}`;
   const coLines = `${esc(s.address)}<br>Tel: ${esc(s.phone)} · ${esc(s.email)}<br>${esc(s.web)}${s.cr ? '<br>CR No. ' + esc(s.cr) : ''}`;
   const custLines = `<b>${esc(c.name || '')}</b>${c.contact ? '<br>Attn: ' + esc(c.contact) : ''}${addrText(c) ? '<br>' + esc(addrText(c)) : ''}${c.phone ? '<br>Tel: ' + esc(c.phone) : ''}${c.email ? '<br>' + esc(c.email) : ''}`;
-  const detLines = `${d._so ? 'Order' : d._pro ? 'Proforma' : isInv ? 'Invoice' : 'Quotation'} No: <b>${esc(d.number)}</b><br>Date: ${dfmt(d.date)}<br>${dueTxt}${d.fromQuote ? '<br>Ref quote: ' + esc(d.fromQuote) : ''}${d.jobType ? '<br>Service: ' + esc(d.jobType) : ''}${d.subject ? '<br>Re: ' + esc(d.subject) : ''}`;
+  const detLines = `${d._so ? 'Order' : d._pro ? 'Proforma' : svcT ? (isInv ? 'Service invoice' : 'Service quote') : isInv ? 'Invoice' : 'Quotation'} No: <b>${esc(d.number)}</b><br>Date: ${dfmt(d.date)}<br>${dueTxt}${d.fromQuote ? '<br>Ref quote: ' + esc(d.fromQuote) : ''}${d.jobType ? '<br>Service: ' + esc(d.jobType) : ''}${d.subject ? '<br>Re: ' + esc(d.subject) : ''}`;
   const nos = lineNos(d.lines);
   const rows = (d.lines || []).map((l, i) => { if (l.kind === 'equip') return `<tr class="eqrow"><td>${nos[i]}</td><td><b>${esc(l.desc || 'Equipment')}</b>${lineEq(l) ? `<span class="leq" style="display:inline;margin-left:8px">${esc(eqText(l))}</span>` : ''}${l.note ? `<div class="lnote">${esc(l.note)}</div>` : ''}</td><td class="n">${num(l.qty) || ''}</td><td class="n">${l.sell ? fmt(l.price) : ''}</td><td class="n">${l.sell ? fmt(num(l.qty) * num(l.price)) : ''}</td></tr>`;
     const sub = nos[i].includes('.'), free = sub && !num(l.price); return `<tr${sub ? ' class="sub"' : ''}><td>${nos[i]}</td><td>${esc(l.desc)}${lineEq(l) ? `<div class="leq">${esc(eqText(l))}</div>` : ''}${l.note ? `<div class="lnote">${esc(l.note)}</div>` : ''}${window.dimsHTML ? dimsHTML(l) : ''}</td><td class="n">${l.qty}${window.unitSfx ? unitSfx(l) : ''}</td><td class="n">${free ? '' : fmt(l.price)}</td><td class="n">${free ? '' : fmt(num(l.qty) * num(l.price))}</td></tr>`; }).join('');

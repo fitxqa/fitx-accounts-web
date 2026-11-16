@@ -17,7 +17,7 @@
     if (t === 'customers') return editCustomer();
     if (t === 'suppliers') return editSupplier();
     if (t === 'stock') return editItem();
-    if (t === 'sales') return editDoc(state.salesType === 'QUO' ? 'QUO' : 'INV');
+    if (t === 'sales') return state.salesType === 'SQ' ? newServiceQuote() : editDoc(state.salesType === 'QUO' ? 'QUO' : 'INV');
     if (t === 'expenses') return state.expTab === 'bills' ? editPurchase() : editExpense();
     if (t === 'porders' && window.FitxPO) return FitxPO.edit();
     newMenu(); // anywhere else: choose what to create (item, customer, supplier, invoice…)
