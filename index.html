@@ -1484,7 +1484,7 @@ function editDoc(type, id, fromDoc) {
         if (l.sub) return '';
         if (lineKind(l) === 'equip') curEq = l.sell ? null : l;
         const under = lineKind(l) !== 'equip' && curEq;
-        const kindBtns = `<div class="kind" role="radiogroup" aria-label="Line type">${type !== 'QUO' || lineKind(l) === 'equip' ? `<button type="button" data-kind="equip" class="${lineKind(l) === 'equip' ? 'on' : ''}">Equipment</button>` : ''}<button type="button" data-kind="service" class="${lineKind(l) === 'service' ? 'on' : ''}">Maintenance / labour</button><button type="button" data-kind="part" class="${lineKind(l) === 'part' ? 'on' : ''}">Spare part</button></div>`;
+        const kindBtns = `<div class="kind" role="radiogroup" aria-label="Line type">${lineKind(l) === 'equip' ? `<button type="button" data-kind="equip" class="${lineKind(l) === 'equip' ? 'on' : ''}">Equipment</button>` : ''}<button type="button" data-kind="service" class="${lineKind(l) === 'service' ? 'on' : ''}">Maintenance / labour</button><button type="button" data-kind="part" class="${lineKind(l) === 'part' ? 'on' : ''}">Spare part</button></div>`;
         if (lineKind(l) === 'equip') return `
         <div class="line leqline" data-i="${i}">
           <div class="lt"><span>Equipment</span>${mains > 1 ? `<button type="button" class="ldel">Remove</button>` : ''}</div>
