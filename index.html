@@ -1331,12 +1331,13 @@ function itemOptions(sel, kind) {
 function pickItem(opts, cb) {
   // tabs: Services / Spare parts / All – opens on the line type; add, edit and delete items right here
   let mode = opts.partsOnly ? 'part' : opts.servicesOnly ? 'svc' : 'all';
-  let cat = '';
+  let cat = '', subc = '';
   const used = id => db.docs.some(d => (d.lines || []).some(l => l.itemId === id)) || db.purchases.some(p => (p.lines || []).some(l => l.itemId === id)) || (db.porders || []).some(p => (p.lines || []).some(l => l.itemId === id));
   openSheet('Pick a service or part', `
     <div class="seg" id="pkT" role="tablist" aria-label="Item type" style="margin-bottom:10px"><button type="button" data-m="svc">Services</button><button type="button" data-m="part">Spare parts</button><button type="button" data-m="all">All</button></div>
     <div style="display:flex;gap:8px;margin-bottom:10px"><input class="search" id="pkQ" placeholder="Search name, code, category or treadmill model" aria-label="Search items" style="flex:1;margin:0"><button type="button" class="btn pri" id="pkNew" style="white-space:nowrap">+ New</button></div>
     <div class="chips" id="pkC" style="flex-wrap:wrap"></div>
+    <div class="chips" id="pkS" style="flex-wrap:wrap;margin-top:-4px"></div>
     <div class="list" id="pkL"></div>`, el => {
     const q = el.querySelector('#pkQ'); setTimeout(() => q.focus(), 150);
     const chip = (v, l) => `<button type="button" data-c="${esc(v)}" class="${cat === v ? 'on' : ''}">${esc(l)}</button>`;
@@ -1345,12 +1346,17 @@ function pickItem(opts, cb) {
       el.querySelectorAll('#pkT [data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === mode));
       el.querySelector('#pkNew').textContent = mode === 'part' ? '+ New part' : mode === 'svc' ? '+ New service' : '+ New';
       const pool = db.items.filter(i => mode === 'svc' ? i.service : mode === 'part' ? !i.service : true);
-      const mains = Array.from(new Set(pool.map(mainOf))).sort();
+      const ord = S().stockCats || [], rank = m => { const k = ord.indexOf(m); return k < 0 ? 1e6 : k; };
+      const mains = Array.from(new Set(pool.map(mainOf))).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
       if (cat && !mains.includes(cat)) cat = '';
       el.querySelector('#pkC').innerHTML = mains.length > 1 ? chip('', 'All') + mains.map(m => chip(m, m)).join('') : '';
-      el.querySelectorAll('#pkC [data-c]').forEach(b => b.onclick = () => { cat = b.dataset.c; draw(); });
+      el.querySelectorAll('#pkC [data-c]').forEach(b => b.onclick = () => { cat = b.dataset.c; subc = ''; draw(); });
+      const subs = cat ? Array.from(new Set(pool.filter(i => mainOf(i) === cat && String(i.category || '').startsWith(cat + ' › ')).map(i => i.category))).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b)) : [];
+      if (subc && !subs.includes(subc)) subc = '';
+      el.querySelector('#pkS').innerHTML = subs.length > 1 ? [['', 'All ' + cat.replace(/ Equipment Service$/, '').toLowerCase()], ...subs.map(c => [c, c.slice(cat.length + 3)])].map(([v, l]) => `<button type="button" data-s="${esc(v)}" class="${subc === v ? 'on' : ''}" style="font-size:12px;min-height:30px">${esc(l)}</button>`).join('') : '';
+      el.querySelectorAll('#pkS [data-s]').forEach(b => b.onclick = () => { subc = b.dataset.s; draw(); });
       const words = q.value.toLowerCase().split(/\s+/).filter(Boolean);
-      const list = pool.filter(i => (!cat || mainOf(i) === cat) &&
+      const list = pool.filter(i => (!cat || mainOf(i) === cat) && (!subc || i.category === subc) &&
         words.every(w => [i.name, i.sku, i.category, i.descr, ...(i.fits || [])].join(' ').toLowerCase().includes(w))).sort((a, b) => (a.category || '').localeCompare(b.category || '') || a.name.localeCompare(b.name));
       el.querySelector('#pkL').innerHTML = list.length ? list.slice(0, 150).map(i => `<div class="item" style="gap:4px;padding-right:6px"><button type="button" data-p="${i.id}" style="all:unset;flex:1;min-width:0;display:flex;align-items:center;gap:10px;cursor:pointer">${window.prodIco ? prodIco(i) : ''}<div class="main"><div class="t">${esc(i.name)}</div><div class="s">${esc(i.category || '—')}${i.sku ? ' · ' + esc(i.sku) : ''}${i.service ? ' · Service' : ' · Stock ' + stockQty(i.id) + ' ' + esc(i.unit || '')}</div></div><div class="r"><div class="amt">${fmt(i.price)}</div></div></button>
           <button type="button" class="btn mailbtn" data-ed="${i.id}" aria-label="Edit ${esc(i.name)}" title="Edit">${ICON.edit}</button><button type="button" class="btn mailbtn" data-del="${i.id}" aria-label="Delete ${esc(i.name)}" title="Delete" style="color:var(--red)">${ICON.trash}</button></div>`).join('') + (list.length > 150 ? `<div class="empty">${list.length - 150} more – type to narrow the search</div>` : '')
