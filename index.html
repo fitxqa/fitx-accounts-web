@@ -265,6 +265,9 @@ textarea.in{min-height:80px;resize:vertical}
 .ptag{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.3px;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:1px}
 .ptag.cash{background:#e3f6ec;color:#1a7f45}.ptag.credit{background:#fff1e7;color:#c24e00}
 .line{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-bottom:10px;box-shadow:var(--sh)}
+.line.leqline{border:1.5px solid var(--orange);background:var(--orange-l)}
+.line.lunder{margin-left:14px;border-left:3px solid var(--orange)}
+.lfor{font-size:12px;font-weight:700;color:var(--orange-d);margin:-2px 0 6px}
 .line .lt{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;color:var(--muted);font-size:12px;font-weight:700}
 .line .lt button{background:none;border:0;color:var(--red);font-size:13px;min-height:36px;font-weight:600}
 .sline{display:grid;grid-template-columns:14px minmax(0,1fr) 38px 46px 66px 34px;gap:6px;align-items:center;margin-top:6px}
@@ -1476,8 +1479,11 @@ function editDoc(type, id, fromDoc) {
       if (draft.lines[0]) delete draft.lines[0].sub;
       const nos = lineNos(draft.lines), mains = draft.lines.filter(x => !x.sub).length;
       const subRow = (l, i) => `<div class="sline" data-i="${i}"><span class="sarr" aria-hidden="true">↳</span><input class="in ldesc" aria-label="Sub item ${nos[i]} description" placeholder="Sub item" value="${esc(l.desc)}"><button type="button" class="btn spick" aria-label="Search items">${ICON.search || '&#128269;'}</button><input class="in lqty" type="number" step="any" min="0" inputmode="decimal" aria-label="Qty" value="${l.qty}"><input class="in lprice" type="number" step="0.01" min="0" inputmode="decimal" aria-label="Price" value="${l.price || ''}" placeholder="Price"><button type="button" class="btn danger sdel" aria-label="Remove sub item">×</button><span class="lamt"></span><div class="lwarn">${lineWarn(l)}</div></div>`;
+      let curEq = null;
       linesEl.innerHTML = draft.lines.map((l, i) => {
         if (l.sub) return '';
+        if (lineKind(l) === 'equip') curEq = l.sell ? null : l;
+        const under = lineKind(l) !== 'equip' && curEq;
         const kindBtns = `<div class="kind" role="radiogroup" aria-label="Line type"><button type="button" data-kind="equip" class="${lineKind(l) === 'equip' ? 'on' : ''}">Equipment</button><button type="button" data-kind="service" class="${lineKind(l) === 'service' ? 'on' : ''}">Maintenance / labour</button><button type="button" data-kind="part" class="${lineKind(l) === 'part' ? 'on' : ''}">Spare part</button></div>`;
         if (lineKind(l) === 'equip') return `
         <div class="line leqline" data-i="${i}">
@@ -1496,22 +1502,24 @@ function editDoc(type, id, fromDoc) {
             <div><span class="hint">Amount</span><div class="amt lamt">${fmt(num(l.qty) * num(l.price))}</div></div>
           </div>` : `<label style="display:block;margin-bottom:8px"><span class="hint">Qty</span><input class="in lqty" type="number" step="1" min="0" inputmode="numeric" value="${l.qty}"></label><div class="lamt" hidden></div>`}
           <label style="display:block;margin-top:8px"><span class="hint">${l.sell ? 'Details (optional)' : 'Condition / problem (optional)'}</span><input class="in lnote" value="${esc(l.note || '')}" placeholder="${l.sell ? 'e.g. New, 1 year warranty, delivery & installation included' : 'e.g. Belt slipping, display not working'}"></label>
-          <div class="hint" style="margin-top:8px">${l.sell ? 'This equipment is sold at the price above.' : 'Maintenance: no price on this line. Add the repair work and parts as the next lines.'}</div>
+          <div class="hint" style="margin-top:8px">${l.sell ? 'This equipment is sold at the price above.' : 'Maintenance: no price on this line. Add what needs to be done for this machine below.'}</div>
+          ${l.sell ? '' : `<div class="btns" style="margin-top:10px"><button type="button" class="btn pri laddrep" data-k="service">+ Service / labour</button><button type="button" class="btn laddrep" data-k="part">+ Spare part</button></div>`}
           <div class="lwarn" hidden></div>
         </div>`;
         const subs = []; for (let j = i + 1; j < draft.lines.length && draft.lines[j].sub; j++) subs.push(subRow(draft.lines[j], j));
         return `
-        <div class="line" data-i="${i}">
+        <div class="line${under ? ' lunder' : ''}" data-i="${i}">
+          ${under ? `<div class="lfor">↳ for ${esc([curEq.desc || 'equipment', curEq.brand, curEq.model].filter(Boolean).join(' '))}${curEq.sn ? ' · SN ' + esc(curEq.sn) : ''}</div>` : ''}
           <div class="lt"><span>Line ${nos[i]}</span>${mains > 1 ? `<button type="button" class="ldel">Remove</button>` : ''}</div>
           <div style="display:flex;gap:8px;margin-bottom:8px"><select class="in litem" aria-label="Item or service">${itemOptions(l.itemId, lineKind(l))}</select><button type="button" class="btn lpick" aria-label="Search items">${ICON.search || '&#128269;'}</button><button type="button" class="btn lnew" aria-label="Add new item">+ New</button></div>
           <button type="button" class="lnk ltm" style="margin:-2px 0 8px">${ICON.wrench.replace('<svg ', '<svg width="14" height="14" style="vertical-align:-2px" ')} Pick part by treadmill model</button>
           ${kindBtns}
           <input class="in ldesc" aria-label="Description" placeholder="Description (e.g. Labour – service visit)" value="${esc(l.desc)}" style="margin-bottom:8px">
-          <div class="row" style="margin-bottom:8px">
+          ${under ? '' : `<div class="row" style="margin-bottom:8px">
             <label><span class="hint">Brand</span><input class="in lbrand" list="brandList" value="${esc(l.brand || '')}" placeholder="e.g. Life Fitness"></label>
             <label><span class="hint">Model</span><input class="in lmodel" value="${esc(l.model || '')}" placeholder="e.g. 95T"></label>
           </div>
-          <label style="display:block;margin-bottom:8px"><span class="hint">Serial No. (SN)</span><input class="in lsn" value="${esc(l.sn || '')}" placeholder="e.g. ITR123456" autocapitalize="characters" style="text-transform:uppercase"></label>
+          <label style="display:block;margin-bottom:8px"><span class="hint">Serial No. (SN)</span><input class="in lsn" value="${esc(l.sn || '')}" placeholder="e.g. ITR123456" autocapitalize="characters" style="text-transform:uppercase"></label>`}
           <label style="display:block;margin-bottom:8px"><span class="hint">Details (shown under this item)</span><textarea class="in lnote" rows="2" placeholder="e.g. Belt slipping under load – replaced, aligned and tested at all speeds">${esc(l.note || '')}</textarea></label>
           <div class="row3">
             <label><span class="hint">Qty</span><input class="in lqty" type="number" step="any" min="0" inputmode="decimal" value="${l.qty}"></label>
@@ -1576,6 +1584,15 @@ function editDoc(type, id, fromDoc) {
       if (sp) { const l = draft.lines[+sp.closest('[data-i]').dataset.i]; pickItem({partsOnly: false}, it => { l.itemId = it.id; l.desc = it.name + (it.sku ? ' (' + it.sku + ')' : ''); l.price = it.price; l.kind = it.service ? 'service' : 'part'; l.cost = it.service ? 0 : num(it.cost); if (!num(l.qty)) l.qty = 1; drawLines(); }); return; }
       const sd = e.target.closest('.sdel');
       if (sd) { draft.lines.splice(+sd.closest('[data-i]').dataset.i, 1); drawLines(); return; }
+      const ar = e.target.closest('.laddrep');
+      if (ar) {
+        let j = +ar.closest('.line').dataset.i + 1;
+        while (j < draft.lines.length && lineKind(draft.lines[j]) !== 'equip') j++;
+        draft.lines.splice(j, 0, {itemId: '', desc: '', qty: 1, price: 0, kind: ar.dataset.k});
+        drawLines();
+        const row = linesEl.querySelector(`.line[data-i="${j}"]`); if (row) { row.scrollIntoView({block: 'center', behavior: 'smooth'}); const d = row.querySelector('.ldesc'); if (d) setTimeout(() => d.focus(), 250); }
+        return;
+      }
       const sb = e.target.closest('.lsub');
       if (sb) { let j = +sb.closest('.line').dataset.i + 1; while (j < draft.lines.length && draft.lines[j].sub) j++; draft.lines.splice(j, 0, {itemId: '', desc: '', qty: 1, price: 0, sub: true}); drawLines(); const inp = linesEl.querySelector(`.sline[data-i="${j}"] .ldesc`); if (inp) inp.focus(); return; }
       const pk = e.target.closest('.lpick'); if (pk) { const row = pk.closest('[data-i]'), ln = draft.lines[+row.dataset.i], k = lineKind(ln); pickItem({partsOnly: k === 'part', servicesOnly: k === 'service'}, it => {
