@@ -80,7 +80,7 @@
       L.addEventListener('click', e => {
         const row = e.target.closest('.line'); if (!row) return; const i = +row.dataset.i;
         if (e.target.closest('.ldel')) { d.lines.splice(i, 1); draw(); }
-        if (e.target.closest('.lpick')) pickItem({partsOnly: true}, it => { const sel = row.querySelector('.litem'); sel.value = it.id; sel.dispatchEvent(new Event('change', {bubbles: true})); });
+        if (e.target.closest('.lpick')) pickItem({partsOnly: true, only: 'part'}, it => { const sel = row.querySelector('.litem'); sel.value = it.id; sel.dispatchEvent(new Event('change', {bubbles: true})); });
       });
       el.querySelector('#poAdd').onclick = () => { d.lines.push({itemId: '', desc: '', qty: 1, cost: ''}); draw(); };
       el.querySelector('#poDisc').oninput = tot;

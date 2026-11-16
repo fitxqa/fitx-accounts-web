@@ -1322,26 +1322,45 @@ function itemOptions(sel, kind) {
 }
 /* searchable picker: type part of a name, code, category or treadmill model; filter by main category */
 function pickItem(opts, cb) {
-  const pool = db.items.filter(i => opts.servicesOnly ? i.service : (!opts.partsOnly || !i.service));
-  const mains = Array.from(new Set(pool.map(i => catParent(i.category || (i.service ? 'Other services' : 'Other parts')))));
-  const svcMains = mains.filter(m => pool.filter(i => catParent(i.category || '') === m).every(i => i.service)).sort();
-  const partMains = mains.filter(m => !svcMains.includes(m)).sort();
+  // tabs: Services / Spare parts / All – opens on the line type; add, edit and delete items right here
+  let mode = opts.partsOnly ? 'part' : opts.servicesOnly ? 'svc' : 'all';
   let cat = '';
-  openSheet(opts.partsOnly ? 'Pick a spare part' : opts.servicesOnly ? 'Pick a service / labour' : 'Pick a service or part', `
-    <input class="search" id="pkQ" placeholder="Search name, code, category or treadmill model" aria-label="Search items">
+  const used = id => db.docs.some(d => (d.lines || []).some(l => l.itemId === id)) || db.purchases.some(p => (p.lines || []).some(l => l.itemId === id)) || (db.porders || []).some(p => (p.lines || []).some(l => l.itemId === id));
+  openSheet('Pick a service or part', `
+    <div class="seg" id="pkT" role="tablist" aria-label="Item type" style="margin-bottom:10px"><button type="button" data-m="svc">Services</button><button type="button" data-m="part">Spare parts</button><button type="button" data-m="all">All</button></div>
+    <div style="display:flex;gap:8px;margin-bottom:10px"><input class="search" id="pkQ" placeholder="Search name, code, category or treadmill model" aria-label="Search items" style="flex:1;margin:0"><button type="button" class="btn pri" id="pkNew" style="white-space:nowrap">+ New</button></div>
     <div class="chips" id="pkC" style="flex-wrap:wrap"></div>
     <div class="list" id="pkL"></div>`, el => {
     const q = el.querySelector('#pkQ'); setTimeout(() => q.focus(), 150);
     const chip = (v, l) => `<button type="button" data-c="${esc(v)}" class="${cat === v ? 'on' : ''}">${esc(l)}</button>`;
+    const mainOf = i => catParent(i.category || (i.service ? 'Other services' : 'Other parts'));
     const draw = () => {
-      el.querySelector('#pkC').innerHTML = chip('', 'All') + (opts.partsOnly || opts.servicesOnly ? '' : chip('__svc', 'All services') + chip('__part', 'All parts')) + svcMains.map(m => chip(m, m)).join('') + partMains.map(m => chip(m, m)).join('');
+      el.querySelectorAll('#pkT [data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === mode));
+      el.querySelector('#pkNew').textContent = mode === 'part' ? '+ New part' : mode === 'svc' ? '+ New service' : '+ New';
+      const pool = db.items.filter(i => mode === 'svc' ? i.service : mode === 'part' ? !i.service : true);
+      const mains = Array.from(new Set(pool.map(mainOf))).sort();
+      if (cat && !mains.includes(cat)) cat = '';
+      el.querySelector('#pkC').innerHTML = mains.length > 1 ? chip('', 'All') + mains.map(m => chip(m, m)).join('') : '';
       el.querySelectorAll('#pkC [data-c]').forEach(b => b.onclick = () => { cat = b.dataset.c; draw(); });
       const words = q.value.toLowerCase().split(/\s+/).filter(Boolean);
-      const list = pool.filter(i => (!cat || (cat === '__svc' ? i.service : cat === '__part' ? !i.service : catParent(i.category || (i.service ? 'Other services' : 'Other parts')) === cat)) &&
+      const list = pool.filter(i => (!cat || mainOf(i) === cat) &&
         words.every(w => [i.name, i.sku, i.category, i.descr, ...(i.fits || [])].join(' ').toLowerCase().includes(w))).sort((a, b) => (a.category || '').localeCompare(b.category || '') || a.name.localeCompare(b.name));
-      el.querySelector('#pkL').innerHTML = list.length ? list.slice(0, 150).map(i => `<button type="button" class="item" data-p="${i.id}">${window.prodIco ? prodIco(i) : ''}<div class="main"><div class="t">${esc(i.name)}</div><div class="s">${esc(i.category || '—')}${i.sku ? ' · ' + esc(i.sku) : ''}${i.service ? ' · Service' : ' · Stock ' + stockQty(i.id)}</div></div><div class="r amt">${fmt(i.price)}</div></button>`).join('') + (list.length > 150 ? `<div class="empty">${list.length - 150} more — type to narrow the search</div>` : '') : '<div class="empty">Nothing found.</div>';
+      el.querySelector('#pkL').innerHTML = list.length ? list.slice(0, 150).map(i => `<div class="item" style="gap:4px;padding-right:6px"><button type="button" data-p="${i.id}" style="all:unset;flex:1;min-width:0;display:flex;align-items:center;gap:10px;cursor:pointer">${window.prodIco ? prodIco(i) : ''}<div class="main"><div class="t">${esc(i.name)}</div><div class="s">${esc(i.category || '—')}${i.sku ? ' · ' + esc(i.sku) : ''}${i.service ? ' · Service' : ' · Stock ' + stockQty(i.id) + ' ' + esc(i.unit || '')}</div></div><div class="r"><div class="amt">${fmt(i.price)}</div></div></button>
+          <button type="button" class="btn mailbtn" data-ed="${i.id}" aria-label="Edit ${esc(i.name)}" title="Edit">${ICON.edit}</button><button type="button" class="btn mailbtn" data-del="${i.id}" aria-label="Delete ${esc(i.name)}" title="Delete" style="color:var(--red)">${ICON.trash}</button></div>`).join('') + (list.length > 150 ? `<div class="empty">${list.length - 150} more – type to narrow the search</div>` : '')
+        : `<div class="empty">Nothing found. Tap <b>${mode === 'part' ? '+ New part' : mode === 'svc' ? '+ New service' : '+ New'}</b> to add it.</div>`;
       el.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { const it = itemById(b.dataset.p); closeSheet(() => cb(it)); });
+      el.querySelectorAll('[data-ed]').forEach(b => b.onclick = () => editItem(b.dataset.ed, () => { toast('Item saved'); draw(); }));
+      el.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+        const it = itemById(b.dataset.del); if (!it) return;
+        if (used(it.id)) { toast('“' + it.name + '” is used on invoices, quotations or bills – it can’t be deleted (you can rename it)'); return; }
+        if (!confirm('Delete “' + it.name + '”?')) return;
+        db.items = db.items.filter(x => x.id !== it.id); db.moves = (db.moves || []).filter(m => m.itemId !== it.id);
+        save(); toast('Deleted'); draw();
+      });
     };
+    el.querySelectorAll('#pkT [data-m]').forEach(b => b.onclick = () => { mode = b.dataset.m; cat = ''; draw(); });
+    if (opts.only) el.querySelector('#pkT').style.display = 'none';
+    el.querySelector('#pkNew').onclick = () => editItem(null, it => { closeSheet(() => cb(it)); }, {name: q.value.trim(), service: mode === 'svc', unit: mode === 'svc' ? 'job' : 'pcs', minQty: mode === 'svc' ? 0 : 1});
     q.oninput = draw; draw();
   });
 }
@@ -1534,7 +1553,10 @@ function editDoc(type, id, fromDoc) {
       if (sd) { draft.lines.splice(+sd.closest('[data-i]').dataset.i, 1); drawLines(); return; }
       const sb = e.target.closest('.lsub');
       if (sb) { let j = +sb.closest('.line').dataset.i + 1; while (j < draft.lines.length && draft.lines[j].sub) j++; draft.lines.splice(j, 0, {itemId: '', desc: '', qty: 1, price: 0, sub: true}); drawLines(); const inp = linesEl.querySelector(`.sline[data-i="${j}"] .ldesc`); if (inp) inp.focus(); return; }
-      const pk = e.target.closest('.lpick'); if (pk) { const row = pk.closest('[data-i]'), k = lineKind(draft.lines[+row.dataset.i]); pickItem({partsOnly: k === 'part', servicesOnly: k === 'service'}, it => { const sel = row.querySelector('.litem'); sel.value = it.id; sel.dispatchEvent(new Event('change', {bubbles: true})); }); return; }
+      const pk = e.target.closest('.lpick'); if (pk) { const row = pk.closest('[data-i]'), ln = draft.lines[+row.dataset.i], k = lineKind(ln); pickItem({partsOnly: k === 'part', servicesOnly: k === 'service'}, it => {
+        ln.kind = it.service ? 'service' : 'part';
+        row.querySelectorAll('[data-kind]').forEach(b => b.classList.toggle('on', b.dataset.kind === ln.kind));
+        const sel = row.querySelector('.litem'); sel.innerHTML = itemOptions(it.id, ln.kind); sel.value = it.id; sel.dispatchEvent(new Event('change', {bubbles: true})); }); return; }
       const tb = e.target.closest('.ltm');
       if (tb) { const l = draft.lines[+tb.closest('.line').dataset.i]; treadmillFinder(it => { l.itemId = it.id; l.desc = it.name + (it.sku ? ' (' + it.sku + ')' : ''); l.price = it.price; l.kind = 'part'; l.cost = num(it.cost); if (!num(l.qty)) l.qty = 1; drawLines(); toast('Part added'); }); return; }
       const kb = e.target.closest('[data-kind]');
@@ -2852,7 +2874,7 @@ function editPurchase(id, prefill) {
       setItem(l, it); if (!num(l.qty)) l.qty = 1; drawLines(); toast('Spare part added');
     }, {name: l.itemId ? '' : (l.desc || '').trim(), cost: num(l.cost) || ''});
     linesEl.addEventListener('click', e => {
-      const pk = e.target.closest('.lpick'); if (pk) { const row = pk.closest('[data-i]'); pickItem({partsOnly: true}, it => { const sel = row.querySelector('.litem'); sel.value = it.id; sel.dispatchEvent(new Event('change', {bubbles: true})); }); return; }
+      const pk = e.target.closest('.lpick'); if (pk) { const row = pk.closest('[data-i]'); pickItem({partsOnly: true, only: 'part'}, it => { const sel = row.querySelector('.litem'); sel.value = it.id; sel.dispatchEvent(new Event('change', {bubbles: true})); }); return; }
       const tb = e.target.closest('.ltm');
       if (tb) { const l = draft.lines[+tb.closest('.line').dataset.i]; treadmillFinder(it => { setItem(l, it); if (!num(l.qty)) l.qty = 1; drawLines(); toast('Part added'); }); return; }
       const nb = e.target.closest('.lnew');
