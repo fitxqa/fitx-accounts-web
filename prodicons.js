@@ -5,6 +5,7 @@
   'use strict';
   const I = {
     treadmill: ['Treadmill', '<path d="M2 18h15l2.6-12"/><path d="M16.4 6h5"/><path d="M18.7 10.5H13"/><path d="M3 21h14"/><circle cx="3.5" cy="18" r=".6"/>'],
+    mchair: ['Massage chair', '<path d="M6.5 4.5l2.8 8.5h6.2"/><path d="M15.5 13l3.5 4.5"/><path d="M8.5 13l-1 3.5h8.8"/><path d="M10 16.5v4M15 16.5v4M8 20.5h9"/><path d="M8.2 7.5l1.3 4"/><circle cx="6" cy="3.2" r="1.3"/>'],
     bike: ['Bike', '<path d="M3 21h16"/><path d="M9 21l1.6-12"/><path d="M8 9h4.5"/><path d="M10.2 13.5h5.3"/><path d="M15.5 13.5L17 6h3.5"/><circle cx="15.5" cy="16.5" r="3"/>'],
     elliptical: ['Elliptical', '<path d="M3 21h16"/><ellipse cx="10" cy="15.5" rx="6" ry="2.8"/><path d="M17.5 21L15.5 4"/><path d="M13.5 4h4.5"/><path d="M5.5 13.5h3M12 17.5h3"/>'],
     rower: ['Rower', '<path d="M2 18h20"/><rect x="5" y="15" width="5" height="3" rx="1"/><circle cx="18.5" cy="13" r="3"/><path d="M15.6 12.3L12 11"/><path d="M12 9.5v3"/><path d="M14 18l1.5-2.5"/>'],
@@ -74,6 +75,10 @@
   };
   /* ordered rules: first match on the item name wins, then on its category */
   const RULES = [
+    [/massage chair (service|preventive|diagnosis|installation|relocation)/, 'mchair'],
+    [/air pump/, 'motor'],
+    [/solenoid|valve/, 'coil'],
+    [/airbag|air hose/, 'pad'],
     [/air bike|fan bike|assault bike/, 'bike'],
     [/edge ramp|\bramp\b|bevel|threshold|transition strip|skirting|wall trim/, 'ramp'],
     [/flooring roll|rubber roll|roll flooring|underlay/, 'floorroll'],
@@ -146,6 +151,7 @@
     [/install|assembl|dismantl/, 'box'],
     [/amc|contract|preventive/, 'calendar'],
     [/electronic/, 'board'],
+    [/massage/, 'mchair'],
     [/cardio/, 'treadmill']
   ];
   function iconKey(i) {

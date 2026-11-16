@@ -1379,7 +1379,7 @@ function pickItem(opts, cb) {
 }
 
 /* equipment (brand / model / serial no.) on invoices & quotes */
-const EQ_BRANDS = ['Life Fitness', 'Technogym', 'Matrix', 'Precor', 'Cybex', 'Star Trac', 'Johnson', 'Horizon', 'Nautilus', 'Concept2', 'Keiser', 'Peloton', 'Free Motion', 'Hoist', 'Body Masters', 'Legend', 'Promaxima', 'Impulse', 'Spirit', 'Sole', 'BH Fitness', 'Schwinn', 'NordicTrack', 'ProForm', 'True Fitness', 'Woodway', 'Panatta', 'Hammer Strength', 'Gym80', 'Bowflex'];
+const EQ_BRANDS = ['Life Fitness', 'Technogym', 'Matrix', 'Precor', 'Cybex', 'Star Trac', 'Johnson', 'Horizon', 'Nautilus', 'Concept2', 'Keiser', 'Peloton', 'Free Motion', 'Hoist', 'Body Masters', 'Legend', 'Promaxima', 'Impulse', 'Spirit', 'Sole', 'BH Fitness', 'Schwinn', 'NordicTrack', 'ProForm', 'True Fitness', 'Woodway', 'Panatta', 'Hammer Strength', 'Gym80', 'Bowflex', 'OSIM', 'OGAWA', 'Panasonic', 'Inada', 'Fujiiryoki', 'iRest', 'Human Touch'];
 const lineEq = l => !!(l && (l.brand || l.model || l.sn));
 const eqText = l => [l.brand && 'Brand: ' + l.brand, l.model && 'Model: ' + l.model, l.sn && 'SN: ' + l.sn].filter(Boolean).join(' · ');
 const docEquip = d => [...(d.lines || []).filter(lineEq), ...(d.equipment || []).filter(e => e && (e.brand || e.model || e.sn || e.name))];
@@ -1445,7 +1445,7 @@ function editDoc(type, id, fromDoc) {
       <label class="f"><span>Job type (for reports)</span><select class="in" name="jobType" id="dJob">${catOptions(S().jobTypes, draft.jobType || '')}</select></label>
       <label class="f"><span>Subject (optional)</span><input class="in" name="subject" value="${esc(draft.subject)}" placeholder="e.g. Treadmill not starting – repair"></label>
       <datalist id="brandList">${brandList().map(b => `<option value="${esc(b)}">`).join('')}</datalist>
-      <datalist id="eqNames">${Array.from(new Set(['Treadmill', 'Upright bike', 'Spin bike', 'Recumbent bike', 'Elliptical / cross trainer', 'Rower', 'Stair climber', 'Air bike', ...db.items.filter(x => x.service && / – service & repair$/.test(x.name)).map(x => x.name.replace(/ – service & repair$/, '')), ...db.docs.flatMap(x => (x.lines || []).filter(l => l.kind === 'equip').map(l => l.desc))].filter(Boolean))).sort().map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+      <datalist id="eqNames">${Array.from(new Set(['Treadmill', 'Upright bike', 'Spin bike', 'Recumbent bike', 'Elliptical / cross trainer', 'Rower', 'Stair climber', 'Air bike', 'Massage chair', ...db.items.filter(x => x.service && / – service & repair$/.test(x.name)).map(x => x.name.replace(/ – service & repair$/, '')), ...db.docs.flatMap(x => (x.lines || []).filter(l => l.kind === 'equip').map(l => l.desc))].filter(Boolean))).sort().map(n => `<option value="${esc(n)}">`).join('')}</datalist>
       <div class="rpanel">
         <label class="rtog"><input type="checkbox" id="rOn" ${R.on ? 'checked' : ''}><span><b>${type === 'QUO' ? 'Inspection report' : 'Work completion report'}</b><small>${type === 'QUO' ? 'Create an inspection report with this quotation' : 'Create a work completion report with this invoice'}</small></span></label>
         <div id="rBox" class="${R.on ? '' : 'hidden'}" style="margin-top:12px">

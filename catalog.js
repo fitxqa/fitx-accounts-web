@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   const S_ = ' › ';
-  const CATALOG_VER = 4; // raise when new catalog items are added, so every device adds them once
+  const CATALOG_VER = 5; // raise when new catalog items are added, so every device adds them once
   // [main category, sub-category, unit, [names…]]
   const SERVICES = [
     ['Cardio Equipment Service', 'Treadmill', 'job', ['Treadmill preventive maintenance', 'Treadmill repair – diagnosis & fault finding', 'Running belt replacement (labour)', 'Running belt alignment & tensioning', 'Deck lubrication', 'Drive belt replacement (labour)', 'Motor brush replacement (labour)', 'Roller replacement (labour)', 'Incline motor repair', 'Speed & incline calibration', 'Treadmill – service & repair', 'Curved / manual treadmill – service & repair']],
@@ -21,6 +21,11 @@
     ['Strength Equipment Service', 'Racks, benches & free weights', 'job', ['Smith machine – service & repair', 'Power rack / squat cage – service & repair', 'Half rack – service & repair', 'Squat rack – service & repair', 'Olympic flat bench press – service & repair', 'Olympic incline bench press – service & repair', 'Olympic decline bench press – service & repair', 'Adjustable bench – service & repair', 'Flat bench – service & repair', 'Preacher curl bench – service & repair', 'Roman chair / hyperextension – service & repair', 'Ab / sit-up bench – service & repair', 'Dip & pull-up station (power tower) – service & repair', 'Dumbbell rack – service & repair', 'Barbell rack – service & repair', 'Weight plate tree – service & repair', 'Kettlebell rack – service & repair', 'Storage rack (accessories) – service & repair']],
     ['General Service', 'Visits, labour & contracts', 'job', ['Service visit / call-out charge', 'Diagnosis / inspection fee', 'Preventive maintenance visit (per gym)', 'Equipment installation & assembly', 'Equipment dismantling & relocation', 'Annual Maintenance Contract (AMC)', 'Emergency call-out (after hours)']],
     ['General Service', 'Visits, labour & contracts', 'hour', ['Technician labour (per hour)']],
+    ['Massage Chair Service', 'General', 'job', ['Massage chair service & repair', 'Massage chair preventive maintenance', 'Massage chair diagnosis & fault finding', 'Massage chair installation & assembly', 'Massage chair relocation (dismantle & reinstall)']],
+    ['Massage Chair Service', 'Mechanism & motors', 'job', ['Massage roller / mechanism repair', 'Massage track (S / L-track) repair', 'Kneading / tapping motor replacement (labour)', 'Walking / travel motor replacement (labour)', 'Recline / leg rest actuator repair', 'Foot & calf massager repair', 'Gearbox / worm gear replacement (labour)']],
+    ['Massage Chair Service', 'Air system', 'job', ['Airbag system repair (air leak)', 'Air pump replacement (labour)', 'Solenoid valve block replacement (labour)', 'Air hose replacement (labour)']],
+    ['Massage Chair Service', 'Electronics', 'job', ['Massage chair control board repair', 'Massage chair remote / handset repair', 'Massage chair power supply repair', 'Massage chair heating function repair', 'Massage chair Bluetooth / speaker repair', 'Massage chair wiring & sensor repair']],
+    ['Massage Chair Service', 'Upholstery', 'job', ['Massage chair PU leather / cover replacement', 'Massage chair airbag cover replacement', 'Massage chair cushion / pillow replacement']],
     ['Electronic Repair', 'Boards', 'job', ['MCB (motor control board) repair', 'MCB replacement & set-up (labour)', 'Console / display board repair', 'Lower board / inverter repair', 'Power supply board repair', 'Heart rate board repair']],
     ['Electronic Repair', 'Components & wiring', 'job', ['Board-level component replacement (labour)', 'Wiring harness repair', 'Safety key / emergency stop repair', 'Speed sensor replacement (labour)', 'Software / firmware update & reset']],
     ['Lathe Work', 'Machining', 'job', ['Shaft / axle machining', 'Roller shaft repair', 'Bushing / spacer fabrication', 'Bearing housing machining', 'Thread repair / re-threading']],
@@ -34,6 +39,10 @@
     ['Flooring Installation', 'Rubber flooring', 'job', ['Flooring site measurement & survey', 'Flooring repair / tile replacement']]
   ];
   const PARTS = [
+    ['Massage Chair Parts', 'Electronics', 'pcs', ['Massage chair main control board', 'Massage chair power supply board', 'Massage chair remote control / handset', 'Massage chair wiring harness', 'Massage chair limit switch / position sensor', 'Massage chair heating pad', 'Massage chair Bluetooth / speaker module']],
+    ['Massage Chair Parts', 'Motors & mechanism', 'pcs', ['Massage chair kneading / tapping motor', 'Massage chair walking / travel motor', 'Massage chair recline / leg rest actuator', 'Massage chair foot roller motor', 'Massage chair gearbox / worm gear', 'Massage chair roller / ball head set', 'Massage chair track rail']],
+    ['Massage Chair Parts', 'Air system', 'pcs', ['Massage chair air pump', 'Massage chair solenoid valve block', 'Massage chair airbag (shoulder / arm / calf)', 'Massage chair air hose set']],
+    ['Massage Chair Parts', 'Covers & cushions', 'pcs', ['Massage chair backrest PU leather cover', 'Massage chair armrest cover', 'Massage chair calf / foot rest cover', 'Massage chair pillow / head cushion', 'Massage chair seat cushion']],
     ['Electronic Components', 'Boards', 'pcs', ['Motor control board (MCB)', 'Lower control board', 'Console / display board', 'Power supply board', 'Inverter board', 'Heart rate receiver board']],
     ['Electronic Components', 'Semiconductors', 'pcs', ['IGBT module', 'MOSFET', 'Bridge rectifier', 'Diode', 'Voltage regulator IC', 'Optocoupler', 'Microcontroller IC', 'Transistor']],
     ['Electronic Components', 'Passive components', 'pcs', ['Electrolytic capacitor', 'Film capacitor', 'Resistor', 'Fuse', 'Thermistor (NTC)', 'Varistor (MOV)', 'Relay', 'Inductor / choke']],
@@ -105,7 +114,7 @@
     const OLD = ['Belts', 'Motors', 'Electronics / Boards', 'Cables', 'Rollers', 'Decks', 'Consoles', 'Lubricant', 'Accessories'];
     st.stockCats = st.stockCats.filter(c => !OLD.includes(c) || db.items.some(i => i.category === c || String(i.category || '').startsWith(c + S_)));
     JOBS.forEach(j => { if (!st.jobTypes.includes(j)) st.jobTypes.push(j); });
-    { const mains = ['Cardio Equipment Service', 'Strength Equipment Service', 'General Service'].filter(m => st.stockCats.includes(m)); st.stockCats.forEach(c => { const m = c.split(S_)[0]; if (!mains.includes(m)) mains.push(m); });
+    { const mains = ['Cardio Equipment Service', 'Strength Equipment Service', 'Massage Chair Service', 'General Service'].filter(m => st.stockCats.includes(m)); st.stockCats.forEach(c => { const m = c.split(S_)[0]; if (!mains.includes(m)) mains.push(m); });
       st.stockCats = mains.flatMap(m => st.stockCats.filter(c => c.split(S_)[0] === m)); } // keep each main category's sub-categories together
     st.catalogV1 = true; st.catalogVer = CATALOG_VER;
     save();
