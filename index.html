@@ -129,6 +129,7 @@ nav.tabs .plus svg{width:24px;height:24px}
 .paper.lay-pro .xd small{display:block;color:#8a8a90;margin-top:1px}
 .paper.lay-pro .xtag{font-size:8px;font-weight:800;letter-spacing:.06em;border-radius:4px;padding:1px 5px;margin-right:6px;vertical-align:1px}
 .paper.lay-pro .xtag.l{background:#eef2fd;color:#2f4fb5}.paper.lay-pro .xtag.p{background:#eaf7ef;color:#1e7f3e}
+.paper.lay-pro .xfree{font-size:9px;font-weight:800;letter-spacing:.08em;color:#1e7f3e;background:#eaf7ef;border-radius:4px;padding:2px 6px}
 .paper.lay-pro tr.xs .xd{padding-left:30px}
 .paper.lay-pro tr.xs .xd:before{content:'↳';color:#bbb;margin-right:6px}
 .paper.lay-pro tr.xnote td{font-style:italic;color:#6a6a70;font-size:10.5px;background:#fcfcfd}
@@ -2083,7 +2084,7 @@ function docHTML(d, layout) {
     const prow = L.map((l, i) => {
       if (l.kind === 'equip') return `<tr class="xm"><td><span class="xb">${nos[i]}</span></td><td colspan="${l.sell ? 1 : 3}"><b class="xmn">${esc(l.desc || 'Equipment')}</b>${lineEq(l) ? `<span class="xms">${esc(eqText(l))}</span>` : ''}${!l.sell && num(l.qty) ? `<span class="xms" style="margin-left:6px">· Qty ${num(l.qty)}</span>` : ''}</td>${l.sell ? `<td class="n">${num(l.qty)}</td><td class="n">${fmt(l.price)}</td>` : ''}<td class="n xmt">${l.sell ? `<b style="margin:0">${fmt(num(l.qty) * num(l.price))}</b>` : `Machine<b>${fmt(mtot[i])}</b>`}</td></tr>${l.note ? `<tr class="xnote"><td></td><td colspan="4">${esc(l.note)}</td></tr>` : ''}`;
       const sub = !!l.sub && i > 0, free = sub && !num(l.price);
-      return `<tr${sub ? ' class="xs"' : ''}><td class="xno">${nos[i]}</td><td class="xd">${tag(l)}${esc(l.desc)}${lineEq(l) ? `<small>${esc(eqText(l))}</small>` : ''}${l.note ? `<small>${esc(l.note)}</small>` : ''}${window.dimsHTML ? dimsHTML(l) : ''}</td><td class="n">${l.qty}${window.unitSfx ? unitSfx(l) : ''}</td><td class="n">${free ? '' : fmt(l.price)}</td><td class="n">${free ? '' : fmt(num(l.qty) * num(l.price))}</td></tr>`;
+      return `<tr${sub ? ' class="xs"' : ''}><td class="xno">${nos[i]}</td><td class="xd">${tag(l)}${esc(l.desc)}${lineEq(l) ? `<small>${esc(eqText(l))}</small>` : ''}${l.note ? `<small>${esc(l.note)}</small>` : ''}${window.dimsHTML ? dimsHTML(l) : ''}</td><td class="n">${l.qty}${window.unitSfx ? unitSfx(l) : ''}</td><td class="n">${free || !num(l.price) ? '' : fmt(l.price)}</td><td class="n">${free ? '' : !num(l.price) ? '<span class="xfree">FREE</span>' : fmt(num(l.qty) * num(l.price))}</td></tr>`;
     }).join('');
     const ptable = `${eqTable}<table class="xitems"><thead><tr><th style="width:44px">#</th><th>Description</th><th class="n" style="width:56px">Qty</th><th class="n" style="width:86px">Unit price</th><th class="n" style="width:96px">Amount</th></tr></thead><tbody>${prow}</tbody></table>`;
     const terms2 = d.creditDays && creditInv ? `Credit · ${num(d.creditDays)} days` : cashInv ? 'Cash · ' + esc(cashMethod) : '';
