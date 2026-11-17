@@ -363,6 +363,23 @@ textarea.in{min-height:80px;resize:vertical}
 .sline .lwarn .warn,.sline .lwarn .hint{margin-top:0}
 .subhd{display:grid;grid-template-columns:14px minmax(0,1fr) 38px 46px 66px 34px;gap:6px;margin-top:10px;font-size:11px;color:var(--muted);font-weight:700}
 .lsub{margin-top:8px}
+.line .ldw{display:block;margin-bottom:8px}
+.line .ldw .hint{display:none}
+.line .lopts{display:flex;flex-wrap:wrap;gap:4px 16px;margin:2px 0 6px}
+.line .lopts .lnk{margin:0;min-height:32px}
+.line .lopts .lnk[hidden]{display:none}
+@media (min-width:900px){
+  .line .lmain{display:grid;grid-template-columns:minmax(0,1fr) 90px 130px 120px;gap:8px;align-items:end;margin-bottom:4px}
+  .line .lmain .row3{display:contents}
+  .line .ldw{margin:0}.line .ldw .hint{display:block}
+  .line .kind button{min-height:36px;padding:6px 10px;font-size:13px}
+  .line .lsub{min-height:38px;width:auto;padding:6px 16px;margin-top:6px}
+  .line .litem{min-height:42px;height:42px}
+  .line .lpick,.line .lnew{min-height:42px;height:42px;padding:0 14px;white-space:nowrap}
+  .line .lmain .in{min-height:42px;height:42px}
+  .line .lt{margin-bottom:6px}
+}
+.line .lnew{white-space:nowrap}
 .line .amt{display:flex;align-items:center;justify-content:flex-end;font-weight:800;min-height:44px}
 .tot{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh)}
 .tot div{display:flex;justify-content:space-between;padding:4px 0}
@@ -1610,20 +1627,22 @@ function editDoc(type, id, fromDoc) {
           ${under ? `<div class="lfor">↳ for ${esc([curEq.desc || 'equipment', curEq.brand, curEq.model].filter(Boolean).join(' '))}${curEq.sn ? ' · SN ' + esc(curEq.sn) : ''}</div>` : ''}
           <div class="lt"><span>Line ${nos[i]}</span>${mains > 1 ? `<button type="button" class="ldel">Remove</button>` : ''}</div>
           <div style="display:flex;gap:8px;margin-bottom:8px"><select class="in litem" aria-label="Item or service">${itemOptions(l.itemId, lineKind(l))}</select><button type="button" class="btn lpick" aria-label="Search items">${ICON.search || '&#128269;'}</button><button type="button" class="btn lnew" aria-label="Add new item">+ New</button></div>
-          <button type="button" class="lnk ltm" style="margin:-2px 0 8px">${ICON.wrench.replace('<svg ', '<svg width="14" height="14" style="vertical-align:-2px" ')} Pick part by treadmill model</button>
           ${kindBtns}
-          <input class="in ldesc" aria-label="Description" placeholder="Description (e.g. Labour – service visit)" value="${esc(l.desc)}" style="margin-bottom:8px">
-          ${under ? '' : `<div class="row" style="margin-bottom:8px">
-            <label><span class="hint">Brand</span><input class="in lbrand" list="brandList" value="${esc(l.brand || '')}" placeholder="e.g. Life Fitness"></label>
-            <label><span class="hint">Model</span><input class="in lmodel" value="${esc(l.model || '')}" placeholder="e.g. 95T"></label>
-          </div>
-          <label style="display:block;margin-bottom:8px"><span class="hint">Serial No. (SN)</span><input class="in lsn" value="${esc(l.sn || '')}" placeholder="e.g. ITR123456" autocapitalize="characters" style="text-transform:uppercase"></label>`}
-          <label style="display:block;margin-bottom:8px"><span class="hint">Details (shown under this item)</span><textarea class="in lnote" rows="2" placeholder="e.g. Belt slipping under load – replaced, aligned and tested at all speeds">${esc(l.note || '')}</textarea></label>
+          <div class="lmain">
+          <label class="ldw"><span class="hint">Description</span><input class="in ldesc" aria-label="Description" placeholder="Description (e.g. Labour – service visit)" value="${esc(l.desc)}"></label>
           <div class="row3">
             <label><span class="hint">Qty</span><input class="in lqty" type="number" step="any" min="0" inputmode="decimal" value="${l.qty}"></label>
             <label><span class="hint">Price</span><input class="in lprice" type="number" step="0.01" min="0" inputmode="decimal" value="${l.price || ''}" placeholder="0.00"></label>
             <div><span class="hint">Amount</span><div class="amt lamt">${fmt(num(l.qty) * num(l.price))}</div></div>
           </div>
+          </div>
+          <div class="lopts"><button type="button" class="lnk ltm">${ICON.wrench.replace('<svg ', '<svg width="14" height="14" style="vertical-align:-2px" ')} Part by treadmill model</button>${under ? '' : `<button type="button" class="lnk lshow" data-s="lbms" ${l.brand || l.model || l.sn ? 'hidden' : ''}>+ Brand / model / SN</button>`}<button type="button" class="lnk lshow" data-s="lnotew" ${l.note ? 'hidden' : ''}>+ Details</button></div>
+          ${under ? '' : `<div class="lbms" ${l.brand || l.model || l.sn ? '' : 'hidden'}><div class="row" style="margin-bottom:8px">
+            <label><span class="hint">Brand</span><input class="in lbrand" list="brandList" value="${esc(l.brand || '')}" placeholder="e.g. Life Fitness"></label>
+            <label><span class="hint">Model</span><input class="in lmodel" value="${esc(l.model || '')}" placeholder="e.g. 95T"></label>
+          </div>
+          <label style="display:block;margin-bottom:8px"><span class="hint">Serial No. (SN)</span><input class="in lsn" value="${esc(l.sn || '')}" placeholder="e.g. ITR123456" autocapitalize="characters" style="text-transform:uppercase"></label></div>`}
+          <div class="lnotew" ${l.note ? '' : 'hidden'}><label style="display:block;margin-bottom:8px"><span class="hint">Details (shown under this item)</span><textarea class="in lnote" rows="2" placeholder="e.g. Belt slipping under load – replaced, aligned and tested at all speeds">${esc(l.note || '')}</textarea></label></div>
           ${window.roomBtn ? roomBtn(l) : ''}
           <div class="lwarn">${lineWarn(l)}</div>
           ${R.on ? (type === 'QUO' ? `<div class="lrep">
@@ -1676,6 +1695,8 @@ function editDoc(type, id, fromDoc) {
       drawLines(); toast((it.service ? 'Service' : 'Item') + ' added');
     }, {name: l.itemId ? '' : (l.desc || '').trim(), price: num(l.price) || '', service: lineKind(l) === 'service', unit: lineKind(l) === 'service' ? 'job' : 'pcs'});
     linesEl.addEventListener('click', e => {
+      const sh = e.target.closest('.lshow');
+      if (sh) { const box = sh.closest('.line').querySelector('.' + sh.dataset.s); if (box) { box.hidden = false; sh.hidden = true; const f = box.querySelector('input,textarea'); if (f) f.focus(); } return; }
       const rb = e.target.closest('.lroom');
       if (rb) { const l = draft.lines[+rb.closest('[data-i]').dataset.i]; roomSize(l, () => drawLines()); return; }
       const sp = e.target.closest('.spick');
