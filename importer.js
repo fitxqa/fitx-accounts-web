@@ -11,7 +11,7 @@
     "expenses":[{"date","amount","category","desc","method","account"}],
     "bills":[{"supplier","date","due","ref","lines":[{"item","desc","qty","cost"}],"discount","whtRate","notes","paid":{"amount","date","method","account","note"}}],
     "billPayments":[{"bill":"PUR-…"|"ref":"supplier invoice no","supplier","amount","date","method","account","note"}],
-    "invoices":[{"type":"INV|QUO","customer","date","due","payType":"cash|credit","subject","lines":[{"item","desc","qty","price","kind":"service|part"}],"discount","notes","paid":{…}}],
+    "invoices":[{"type":"INV|QUO","customer","date","due","payType":"cash|credit","subject","svc":true,"jobType","lines":[{"item","desc","qty","price","kind":"service|part|equip","brand","model","sn","note","sub":true,"sell":true}],"discount","notes","paid":{…}}],
     "payments":[{"invoice":"INV-…","customer","amount","date","method","account","note"}],   // no invoice → oldest open invoices of that customer
     "transfers":[{"date","amount","from","to","memo"}],
     "moneyIn":[{"date","amount","account","other","memo"}], "moneyOut":[…]}
@@ -110,7 +110,8 @@
     });
     (b.invoices || []).forEach(v => {
       const type = v.type === 'QUO' ? 'QUO' : 'INV', date = D(v.date);
-      const mk = () => (v.lines || []).map(l => { const it = itemSpec(l.item || l.desc); return {itemId: it && it.id ? it.id : '', desc: l.desc || (it && it.name) || l.item || '', qty: num(l.qty || 1), price: r2(l.price !== undefined ? l.price : it ? it.price : 0), kind: l.kind || (it && it.service ? 'service' : it ? 'part' : 'service'), cost: it && !it.service ? r2(it.cost) : 0}; });
+      const mk = () => (v.lines || []).map(l => { if (l.kind === 'equip') return {kind: 'equip', itemId: '', desc: l.desc || l.item || 'Equipment', brand: l.brand || '', model: l.model || '', sn: l.sn || '', note: l.note || '', qty: num(l.qty || 1), price: l.sell ? r2(l.price) : 0, sell: !!l.sell};
+        const it = itemSpec(l.item || l.desc); return {sub: !!l.sub, note: l.note || '', itemId: it && it.id ? it.id : '', desc: l.desc || (it && it.name) || l.item || '', qty: num(l.qty || 1), price: r2(l.price !== undefined ? l.price : it ? it.price : 0), kind: l.kind || (it && it.service ? 'service' : it ? 'part' : 'service'), cost: it && !it.service ? r2(it.cost) : 0}; });
       const lines = mk();
       const tot = r2(lines.reduce((s, l) => s + l.qty * l.price, 0) - num(v.discount));
       const ec = findCust(v.customer);
@@ -120,7 +121,7 @@
           let c = custRef(v.customer);
           if (!c || c.pending) { c = {id: uid(), name: String(v.customer).trim(), imp: ctx.id}; db.customers.push(c); newC[low(v.customer)] = c; }
           const s = S(), d = {id: uid(), type, number: nextNumber(type), customerId: c.id, date, due: v.due || addDays(date, type === 'INV' ? (num(v.creditDays || c.creditDays) || s.dueDays || 15) : (s.quoValid || 30)),
-            subject: v.subject || '', lines: mk(), discount: num(v.discount), notes: v.notes || '', payments: [], status: 'Open', created: String(Date.now()), imp: ctx.id};
+            subject: v.subject || '', jobType: v.jobType || '', svc: !!(v.svc || (v.lines || []).some(l => l.kind === 'equip')), lines: mk(), discount: num(v.discount), notes: v.notes || '', payments: [], status: 'Open', created: String(Date.now()), imp: ctx.id};
           if (type === 'INV') { d.payType = v.payType === 'cash' ? 'cash' : 'credit'; if (d.payType === 'credit') d.creditDays = v.creditDays || c.creditDays || ''; }
           bumpNumber(type);
           if (v.paid && num(v.paid.amount)) d.payments.push({amount: r2(v.paid.amount), date: D(v.paid.date || date), method: v.paid.method || 'Cash', acc: findAcc(v.paid.account), note: v.paid.note || '', imp: ctx.id});
