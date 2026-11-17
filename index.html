@@ -735,8 +735,14 @@ const stockIn = itemId => db.moves.filter(m => m.itemId === itemId).reduce((s, m
 /* parts vs service per line; cost snapshot taken when the line is saved */
 /* sub items: a line with sub:true belongs to the main line above it; numbered 1.1, 1.2 … */
 function lineNos(lines) {
-  let n = 0, k = 0;
-  return (lines || []).map((l, i) => { if (l.kind === 'equip' && !l.sell) { k = 0; return ''; } if (l.sub && i > 0 && n) { k++; return n + '.' + k; } n++; k = 0; return String(n); });
+  // machines are numbered 1, 2, 3…; the work under machine 2 is 2.1, 2.2… and its sub items 2.1.1…
+  let n = 0, k = 0, eq = 0;
+  return (lines || []).map((l, i) => {
+    if (l.kind === 'equip') { eq++; n = 0; k = 0; return String(eq); }
+    const pre = eq ? eq + '.' : '';
+    if (l.sub && i > 0 && n) { k++; return pre + n + '.' + k; }
+    n++; k = 0; return pre + n;
+  });
 }
 function lineKind(l) {
   if (l.kind === 'part' || l.kind === 'service' || l.kind === 'equip') return l.kind;
@@ -1495,7 +1501,7 @@ function editDoc(type, id, fromDoc) {
         const kindBtns = `<div class="kind" role="radiogroup" aria-label="Line type">${draft.svc || lineKind(l) === 'equip' ? `<button type="button" data-kind="equip" class="${lineKind(l) === 'equip' ? 'on' : ''}">Equipment</button>` : ''}<button type="button" data-kind="service" class="${lineKind(l) === 'service' ? 'on' : ''}">Maintenance / labour</button><button type="button" data-kind="part" class="${lineKind(l) === 'part' ? 'on' : ''}">Spare part</button></div>`;
         if (lineKind(l) === 'equip') return `
         <div class="line leqline" data-i="${i}">
-          <div class="lt"><span>Equipment</span>${mains > 1 ? `<button type="button" class="ldel">Remove</button>` : ''}</div>
+          <div class="lt"><span>Equipment ${nos[i]}</span>${mains > 1 ? `<button type="button" class="ldel">Remove</button>` : ''}</div>
           ${kindBtns}
           <input class="in ldesc" aria-label="Equipment name" placeholder="Equipment (e.g. Treadmill, Leg press)" value="${esc(l.desc)}" list="eqNames" style="margin-bottom:8px">
           <div class="row" style="margin-bottom:8px">
