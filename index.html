@@ -146,7 +146,35 @@ nav.tabs .plus svg{width:24px;height:24px}
 .paper.lay-pro .xterms div{white-space:pre-wrap;margin-top:3px}
 .paper.lay-pro .pstamp{margin:0}
 .paper.lay-pro .xfoot{margin-top:14px;border-top:1px solid #ebebef;padding-top:8px;display:flex;justify-content:space-between;gap:10px;color:#8a8a90;font-size:9.5px}
-@media (max-width:600px){.paper.lay-pro .xmeta,.paper.lay-pro .xmeta.two,.paper.lay-pro .xlow{grid-template-columns:1fr}.paper.lay-pro .xmeta>div+div{border-left:0;border-top:1px solid #ebebef}}
+@media (max-width:600px){
+  .paper.lay-pro{padding:0 14px 14px;font-size:11px}
+  .paper.lay-pro .xband{margin:0 -14px 16px}
+  .paper.lay-pro .xh{flex-direction:column;gap:12px}
+  .paper.lay-pro .xtt{text-align:left;width:100%;display:grid;grid-template-columns:1fr auto;align-items:end;column-gap:10px}
+  .paper.lay-pro .xtt h2{font-size:21px;letter-spacing:1.5px}
+  .paper.lay-pro .xtt .ar{grid-column:1}
+  .paper.lay-pro .xtt .xnum{grid-column:1}
+  .paper.lay-pro .xtt .xdue{grid-column:2;grid-row:1 / span 3;margin:0}
+  .paper.lay-pro .xtt>div:last-child{grid-column:1 / -1}
+  .paper.lay-pro .pname{white-space:normal}
+  .paper.lay-pro .xmeta,.paper.lay-pro .xmeta.two,.paper.lay-pro .xlow{grid-template-columns:1fr}
+  .paper.lay-pro .xmeta>div+div{border-left:0;border-top:1px solid #ebebef}
+  .paper.lay-pro table.xitems{table-layout:fixed;font-size:10.5px}
+  .paper.lay-pro table.xitems th{font-size:8px;letter-spacing:.03em;padding:7px 4px}
+  .paper.lay-pro table.xitems td{padding:6px 4px;overflow-wrap:anywhere}
+  .paper.lay-pro table.xitems th:nth-child(1){width:34px!important}
+  .paper.lay-pro table.xitems th:nth-child(3){width:30px!important}
+  .paper.lay-pro table.xitems th:nth-child(4){width:62px!important}
+  .paper.lay-pro table.xitems th:nth-child(5){width:68px!important}
+  .paper.lay-pro .xms{display:block;margin-left:0!important;font-size:10px}
+  .paper.lay-pro .xmt{font-size:0}.paper.lay-pro .xmt b{font-size:11.5px;margin:0}
+  .paper.lay-pro .xtag{display:inline-block;margin:0 0 2px}
+  .paper.lay-pro tr.xs .xd{padding-left:14px}
+  .paper.lay-pro .xb{min-width:18px;height:18px;font-size:10px}
+  .paper.lay-pro .xsig{flex-direction:column;align-items:stretch}
+  .paper.lay-pro .xsig .pstamp{align-self:flex-end}
+  .paper.lay-pro .xfoot{flex-direction:column;gap:2px}
+}
 
 /* sub navigation (Sales: Invoices · Quotations · Customers · Products & services) */
 .subnav{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);margin:-14px -14px 14px;padding:0 10px;background:#fff;scrollbar-width:none}
