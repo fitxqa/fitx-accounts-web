@@ -1,6 +1,6 @@
 /* FitX Accounts — full-screen layout on computers.
    On wide screens (1200 px and up) the quotation / invoice form and the document view use the whole width:
-   form → details on the left, items & totals on the right; view → the document on the left, actions on the right.
+   one column that fills the window (no split).
    Phones and tablets are unchanged. */
 (function () {
   'use strict';
@@ -10,6 +10,9 @@
     @media ${WIDE}{
       .sheet.dwide .sb>div{max-width:none;margin:0}
       .sheet.dwide .sb{padding-left:28px;padding-right:28px}
+      .sheet.dwide #docForm .in:not(textarea){min-height:40px;height:40px;padding-top:6px;padding-bottom:6px}
+      .sheet.dwide #docForm textarea.in{min-height:60px}
+      .sheet.dwide #docForm .f,.sheet.dwide #docForm label.f{margin-bottom:8px}
       .dgrid{display:grid;gap:28px;align-items:start}
       .dgrid.dform{grid-template-columns:minmax(380px,1fr) minmax(0,1.85fr)}
       .dgrid.dview{grid-template-columns:minmax(0,1.6fr) minmax(400px,1fr)}
@@ -17,7 +20,7 @@
       .dgrid.dview>.dR{position:sticky;top:0}
       .dgrid .dcard{background:var(--card,#fff);border:1px solid var(--line);border-radius:14px;padding:16px 16px 6px;margin-bottom:16px}
       .dgrid .dcard>.sec:first-child{margin-top:0}
-      .dgrid.dview #docPrev .paper{max-width:none}
+      .sheet.dwide #docPrev{max-width:1100px;margin:0 auto}
     }`;
   document.head.appendChild(css);
 
@@ -68,7 +71,7 @@
   if (typeof orig !== 'function') return;
   window.openSheet = function (title, html, mount) {
     const el = orig.call(this, title, html, mount);
-    try { if (el && wide()) { layoutForm(el); layoutView(el); } } catch (e) {}
+    try { if (el && wide() && (el.querySelector('#docForm') || el.querySelector('#docPrev'))) el.classList.add('dwide'); } catch (e) {} // single column, full window width
     return el;
   };
 })();
