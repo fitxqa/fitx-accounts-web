@@ -92,7 +92,8 @@ nav.tabs .plus svg{width:24px;height:24px}
   .stip{position:fixed;z-index:200;background:#111;color:#fff;font-size:12.5px;font-weight:600;padding:6px 10px;border-radius:7px;pointer-events:none;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 }
 /* very large screens: a little more room */
-@media (min-width:1600px){main{max-width:1320px}}
+@media (min-width:1100px){main{max-width:none}}
+.trow.cols>.desk{white-space:nowrap}
 
 
 /* ---------- FitX Pro layout ---------- */
@@ -281,7 +282,7 @@ button.item:active{background:#f6f7f9}
 .lnk.pri{background:var(--orange);color:#fff;border-color:var(--orange)}
 @media (min-width:900px){
   .tlist .th{display:grid;background:#f8f9fb;font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:10px 14px;border-bottom:1px solid var(--line);cursor:default;min-height:0}
-  .trow.cols{grid-template-columns:88px 112px minmax(100px,1fr) 92px 92px 92px 124px 140px;gap:2px 8px}
+  .trow.cols{grid-template-columns:96px 120px minmax(100px,1fr) 96px 92px 92px 124px 140px;gap:2px 8px}
   .tlist{overflow-x:auto}
   .trow.cols .cD{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
   .trow.cols .c2,.trow.cols .cB .badge{margin:0}
@@ -380,6 +381,18 @@ textarea.in{min-height:80px;resize:vertical}
   .line .lt{margin-bottom:6px}
 }
 .line .lnew{white-space:nowrap}
+@media (min-width:1100px){
+  .line.leqline{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));column-gap:10px;row-gap:6px;align-items:end}
+  .line.leqline>*{margin:0!important}
+  .line.leqline>.row{display:contents}
+  .line.leqline>:is(.lt,.kind,.hint,.btns,.lwarn,.row3){grid-column:1/-1}
+  .line.leqline>.ldesc{grid-column:span 2}
+  .line.leqline>label:has(.lsell){grid-column:span 3;min-height:42px}
+  .line.leqline>label:has(.lnote){grid-column:span 3}
+  .line.leqline .in{min-height:42px;height:42px}
+  .line.leqline .btns .btn{min-height:40px}
+  .line.leqline>.hint{font-size:12px}
+}
 .line .amt{display:flex;align-items:center;justify-content:flex-end;font-weight:800;min-height:44px}
 .tot{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh)}
 .tot div{display:flex;justify-content:space-between;padding:4px 0}
@@ -3930,6 +3943,7 @@ render();
 (function () { function proDefault() { try { const st = S(); if (!st.proLayoutV1) { st.proLayoutV1 = true; st.docLayout = 'pro'; save(); } } catch (e) {} }
   proDefault(); (window.FITX_AFTER_SYNC = window.FITX_AFTER_SYNC || []).push(proDefault); })();
 </script>
+<script src="desk.js"></script>
 <script src="cloud.js"></script>
 </body>
 </html>
