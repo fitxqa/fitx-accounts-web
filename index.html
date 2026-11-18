@@ -246,6 +246,7 @@ button.item:active{background:#f6f7f9}
 .mbar{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:12px;box-shadow:var(--sh)}
 .mbar .mg{display:flex;gap:10px}
 .mbar .grp{min-width:0}
+@media (min-width:641px){.mbar .grp{min-width:max-content}.mbar .seg2{min-width:max-content}.mbar .seg2 .ml,.mbar .seg2 .ma{padding-right:8px}}
 .mbar .gt{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;white-space:nowrap}
 .mbar .segs{display:flex;gap:3px}
 .mbar .seg2{background:none;border:0;padding:0;text-align:left;min-width:56px;display:flex;flex-direction:column}
@@ -1112,10 +1113,10 @@ function bindSubnav() {
 
 /* money bar: groups of coloured segments sized by amount (tap a segment to filter) */
 function moneyBar(groups, selKey) {
-  const all = groups.reduce((s, g) => s + g.segs.reduce((a, x) => a + x.amt, 0), 0) || 1;
+  const raw = groups.reduce((s, g) => s + g.segs.reduce((a, x) => a + x.amt, 0), 0), all = raw || 1;
   return `<div class="mbar"><div class="mg">${groups.map(g => {
     const gt = g.segs.reduce((a, x) => a + x.amt, 0);
-    return `<div class="grp" style="flex:${Math.max(gt / all, .16)}"><div class="gt">${esc(g.title)}</div><div class="segs">${g.segs.map(x =>
+    return `<div class="grp" style="flex:${raw ? Math.max(gt / all, .16) : g.segs.length}"><div class="gt">${esc(g.title)}</div><div class="segs">${g.segs.map(x =>
       `<button type="button" class="seg2${selKey === x.k ? ' sel' : ''}" data-mk="${x.k}" style="flex:${Math.max(gt ? x.amt / gt : 1 / g.segs.length, .3)};color:${x.color}"><span class="mt">${esc(g.title)}</span><span class="ma" style="color:var(--text)">${fmt(x.amt)}</span><span class="ml">${esc(x.label)}</span><i style="background:${x.color}"></i></button>`).join('')}</div></div>`;
   }).join('')}</div></div>`;
 }

@@ -118,7 +118,14 @@
     body.xstyle header.top #topAct{margin-left:8px}
     .xpages .item{padding:9px 14px}
   }
-  @media (min-width:768px) and (max-width:1023px){ .xtop .xa span,.xtop .xb span{display:none} }`;
+  /* tablets: the opened menu floats over the page instead of squeezing it, and closes after you pick a page */
+  @media (min-width:768px) and (max-width:1023px){
+    body:not(.side-mini){padding-left:68px!important}
+    body:not(.side-mini) .sheet{left:68px!important}
+    body:not(.side-mini) aside.side{box-shadow:10px 0 30px rgba(0,0,0,.35)}
+    .xtop .xa,.xtop .xb{display:none!important}
+  }
+  @media (max-width:767px){ #xStyleCard{display:none} }`;
   document.head.appendChild(css);
 
   let openGroup = null;
@@ -144,16 +151,16 @@
   function onClick(e) {
     const nav = e.target.closest('.xnav'); if (!nav) return;
     e.stopPropagation();
-    if (e.target.closest('[data-xs]')) { openAnything(); return; }
+    if (e.target.closest('[data-xs]')) { openAnything(); setTimeout(collapse, 0); return; }
     const M = MENU();
     const a = e.target.closest('[data-sa]'), ga = e.target.closest('[data-ga]');
-    if (a) { closeAll(); M[a.dataset.g][2][a.dataset.sa][3](); return; }
-    if (ga) { closeAll(); M[ga.dataset.ga][2].add(); return; }
+    if (a) { closeAll(); M[a.dataset.g][2][a.dataset.sa][3](); setTimeout(collapse, 0); return; }
+    if (ga) { closeAll(); M[ga.dataset.ga][2].add(); setTimeout(collapse, 0); return; }
     const s = e.target.closest('[data-s]');
-    if (s) { M[s.dataset.g][2][s.dataset.s][2](); return; }
+    if (s) { M[s.dataset.g][2][s.dataset.s][2](); setTimeout(collapse, 0); return; }
     const g = e.target.closest('[data-g]'); if (!g) return;
     const item = M[g.dataset.g];
-    if (!Array.isArray(item[2])) { openGroup = ''; item[2].open(); return; }
+    if (!Array.isArray(item[2])) { openGroup = ''; item[2].open(); setTimeout(collapse, 0); return; }
     if (document.body.classList.contains('side-mini')) { const t = document.getElementById('sideTog'); if (t) t.click(); openGroup = item[1]; build(); return; }
     openGroup = openGroup === item[1] ? '' : item[1]; build();
   }
@@ -196,8 +203,12 @@
     if (x) { build(); topButtons(); }
   }
 
+  const tablet = () => innerWidth >= 768 && innerWidth < 1024;
+  const collapse = () => { if (tablet() && !document.body.classList.contains('side-mini')) { const t = document.getElementById('sideTog'); if (t) t.click(); } };
   const side = document.getElementById('side');
   if (side) side.addEventListener('click', onClick, true);
+  if (side) side.addEventListener('click', e => { if (e.target.closest('button.si,[data-s],.xadd,.xi[data-g]') && !e.target.closest('#sideTog')) { const g = e.target.closest('.xi[data-g]'); if (g && g.nextElementSibling && g.nextElementSibling.classList.contains('xsub')) return; setTimeout(collapse, 0); } });
+  document.addEventListener('click', e => { if (tablet() && !document.body.classList.contains('side-mini') && !e.target.closest('#side')) collapse(); }, true);
   document.addEventListener('keydown', e => {
     if (getStyle() !== 'x') return;
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'f' || e.key === 'F')) {
