@@ -8,7 +8,8 @@
   const css = document.createElement('style');
   css.textContent = `
     @media ${WIDE}{
-      .sheet.dwide .sb>div{max-width:none;margin:0}
+      .sheet:not(.pvfull) .sb>div{max-width:1100px;margin:0 auto}
+      .sheet.dwide .sb>div{max-width:1100px;margin:0 auto}
       .sheet.dwide .sb{padding-left:28px;padding-right:28px}
       .sheet.dwide #docForm .in:not(textarea){min-height:40px;height:40px;padding-top:6px;padding-bottom:6px}
       .sheet.dwide #docForm textarea.in{min-height:60px}

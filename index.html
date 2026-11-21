@@ -1145,8 +1145,8 @@ function salesBarData() {
 /* "+ New" menu */
 function newMenu() {
   const G = [
-    ['Customers', [['inv', ICON.inv, 'Invoice'], ['rcv', ICON.pay, 'Receive payment'], ['quo', ICON.quo, 'Quotation'], ['cus', ICON.user, 'Customer']]],
-    ['Suppliers', [['exp', ICON.exp, 'Expense'], ['po', ICON.quo, 'Purchase order'], ['bill', ICON.box, 'Bill (parts purchase)'], ['paybill', ICON.cash, 'Pay bills'], ['sup', ICON.truck, 'Supplier']]],
+    ['Customers', [['inv', ICON.inv, 'Invoice'], ['rcv', ICON.pay, 'Payment In (receive)'], ['quo', ICON.quo, 'Quotation'], ['cus', ICON.user, 'Customer']]],
+    ['Suppliers', [['exp', ICON.exp, 'Expense'], ['po', ICON.quo, 'Purchase order'], ['bill', ICON.box, 'Bill (parts purchase)'], ['paybill', ICON.cash, 'Payment Out (pay bills)'], ['sup', ICON.truck, 'Supplier']]],
     ['Other', [['item', ICON.wrench, 'Spare part / service'], ['tm', ICON.box, 'Find part by treadmill'], ['rep', ICON.chart, 'Reports'], ['bak', ICON.drive, 'Backup to Google Drive']]]
   ];
   const ACT = {inv: () => editDoc('INV'), rcv: () => receivePayment(), quo: () => editDoc('QUO'), po: () => window.FitxPO && FitxPO.edit(), cus: () => editCustomer(), exp: () => editExpense(), bill: () => editPurchase(),
@@ -1242,7 +1242,7 @@ function viewHome() {
     ${needBackup ? `<div class="card" style="border-left:4px solid var(--orange);display:flex;align-items:center;gap:12px"><div style="flex:1"><b>Back up your data</b><div class="hint">${lb ? 'Last backup ' + dfmt(lb) : 'No backup yet'} — save a copy to Google Drive.</div></div><button type="button" class="btn pri" id="qBak">Backup</button></div>` : ''}
     <div class="quick">
       <button type="button" data-q="inv"><span class="qi">${ICON.inv}</span>Invoice</button>
-      <button type="button" data-q="rcv"><span class="qi">${ICON.pay}</span>Receive payment</button>
+      <button type="button" data-q="rcv"><span class="qi">${ICON.pay}</span>Payment In</button>
       <button type="button" data-q="quo"><span class="qi">${ICON.quo}</span>Quotation</button>
       <button type="button" data-q="exp"><span class="qi">${ICON.exp}</span>Expense</button>
       <button type="button" data-q="bill"><span class="qi">${ICON.box}</span>Bill</button>
@@ -1372,7 +1372,7 @@ function allocPayment(kind, partyId, focusId) {
   let sel = parties.some(p => p.id === partyId) ? partyId : (parties.length === 1 ? parties[0].id : '');
   const methods = C ? ['Fawran', 'Cash', 'Bank transfer', 'Card', 'Cheque'] : ['Bank transfer', 'Cash', 'Fawran', 'Card', 'Cheque'];
   const balOf = d => C ? docBal(d) : purBal(d);
-  openSheet(C ? 'Receive payment' : 'Pay bills', `
+  openSheet(C ? 'Payment In · receive payment' : 'Payment Out · pay bills', `
     <form id="apForm" autocomplete="off">
       <label class="f"><span>${C ? 'Customer' : 'Supplier'}</span><select class="in" id="apP"><option value="">— Select ${C ? 'customer' : 'supplier'} —</option>${parties.map(p => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${esc(p.name)} · owes ${fmt(C ? custBalance(p.id) : supBalance(p.id))}</option>`).join('')}</select></label>
       <div class="row">
@@ -2317,13 +2317,13 @@ function viewDoc(id) {
   });
 }
 function recordPayment(d, done) {
-  openSheet('Record payment · ' + d.number, `
+  openSheet('Payment In · ' + d.number, `
     <form id="payForm">
       <p class="hint">Balance due: <b style="color:var(--text)">${money(docBal(d))}</b></p>
-      <label class="f"><span>Amount (QAR)</span><input class="in" type="number" step="0.01" min="0.01" inputmode="decimal" name="amount" value="${docBal(d)}" required></label>
-      <label class="f"><span>Date</span><input class="in" type="date" name="date" value="${today()}" required></label>
-      <label class="f"><span>Method</span><select class="in" name="method">${['Fawran', 'Cash', 'Bank transfer', 'Card', 'Cheque'].map(m => `<option>${m}</option>`).join('')}</select></label>
-      <label class="f"><span>Deposit to</span><select class="in" name="acc">${window.bankAccOptions ? bankAccOptions('') : '<option value="">Automatic</option>'}</select></label>
+      <div class="row"><label class="f"><span>Amount (QAR)</span><input class="in" type="number" step="0.01" min="0.01" inputmode="decimal" name="amount" value="${docBal(d)}" required></label>
+      <label class="f"><span>Date</span><input class="in" type="date" name="date" value="${today()}" required></label></div>
+      <div class="row"><label class="f"><span>Payment method</span><select class="in" name="method">${['Fawran', 'Cash', 'Bank transfer', 'Card', 'Cheque'].map(m => `<option>${m}</option>`).join('')}</select></label>
+      <label class="f"><span>Deposit to</span><select class="in" name="acc">${window.bankAccOptions ? bankAccOptions('') : '<option value="">Automatic</option>'}</select></label></div>
       <label class="f"><span>Reference / note</span><input class="in" name="note" placeholder="Optional"></label>
       <button class="btn pri full" type="submit">Save payment</button>
     </form>`, el => {
@@ -2492,11 +2492,12 @@ function viewMore() {
     <div class="sec"><h2>Sales</h2></div><div class="list">
       ${row('mCus', ICON.user, 'Customers', `${db.customers.length} customers · ${fmt(receivables())} owed to you`)}
       ${row('mStock', ICON.box, 'Products & services', 'Spare parts stock and service rates')}
-      ${row('mRcv', ICON.pay, 'Receive payment', 'Record money received against invoices')}
+      ${row('mRcv', ICON.pay, 'Payment In', 'Receive money against one or several invoices')}
     </div>
     <div class="sec"><h2>Expenses</h2></div><div class="list">
       ${row('mPO', ICON.quo, 'Purchase orders', 'Orders sent to suppliers → bills')}
       ${row('mBills', ICON.inv, 'Bills (parts purchases)', `${fmt(payables())} owed to suppliers`)}
+      ${row('mPayOut', ICON.cash, 'Payment Out', 'Pay one or several supplier bills')}
       ${row('mSup', ICON.truck, 'Suppliers', `${db.suppliers.length} suppliers`)}
     </div>
     <div class="sec"><h2>Business</h2></div><div class="list">
@@ -2507,7 +2508,7 @@ function viewMore() {
     </div>
     <p class="hint" style="text-align:center;margin-top:24px">All data is stored on this phone. Back up regularly.</p>`;
   const go = (t, extra) => () => { if (extra) extra(); goTab(t); };
-  $('#mCus').onclick = go('customers'); $('#mStock').onclick = go('stock'); $('#mRcv').onclick = () => receivePayment(); $('#mPO').onclick = go('porders');
+  $('#mCus').onclick = go('customers'); $('#mStock').onclick = go('stock'); $('#mRcv').onclick = () => receivePayment(); { const po = $('#mPayOut'); if (po) po.onclick = () => paySupplier(); } $('#mPO').onclick = go('porders');
   $('#mBills').onclick = go('expenses', () => { state.expTab = 'bills'; }); $('#mSup').onclick = go('suppliers');
   $('#mRep').onclick = go('reports'); $('#mSet').onclick = viewSettings; $('#mBak').onclick = viewBackup; $('#mKeys').onclick = () => window.FitxKeys && FitxKeys.help();
 }
@@ -3090,11 +3091,21 @@ function editPurchase(id, prefill) {
       <label class="f" style="margin-top:12px"><span>Discount (QAR)</span><input class="in" type="number" step="0.01" min="0" inputmode="decimal" name="discount" id="pDisc" value="${draft.discount || ''}" placeholder="0.00"></label>
       <label class="f" style="margin-top:12px"><span>Withholding tax (Qatar)</span><select class="in" name="whtRate" id="pWht">${WHT_OPTS.map(([v, l]) => `<option value="${v}" ${String(draft.whtRate || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <div class="tot" id="pTot"></div>
+      <div class="sec"><h2>Payment</h2>${existing && (existing.payments || []).length ? `<span class="hint">${money(purPaid(existing))} already paid</span>` : ''}</div>
+      <div class="seg" id="pPayT" style="margin-bottom:10px"><button type="button" data-v="credit" class="on">Pay later (credit)</button><button type="button" data-v="now">Paid now</button></div>
+      <input type="hidden" name="payNow" id="pPayNow" value="">
+      <div id="pPayBox" style="display:none">
+        <div class="row"><label class="f"><span>Amount paid (QAR)</span><input class="in" type="number" step="0.01" min="0" inputmode="decimal" name="payAmt" id="pPayAmt" placeholder="Full amount"></label>
+        <label class="f"><span>Payment method</span><select class="in" name="payMethod">${['Cash', 'Bank transfer', 'Fawran', 'Card', 'Cheque'].map(m => `<option>${m}</option>`).join('')}</select></label></div>
+        <div class="row"><label class="f"><span>Paid from</span><select class="in" name="payAcc">${window.bankAccOptions ? bankAccOptions('') : '<option value="">Automatic</option>'}</select></label>
+        <label class="f"><span>Payment reference</span><input class="in" name="payNote" placeholder="Optional, e.g. cheque no."></label></div>
+      </div>
       <label class="f" style="margin-top:12px;display:flex;gap:10px;align-items:center"><input type="checkbox" name="updateCost" ${draft.updateCost !== false ? 'checked' : ''} style="width:20px;height:20px"><span style="margin:0;color:var(--text)">Update each part’s cost price to this purchase price</span></label>
       <label class="f"><span>Notes</span><textarea class="in" name="notes" placeholder="Optional">${esc(draft.notes)}</textarea></label>
       <button type="submit" class="btn pri full">Save purchase</button>
     </form>`, el => {
     const linesEl = el.querySelector('#plines');
+    el.querySelectorAll('#pPayT button').forEach(b => b.onclick = () => { el.querySelectorAll('#pPayT button').forEach(x => x.classList.toggle('on', x === b)); const now = b.dataset.v === 'now'; el.querySelector('#pPayNow').value = now ? '1' : ''; el.querySelector('#pPayBox').style.display = now ? '' : 'none'; });
     const gross = () => draft.lines.reduce((s, l) => s + num(l.qty) * num(l.cost), 0);
     const drawTot = () => {
       draft.discount = num(el.querySelector('#pDisc').value);
@@ -3166,6 +3177,7 @@ function editPurchase(id, prefill) {
         const s = S(); saved = Object.assign({}, draft, {id: uid(), number: `${s.purPrefix || 'PUR'}-${new Date().getFullYear()}-${String(s.nextPur || 1).padStart(4, '0')}`, created: String(Date.now()), payments: []});
         s.nextPur = (s.nextPur || 1) + 1; db.purchases.push(saved);
       }
+      if (f.payNow) { const bal = purBal(saved); const amt = r2(Math.min(f.payAmt === '' || f.payAmt == null ? bal : num(f.payAmt), bal)); if (amt > 0.004) { saved.payments = saved.payments || []; saved.payments.push({amount: amt, date: draft.date, method: f.payMethod || 'Cash', acc: f.payAcc || '', note: (f.payNote || '').trim()}); } }
       save(); closeSheet(() => { viewPurchase(saved.id); toast(`Purchase ${saved.number} saved`); });
     };
   });
@@ -3194,13 +3206,13 @@ function viewPurchase(id) {
     ${(p.payments || []).length ? `<div class="sec"><h2>Payments to supplier</h2></div><div class="list">${p.payments.map((x, i) => `<div class="item"><div class="main"><div class="t">${money(x.amount)}</div><div class="s">${dfmt(x.date)} · ${esc(x.method)}${x.note ? ' · ' + esc(x.note) : ''}</div></div><button type="button" class="btn danger" data-delpay="${i}" aria-label="Delete payment">${ICON.trash}</button></div>`).join('')}</div>` : ''}`, el => {
     const reopen = () => reopenWith(() => viewPurchase(id));
     const pay = el.querySelector('#ppPay');
-    if (pay) pay.onclick = () => openSheet('Pay supplier · ' + p.number, `
+    if (pay) pay.onclick = () => openSheet('Payment Out · ' + p.number, `
       <form id="spayForm">
         <p class="hint">Balance owed: <b style="color:var(--text)">${money(purBal(p))}</b></p>
-        <label class="f"><span>Amount (QAR)</span><input class="in" type="number" step="0.01" min="0.01" inputmode="decimal" name="amount" value="${purBal(p)}" required></label>
-        <label class="f"><span>Date</span><input class="in" type="date" name="date" value="${today()}" required></label>
-        <label class="f"><span>Method</span><select class="in" name="method">${['Bank transfer', 'Cash', 'Fawran', 'Card', 'Cheque'].map(m => `<option>${m}</option>`).join('')}</select></label>
-        <label class="f"><span>Paid from</span><select class="in" name="acc">${window.bankAccOptions ? bankAccOptions('') : '<option value="">Automatic</option>'}</select></label>
+        <div class="row"><label class="f"><span>Amount (QAR)</span><input class="in" type="number" step="0.01" min="0.01" inputmode="decimal" name="amount" value="${purBal(p)}" required></label>
+        <label class="f"><span>Date</span><input class="in" type="date" name="date" value="${today()}" required></label></div>
+        <div class="row"><label class="f"><span>Payment method</span><select class="in" name="method">${['Bank transfer', 'Cash', 'Fawran', 'Card', 'Cheque'].map(m => `<option>${m}</option>`).join('')}</select></label>
+        <label class="f"><span>Paid from</span><select class="in" name="acc">${window.bankAccOptions ? bankAccOptions('') : '<option value="">Automatic</option>'}</select></label></div>
         <label class="f"><span>Reference / note</span><input class="in" name="note" placeholder="Optional"></label>
         <button class="btn pri full" type="submit">Save payment</button>
       </form>`, e2 => {

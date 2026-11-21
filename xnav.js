@@ -43,12 +43,13 @@
     ['sale', 'Sale', [
       ['Invoices', 'sales:INV', sales('INV'), () => editDoc('INV')],
       ['Quotations', 'sales:QUO', sales('QUO'), () => editDoc('QUO')],
-      ['Receive payment', '', call(() => receivePayment())],
+      ['Payment In (receive)', '', call(() => receivePayment())],
       ['Service reminders', 'reminders', tab('reminders')],
       ['Payment reminders', '', viaMenu('mPayRem')],
       ['SkipCash card payments', '', viaMenu('mSkip')]]],
     ['buy', 'Purchase & Expense', [
       ['Bills (parts purchases)', 'expenses:bills', exp('bills'), () => editPurchase()],
+      ['Payment Out (pay bills)', '', call(() => paySupplier())],
       ['Expenses', 'expenses:exp', exp('exp'), () => editExpense()],
       ['Purchase orders', 'porders', tab('porders'), window.FitxPO ? () => FitxPO.edit() : null]]],
     ['bank', 'Cash & Bank', {key: 'banking', open: tab('banking')}],
