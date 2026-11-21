@@ -301,7 +301,7 @@ ${sigHTML(logoSrc)}
   // zoom for the PDF preview: pinch, double-tap, buttons, Ctrl + wheel
   function bindZoom(box, pages, lvl, bIn, bOut, bFit) {
     let scale = 1;
-    const baseW = () => Math.min(box.clientWidth - 24, 680);
+    const baseW = () => Math.min(box.clientWidth - 24, 1076); // same width as the invoice preview (1100 px) on computers
     const apply = (ns, cx, cy) => {
       ns = Math.max(1, Math.min(5, ns));
       if (cx === undefined) { cx = box.clientWidth / 2; cy = box.clientHeight / 2; }
@@ -313,6 +313,7 @@ ${sigHTML(logoSrc)}
     };
     apply(1);
     window.addEventListener('resize', () => apply(scale));
+    let lastW = box.clientWidth; if (window.ResizeObserver) new ResizeObserver(() => { if (box.clientWidth !== lastW) { lastW = box.clientWidth; apply(scale); } }).observe(box);
     bIn.onclick = () => apply(scale * 1.25);
     bOut.onclick = () => apply(scale / 1.25);
     bFit.onclick = () => { apply(1); box.scrollTop = 0; box.scrollLeft = 0; };
