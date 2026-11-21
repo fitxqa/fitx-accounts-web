@@ -479,8 +479,15 @@ textarea.in{min-height:80px;resize:vertical}
 .paper .pay{margin-top:16px;border:1px dashed #ff6a00;border-radius:8px;padding:10px 12px;line-height:1.6}
 .paper .notes{margin-top:12px;white-space:pre-wrap;color:#444;line-height:1.5}
 .paper .pstamp{display:flex;justify-content:flex-end;margin:6px 0 0;page-break-inside:avoid}
-.paper .pstin{width:200px;text-align:center}
-.paper .pstin img{display:block;width:128px;height:128px;margin:0 auto -14px;opacity:.93}
+.list .item.r2{padding:8px 16px;min-height:0;gap:12px}
+.item.r2 .main .t{font-size:14.5px;line-height:1.3}
+.item.r2 .main .s{font-size:12.5px;margin-top:2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.item.r2 .main .s .badge{font-size:10.5px;padding:1px 7px}
+.item.r2 .r{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.item.r2 .r .amt{font-size:14.5px;line-height:1.3}
+.item.r2 .r .s{font-size:12px;margin:0}
+.paper .pstin{width:240px;text-align:center}
+.paper .pstin img{display:block;width:170px;height:170px;margin:0 auto -18px;opacity:.93}
 .paper .pstl{border-top:1px solid #9a9a9a;padding-top:5px;font-size:10px;color:#222;font-weight:600;line-height:1.35}
 .paper .pstl span{font-weight:400;color:#666}
 .paper .terms{margin-top:14px;border-top:1px solid #e3e3e3;padding-top:10px;font-size:10.5px;color:#444;line-height:1.55;page-break-inside:avoid}
@@ -1189,6 +1196,11 @@ function docRow(d) {
   const right = d.type === 'INV' && docBal(d) > 0 && !d.cancelled ? `<div class="s">Bal ${fmt(docBal(d))}</div>` : '';
   return `<button type="button" class="item" data-doc="${d.id}"><div class="main"><div class="t">${esc(c ? c.name : 'No customer')}</div><div class="s">${esc(d.number)} · ${dfmt(d.date)}</div></div><div class="r"><div class="amt">${fmt(docTotal(d))}</div>${right}<span class="badge ${cls}">${st}</span></div></button>`;
 }
+function docRow2(d) {
+  const c = custById(d.customerId); const [st, cls] = status(d);
+  const right = d.type === 'INV' && docBal(d) > 0.004 && !d.cancelled ? `<div class="s">Bal ${fmt(docBal(d))}</div>` : '';
+  return `<button type="button" class="item r2" data-doc="${d.id}"><div class="main"><div class="t">${esc(c ? c.name : 'No customer')}</div><div class="s"><span>${esc(d.number)} · ${dfmt(d.date)}</span><span class="badge ${cls}">${st}</span></div></div><div class="r"><div class="amt">${fmt(docTotal(d))}</div>${right}</div></button>`;
+}
 function bindDocRows(root) { root.querySelectorAll('[data-doc]').forEach(b => b.onclick = () => viewDoc(b.dataset.doc)); }
 const PAL = ['#ff6a00', '#1a73c8', '#21a366', '#8e5bd6', '#f2b600', '#00a3a3', '#e8559a', '#9aa0a8'];
 function donutSVG(parts) {
@@ -1221,7 +1233,7 @@ function viewHome() {
   const low = db.items.filter(i => !i.service && isLow(i));
   const billsOd = db.purchases.filter(p => purBal(p) > 0.004 && p.due && p.due < today()).reduce((s, p) => s + purBal(p), 0);
   const tot = a.servRev + a.partsRev, sp = tot ? a.servRev / tot * 100 : 0;
-  const recent = db.docs.slice().sort((x, y) => (y.date + y.created).localeCompare(x.date + x.created)).slice(0, 5);
+  const recent = db.docs.slice().sort((x, y) => (y.date + y.created).localeCompare(x.date + x.created)).slice(0, 8);
   $('#main').innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px">
       <div><div class="hint">Welcome back</div><div style="font-weight:800;font-size:18px">${esc(S().name)}</div></div>
@@ -1271,7 +1283,7 @@ function viewHome() {
         <button type="button" class="wl" data-go="${payables() > 0 ? 'paybill' : 'stock'}">${payables() > 0 ? 'Pay bills ›' : 'View products ›'}</button></div>
     </div>
     <div class="sec"><h2>Recent invoices & quotes</h2><button type="button" class="lnk" data-go="inv">See all</button></div>
-    <div class="list">${recent.length ? recent.map(docRow).join('') : '<div class="empty">No invoices or quotes yet.<br>Tap <b>+ New</b> to create your first invoice.</div>'}</div>`;
+    <div class="list">${recent.length ? recent.map(docRow2).join('') : '<div class="empty">No invoices or quotes yet.<br>Tap <b>+ New</b> to create your first invoice.</div>'}</div>`;
   $('#dPer').onchange = e => { state.dash = e.target.value; render(); };
   const qb = $('#qBak'); if (qb) qb.onclick = () => { backupToDrive(); setTimeout(render, 500); };
   const Q = {inv: () => editDoc('INV'), rcv: () => receivePayment(), quo: () => editDoc('QUO'), exp: () => editExpense(), bill: () => editPurchase(), cus: () => editCustomer()};
@@ -2159,7 +2171,7 @@ function docHTML(d, layout) {
       return `<tr${sub ? ' class="xs"' : ''}><td class="xno">${nos[i]}</td><td class="xd">${tag(l)}${esc(l.desc)}${lineEq(l) ? `<small>${esc(eqText(l))}</small>` : ''}${l.note ? `<small>${esc(l.note)}</small>` : ''}${window.dimsHTML ? dimsHTML(l) : ''}</td><td class="n">${l.qty}${window.unitSfx ? unitSfx(l) : ''}</td><td class="n">${free || !num(l.price) ? '' : fmt(l.price)}</td><td class="n">${free ? '' : !num(l.price) ? '<span class="xfree">FREE</span>' : fmt(num(l.qty) * num(l.price))}</td></tr>`;
     }).join('');
     const ptable = `${eqTable}<table class="xitems"><thead><tr><th style="width:44px">#</th><th>Description</th><th class="n" style="width:56px">Qty</th><th class="n" style="width:86px">Unit price</th><th class="n" style="width:96px">Amount</th></tr></thead><tbody>${prow}</tbody></table>`;
-    const terms2 = d.creditDays && creditInv ? `Credit · ${num(d.creditDays)} days` : cashInv ? 'Cash · ' + esc(cashMethod) : '';
+    const terms2 = d.creditDays && creditInv ? `Credit · ${num(d.creditDays)} days` : cashInv ? (/^cash$/i.test(cashMethod || '') ? 'Cash' : 'Cash · ' + esc(cashMethod)) : '';
     const det = [['Date', dfmt(d.date)], d._so ? ['Delivery', d.due ? dfmt(d.due) : 'to be agreed'] : cashInv ? null : [isInv || d._pro ? 'Due date' : 'Valid until', dfmt(d.due)], terms2 ? ['Terms', terms2] : null, d.fromQuote ? ['Quotation', esc(d.fromQuote)] : null, d._custRef ? ['Customer ref', esc(d._custRef)] : null].filter(Boolean);
     const job = [d.subject ? esc(d.subject) : '', d.jobType ? `<span class="xmu">Job type:</span> ${esc(d.jobType)}` : ''].filter(Boolean);
     const cats = [['Equipment', eqs], ['Labour', lab], ['Spare parts', prt]].filter(x => Math.abs(x[1]) > 0.004), brk = cats.length > 1 ? cats : [];
