@@ -126,7 +126,7 @@
   if (origMore) window.viewMore = function () {
     origMore.apply(this, arguments);
     const k = document.getElementById('mImp') || document.getElementById('mBak'); if (!k || document.getElementById('mRcp')) return;
-    k.insertAdjacentHTML('beforebegin', `<button type="button" class="item rcard" id="mRcp"><span class="ic">${CAM}</span><div class="main"><div class="t">Receipt photos</div><div class="s">Take photos of receipts & bills · send to Claude for data entry</div></div></button>`);
+    k.insertAdjacentHTML(k.id === 'mImp' ? 'afterend' : 'beforebegin', `<button type="button" class="item rcard" id="mRcp"><span class="ic">${CAM}</span><div class="main"><div class="t">Receipt photos</div><div class="s">Take photos of receipts & bills · send to Claude for data entry</div></div></button>`);
     document.getElementById('mRcp').onclick = view;
   };
   window.FitxReceipts = {view, pick};

@@ -1159,10 +1159,10 @@ function newMenu() {
   const G = [
     ['Customers', [['inv', ICON.inv, 'Invoice'], ['rcv', ICON.pay, 'Payment In (receive)'], ['quo', ICON.quo, 'Quotation'], ['cus', ICON.user, 'Customer']]],
     ['Suppliers', [['exp', ICON.exp, 'Expense'], ['po', ICON.quo, 'Purchase order'], ['bill', ICON.box, 'Bill (parts purchase)'], ['paybill', ICON.cash, 'Payment Out (pay bills)'], ['sup', ICON.truck, 'Supplier']]],
-    ['Other', [['item', ICON.wrench, 'Spare part / service'], ['tm', ICON.box, 'Find part by treadmill'], ['rep', ICON.chart, 'Reports'], ['bak', ICON.drive, 'Backup to Google Drive']]]
+    ['Other', [['item', ICON.wrench, 'Spare part / service'], ['tm', ICON.box, 'Find part by treadmill'], ['rep', ICON.chart, 'Reports'], ['bak', ICON.drive, 'Backup to Google Drive'], ['imp', ICON.box, 'Import entries']]]
   ];
   const ACT = {inv: () => editDoc('INV'), rcv: () => receivePayment(), quo: () => editDoc('QUO'), po: () => window.FitxPO && FitxPO.edit(), cus: () => editCustomer(), exp: () => editExpense(), bill: () => editPurchase(),
-    paybill: () => paySupplier(), sup: () => editSupplier(null, () => render()), item: () => editItem(), tm: () => treadmillFinder(), rep: () => goTab('reports'), bak: () => { backupToDrive(); render(); }};
+    paybill: () => paySupplier(), sup: () => editSupplier(null, () => render()), item: () => editItem(), tm: () => treadmillFinder(), rep: () => goTab('reports'), bak: () => { backupToDrive(); render(); }, imp: () => window.FitxImport && FitxImport.start()};
   openSheet('New', `<div class="newgrid">${G.map(([h, items]) => `<div><h4>${h}</h4><div class="list">${items.map(([k, ic, l]) => `<button type="button" class="item" data-nk="${k}">${ic}<div class="main">${l}</div></button>`).join('')}</div></div>`).join('')}</div>`, el => {
     el.querySelectorAll('[data-nk]').forEach(b => b.onclick = () => closeSheet(ACT[b.dataset.nk]));
   });
