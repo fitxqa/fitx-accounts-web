@@ -106,7 +106,7 @@ nav.tabs .plus svg{width:24px;height:24px}
 .paper.lay-pro .xtt h2{margin:0;font-size:26px;letter-spacing:2.5px;font-weight:800;line-height:1}
 .paper.lay-pro .xtt .ar{color:#9a9aa0;font-size:14px;margin-top:3px}
 .paper.lay-pro .xnum{margin-top:5px;font-size:13px;font-weight:700;color:#ff6a00}
-.paper.lay-pro .xdue{display:inline-block;margin-top:9px;background:#1f1f22;color:#fff;border-radius:9px;padding:7px 13px;text-align:right}
+.paper.lay-pro .xdue{display:table;margin-left:auto;margin-top:9px;background:#1f1f22;color:#fff;border-radius:9px;padding:7px 13px;text-align:right}
 .paper.lay-pro .xdue small{display:block;font-size:8.5px;letter-spacing:.12em;color:#c9c9ce;font-weight:700}
 .paper.lay-pro .xdue b{font-size:16px}
 .paper.lay-pro .xmeta{display:grid;grid-template-columns:1.25fr 1fr 1.35fr;margin:18px 0 16px;border:1px solid #ebebef;border-radius:12px;overflow:hidden}
@@ -147,34 +147,46 @@ nav.tabs .plus svg{width:24px;height:24px}
 .paper.lay-pro .xterms div{white-space:pre-wrap;margin-top:3px}
 .paper.lay-pro .pstamp{margin:0}
 .paper.lay-pro .xfoot{margin-top:14px;border-top:1px solid #ebebef;padding-top:8px;display:flex;justify-content:space-between;gap:10px;color:#8a8a90;font-size:9.5px}
+.paper.lay-pro.stmt .ssum{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 16px}
+.paper.lay-pro.stmt .ssum div{border:1px solid #ebebef;border-radius:10px;padding:9px 12px}
+.paper.lay-pro.stmt .ssum small,.paper.lay-pro.stmt .sa small{display:block;font-size:8.5px;font-weight:800;letter-spacing:.1em;color:#8a8a90;text-transform:uppercase}
+.paper.lay-pro.stmt .ssum b{font-size:15px}
+.paper.lay-pro.stmt .ssum .due{background:#ff6a00;border-color:#ff6a00;color:#fff}.paper.lay-pro.stmt .ssum .due small{color:#ffe1cc}
+.paper.lay-pro.stmt .sage{display:grid;grid-template-columns:repeat(5,1fr);border:1px solid #ebebef;border-radius:10px;overflow:hidden;margin:6px 0 14px}
+.paper.lay-pro.stmt .sa{padding:8px 11px;min-width:0}.paper.lay-pro.stmt .sa+.sa{border-left:1px solid #ebebef}.paper.lay-pro.stmt .sa b{font-size:12.5px}
+.paper.lay-pro.stmt .sa.red b{color:#c62828}
+.paper.lay-pro.stmt h4{font-size:9px;letter-spacing:.11em;color:#ff6a00;margin:16px 0 6px;text-transform:uppercase}
+.paper.lay-pro.stmt table.xitems td{vertical-align:top}.paper.lay-pro.stmt .snw{white-space:nowrap}
+.paper.lay-pro.stmt .sod{color:#c62828;font-weight:700}
+@media (max-width:600px){:not(.pdfhost):not(#printArea)>.paper.lay-pro.stmt .ssum{grid-template-columns:1fr 1fr}:not(.pdfhost):not(#printArea)>.paper.lay-pro.stmt .sage{grid-template-columns:repeat(3,1fr)}:not(.pdfhost):not(#printArea)>.paper.lay-pro.stmt .sa:nth-child(4){border-left:0}:not(.pdfhost):not(#printArea)>.paper.lay-pro.stmt .sa:nth-child(n+4){border-top:1px solid #ebebef}}
 @media (max-width:600px){
-  .paper.lay-pro{padding:0 14px 14px;font-size:11px}
-  .paper.lay-pro .xband{margin:0 -14px 16px}
-  .paper.lay-pro .xh{flex-direction:column;gap:12px}
-  .paper.lay-pro .xtt{text-align:left;width:100%;display:grid;grid-template-columns:1fr auto;align-items:end;column-gap:10px}
-  .paper.lay-pro .xtt h2{font-size:21px;letter-spacing:1.5px}
-  .paper.lay-pro .xtt .ar{grid-column:1}
-  .paper.lay-pro .xtt .xnum{grid-column:1}
-  .paper.lay-pro .xtt .xdue{grid-column:2;grid-row:1 / span 3;margin:0}
-  .paper.lay-pro .xtt>div:last-child{grid-column:1 / -1}
-  .paper.lay-pro .pname{white-space:normal}
-  .paper.lay-pro .xmeta,.paper.lay-pro .xmeta.two,.paper.lay-pro .xlow{grid-template-columns:1fr}
-  .paper.lay-pro .xmeta>div+div{border-left:0;border-top:1px solid #ebebef}
-  .paper.lay-pro table.xitems{table-layout:fixed;font-size:10.5px}
-  .paper.lay-pro table.xitems th{font-size:8px;letter-spacing:.03em;padding:7px 4px}
-  .paper.lay-pro table.xitems td{padding:6px 4px;overflow-wrap:anywhere}
-  .paper.lay-pro table.xitems th:nth-child(1){width:34px!important}
-  .paper.lay-pro table.xitems th:nth-child(3){width:30px!important}
-  .paper.lay-pro table.xitems th:nth-child(4){width:62px!important}
-  .paper.lay-pro table.xitems th:nth-child(5){width:68px!important}
-  .paper.lay-pro .xms{display:block;margin-left:0!important;font-size:10px}
-  .paper.lay-pro .xmt{font-size:0}.paper.lay-pro .xmt b{font-size:11.5px;margin:0}
-  .paper.lay-pro .xtag{display:inline-block;margin:0 0 2px}
-  .paper.lay-pro tr.xs .xd{padding-left:14px}
-  .paper.lay-pro .xb{min-width:18px;height:18px;font-size:10px}
-  .paper.lay-pro .xsig{flex-direction:column;align-items:stretch}
-  .paper.lay-pro .xsig .pstamp{align-self:flex-end}
-  .paper.lay-pro .xfoot{flex-direction:column;gap:2px}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro{padding:0 14px 14px;font-size:11px}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro .xband{margin:0 -14px 16px}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro .xh{flex-direction:column;gap:12px}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro .xtt{text-align:left;width:100%;display:grid;grid-template-columns:1fr auto;align-items:end;column-gap:10px}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro .xtt h2{font-size:21px;letter-spacing:1.5px}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro .xtt .ar{grid-column:1}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro .xtt .xnum{grid-column:1}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro .xtt .xdue{grid-column:2;grid-row:1 / span 3;margin:0}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro .xtt>div:last-child{grid-column:1 / -1}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro .pname{white-space:normal}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro .xmeta,:not(.pdfhost):not(#printArea)>.paper.lay-pro .xmeta.two,:not(.pdfhost):not(#printArea)>.paper.lay-pro .xlow{grid-template-columns:1fr}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro .xmeta>div+div{border-left:0;border-top:1px solid #ebebef}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro table.xitems{table-layout:fixed;font-size:10.5px}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro table.xitems th{font-size:8px;letter-spacing:.03em;padding:7px 4px}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro table.xitems td{padding:6px 4px;overflow-wrap:anywhere}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro:not(.stmt) table.xitems th:nth-child(1){width:34px!important}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro:not(.stmt) table.xitems th:nth-child(3){width:30px!important}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro:not(.stmt) table.xitems th:nth-child(4){width:62px!important}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro:not(.stmt) table.xitems th:nth-child(5){width:68px!important}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro .xms{display:block;margin-left:0!important;font-size:10px}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro .xmt{font-size:0}:not(.pdfhost):not(#printArea)>.paper.lay-pro .xmt b{font-size:11.5px;margin:0}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro .xtag{display:inline-block;margin:0 0 2px}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro tr.xs .xd{padding-left:14px}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro .xb{min-width:18px;height:18px;font-size:10px}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro .xsig{flex-direction:column;align-items:stretch}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro .xsig .pstamp{align-self:flex-end}
+  :not(.pdfhost):not(#printArea)>.paper.lay-pro .xfoot{flex-direction:column;gap:2px}
 }
 
 /* sub navigation (Sales: Invoices · Quotations · Customers · Products & services) */
@@ -3649,11 +3661,39 @@ function reportExpenses() { openReport({title: 'Expenses report', ar: 'تقري�
 function reportSales() { openReport({title: 'Sales register', ar: 'سجل المبيعات', body: (ctx, P) => { const a = acct(ctx.f, ctx.t); return KP([['Invoiced', fmt(a.revenue), '', true], ['Invoices', String(a.inv.length)], ['Collected', fmt(a.collected), 'var(--green)'], ['Quotes won', `${a.won} / ${a.quotes}`]], P) + secInvoices(a, P); }}); }
 
 function stmtPaper(kind, id, f, t) {
+  if (kind !== 'sup') return custStmtPro(id, f, t);
   const L = kind === 'sup' ? supLedger(id, f, t) : custLedger(id, f, t);
   const who = kind === 'sup' ? supById(id) : custById(id);
   const box = `<div class="meta"><div class="box"><b class="l">${kind === 'sup' ? 'SUPPLIER' : 'CUSTOMER'}</b><b>${esc(who.name)}</b>${who.contact ? '<br>Attn: ' + esc(who.contact) : ''}${kind !== 'sup' && addrText(who) ? '<br>' + esc(addrText(who)) : ''}${who.phone ? '<br>Tel: ' + esc(who.phone) : ''}</div>
     <div class="box"><b class="l">SUMMARY</b>Opening balance: ${fmt(L.open)}<br>${kind === 'sup' ? 'Billed' : 'Invoiced'}: ${fmt(L.dr)}<br>Paid: ${fmt(L.cr)}<br><b>Balance ${kind === 'sup' ? 'owed' : 'due'}: QAR ${fmt(L.close)}</b></div></div>`;
   return reportPaper('Statement of account', 'كشف حساب', periodLabel(f, t), box + secLedger(L, true, kind) + (kind !== 'sup' && S().payNote && L.close > 0 ? `<div class="pay"><b>Payment</b><br>${esc(S().payNote)}</div>` : ''));
+}
+/* customer statement – FitX Pro style */
+function custStmtPro(cid, f, t) {
+  const s = S(), c = custById(cid) || {}, L = custLedger(cid, f, t), td = today();
+  const brand = `<div class="pbrand">${s.logo ? `<img class="logoimg" src="${s.logo}" alt="${esc(s.name)}">` : '<div class="plogo">Fit<span>X</span></div>'}<div class="pname">${esc(s.name)}</div></div>`;
+  const coLines = `${esc(s.address)}<br>Tel: ${esc(s.phone)} · ${esc(s.email)}<br>${esc(s.web)}${s.cr ? '<br>CR No. ' + esc(s.cr) : ''}`;
+  const custLines = `<b>${esc(c.name || '')}</b>${c.contact ? '<br>Attn: ' + esc(c.contact) : ''}${addrText(c) ? '<br>' + esc(addrText(c)) : ''}${c.phone ? '<br>Tel: ' + esc(c.phone) : ''}${c.email ? '<br>' + esc(c.email) : ''}`;
+  const open = activeInvoices().filter(d => d.customerId === cid && docBal(d) > 0.004).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const age = [0, 0, 0, 0, 0];
+  open.forEach(d => { const days = Math.floor((new Date(td) - new Date(d.due || d.date)) / 864e5); age[days <= 0 ? 0 : days <= 30 ? 1 : days <= 60 ? 2 : days <= 90 ? 3 : 4] += docBal(d); });
+  const tag = e => e.cr ? '<span class="xtag p">PAYMENT</span>' : '<span class="xtag l">INVOICE</span>';
+  const rows = `<tr class="xnote"><td></td><td colspan="3">Opening balance</td><td></td><td></td><td class="n"><b>${fmt(L.open)}</b></td></tr>` +
+    L.rows.map(e => `<tr><td class="snw">${dfmt(e.date)}</td><td>${tag(e)}</td><td class="snw"><b>${esc(e.ref)}</b></td><td class="xd">${esc(e.desc)}</td><td class="n">${e.dr ? fmt(e.dr) : ''}</td><td class="n" style="color:#1e7f3e">${e.cr ? fmt(e.cr) : ''}</td><td class="n"><b>${fmt(e.bal)}</b></td></tr>`).join('');
+  const ageBox = ['Current', '1–30 days', '31–60 days', '61–90 days', 'Over 90'].map((k, i) => `<div class="sa${i >= 2 && age[i] > 0.004 ? ' red' : ''}"><small>${k}</small><b>${fmt(age[i])}</b></div>`).join('');
+  const openT = open.length ? `<h4>Open invoices</h4><table class="xitems"><thead><tr><th>Invoice</th><th>Date</th><th>Due date</th><th class="n">Total</th><th class="n">Balance</th></tr></thead><tbody>${open.map(d => `<tr><td class="snw"><b>${esc(d.number)}</b></td><td class="snw">${dfmt(d.date)}</td><td>${d.due ? dfmt(d.due) + (d.due < td ? ' <span class="sod">overdue</span>' : '') : ''}</td><td class="n">${fmt(docTotal(d))}</td><td class="n"><b>${fmt(docBal(d))}</b></td></tr>`).join('')}</tbody></table>` : '';
+  const stamp = s.stampOn === false ? '' : `<div class="pstamp"><div class="pstin"><img src="${s.stampImg || window.FITX_STAMP_DATA || 'icons/stamp.png'}" alt="Company stamp"><div class="pstl">For ${esc(s.name)}<br><span>Authorised signature &amp; stamp</span></div></div></div>`;
+  return `<div class="paper lay-pro stmt"><div class="xband"></div>
+  <div class="xh"><div>${brand}<div class="xco">${coLines}</div></div>
+    <div class="xtt"><h2>STATEMENT</h2><div class="ar" dir="rtl" lang="ar">كشف حساب</div><div class="xnum">${esc(periodLabel(f, t))}</div><div class="xdue"><small>${L.close > 0.004 ? 'BALANCE DUE' : L.close < -0.004 ? 'CREDIT BALANCE' : 'ALL PAID'}</small><b>QAR ${fmt(Math.abs(L.close))}</b></div><div></div></div></div>
+  <div class="xmeta two"><div><span class="xl">Customer <span dir="rtl" lang="ar">· العميل</span></span>${custLines}</div>
+    <div class="xdg"><span>Statement date</span><span>${dfmt(td)}</span><span>Period</span><span>${esc(periodLabel(f, t))}</span><span>Open invoices</span><span>${open.length}</span></div></div>
+  <div class="ssum"><div><small>Opening balance</small><b>${fmt(L.open)}</b></div><div><small>Invoiced</small><b>${fmt(L.dr)}</b></div><div><small>Paid</small><b style="color:#1e7f3e">${fmt(L.cr)}</b></div><div class="due"><small>Balance due</small><b>${fmt(L.close)}</b></div></div>
+  <table class="xitems"><thead><tr><th style="width:84px">Date</th><th style="width:70px">Type</th><th style="width:112px">Ref</th><th>Details</th><th class="n" style="width:80px">Invoiced</th><th class="n" style="width:80px">Paid</th><th class="n" style="width:86px">Balance</th></tr></thead><tbody>${rows || ''}</tbody></table>
+  ${open.length ? `<h4>Ageing of balance due</h4><div class="sage">${ageBox}</div>` : ''}
+  ${openT}
+  <div class="xsig"><div class="xterms">${s.payNote && L.close > 0.004 ? `<b>Payment</b><div>${esc(s.payNote)}</div>` : ''}<div style="margin-top:6px">Please report any difference within 7 days of this statement.</div></div>${stamp}</div>
+  <div class="xfoot"><span>${esc(s.name)} · ${esc(s.phone)} · ${esc(s.web)}</span><span>Thank you for your business</span></div></div>`;
 }
 function reportCustStatement(cid) {
   let sel = cid || '';
