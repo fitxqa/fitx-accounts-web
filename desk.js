@@ -21,7 +21,8 @@
       .dgrid .dcard{background:var(--card,#fff);border:1px solid var(--line);border-radius:14px;padding:16px 16px 6px;margin-bottom:16px}
       .dgrid .dcard>.sec:first-child{margin-top:0}
       .sheet.dwide.dview .sb>div{max-width:1100px;margin:0 auto}
-      .sheet.dwide.dview .btns.sharebar{grid-template-columns:repeat(5,1fr)}
+      .sheet.dwide.dview .btns.sharebar{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}
+      .sheet.dwide.dview #rvPrev .vpaper{zoom:1.447!important}
       .sheet.dwide.dview .layseg{grid-template-columns:repeat(7,1fr)}
     }`;
   document.head.appendChild(css);
@@ -73,7 +74,7 @@
   if (typeof orig !== 'function') return;
   window.openSheet = function (title, html, mount) {
     const el = orig.call(this, title, html, mount);
-    try { if (el && wide() && (el.querySelector('#docForm') || el.querySelector('#docPrev'))) { el.classList.add('dwide'); if (el.querySelector('#docPrev')) el.classList.add('dview'); } } catch (e) {} // single column, full window width
+    try { if (el && wide() && !el.classList.contains('pvfull')) { const isView = !!el.querySelector('#docPrev, .paper, .sharebar, .pvz, #rvPrev'); if (el.querySelector('#docForm') || isView) el.classList.add('dwide'); if (isView && !el.querySelector('#docForm')) el.classList.add('dview'); } } catch (e) {} // single column, full window width
     return el;
   };
 })();
