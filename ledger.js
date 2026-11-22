@@ -14,7 +14,7 @@
     ['1100', 'Bank – current account', 'asset', 'bank'],
     ['1150', 'SkipCash (card payments clearing)', 'asset', 'bank'],
     ['1200', 'Accounts receivable (customers)', 'asset', 'ar'], ['1300', 'Inventory – spare parts', 'asset', 'inv'],
-    ['1400', 'Prepaid expenses & deposits', 'asset', ''], ['1500', 'Tools & equipment', 'asset', 'fixed'], ['1510', 'Vehicles', 'asset', 'fixed'],
+    ['1400', 'Prepaid expenses & deposits', 'asset', ''], ['1500', 'Tools & equipment', 'asset', 'fixed'], ['1510', 'Vehicles', 'asset', 'fixed'], ['1520', 'Machinery', 'asset', 'fixed'],
     ['2000', 'Accounts payable (suppliers)', 'liability', 'ap'], ['2100', 'Accrued expenses', 'liability', ''],
     ['2200', 'Customer advances', 'liability', ''], ['2300', 'Loans', 'liability', ''], ['2400', 'End of service benefits payable', 'liability', ''],
     ['1410', 'Employee advances & loans', 'asset', ''], ['2410', 'Salaries payable', 'liability', ''], ['2420', 'Social insurance payable (GRSIA)', 'liability', ''],
@@ -154,7 +154,7 @@
       const k = 'pu:' + p.id + ':';
       const stockNet = r2(stock * kf);
       add(k + 'inv', p.date, A(1300), stockNet, 'Bill · ' + who, p.number, open);
-      add(k + 'job', p.date, A(5010), r2(purTotal(p) - stockNet), 'Bill · ' + who, p.number, open);
+      add(k + 'job', p.date, (p.assetAcc && accById(p.assetAcc)) ? p.assetAcc : A(5010), r2(purTotal(p) - stockNet), 'Bill · ' + who, p.number, open);
       add(k + 'ap', p.date, A(2000), -purTotal(p), 'Bill · ' + who, p.number, open);
       const wht = typeof purWht === 'function' ? purWht(p) : 0;
       if (wht) { add(k + 'whtap', p.date, A(2000), wht, `WHT ${p.whtRate}% · ` + who, p.number, open); add(k + 'wht', p.date, 'acc_2510', -wht, `WHT ${p.whtRate}% · ` + who, p.number, open); }

@@ -851,11 +851,15 @@ const docById = id => db.docs.find(d => d.id === id);
 const subTotal = d => r2((d.lines || []).reduce((s, l) => s + num(l.qty) * num(l.price), 0));
 const docTotal = d => r2(Math.max(0, subTotal(d) - num(d.discount)));
 const docPaid = d => r2((d.payments || []).reduce((s, p) => s + num(p.amount), 0));
-const docBal = d => r2(docTotal(d) - docPaid(d));
+// credit notes (sales returns) reduce an invoice's balance; refunds paid back raise it again
+const docCredit = d => window.FitxRet ? FitxRet.invCredit(d.id) : 0;
+const docRefund = d => window.FitxRet ? FitxRet.invRefund(d.id) : 0;
+const docBal = d => r2(docTotal(d) - docPaid(d) - docCredit(d) + docRefund(d));
 function invStatus(d) {
   if (d.cancelled) return ['Cancelled', 'b-grey'];
-  const t = docTotal(d), p = docPaid(d);
-  if (t > 0 && p >= t) return ['Paid', 'b-green'];
+  const t = docTotal(d), cr = docCredit(d), p = r2(docPaid(d) + cr - docRefund(d));
+  if (t > 0 && cr >= t - 0.004) return ['Credited', 'b-grey'];
+  if (t > 0 && p >= t - 0.004) return [docBal(d) < -0.004 ? 'Paid · refund due' : 'Paid', 'b-green'];
   if (d.due && d.due < today()) return [p > 0 ? 'Overdue · part paid' : 'Overdue', 'b-red'];
   if (p > 0) return ['Part paid', 'b-yellow'];
   return ['Unpaid', 'b-orange'];
@@ -874,7 +878,9 @@ function soldQty(itemId, exceptDocId) {
   return q;
 }
 const purQtyOf = itemId => db.purchases.reduce((s, p) => s + (p.lines || []).reduce((a, l) => a + (l.itemId === itemId ? num(l.qty) : 0), 0), 0);
-const stockIn = itemId => db.moves.filter(m => m.itemId === itemId).reduce((s, m) => s + num(m.qty), 0) + purQtyOf(itemId);
+// other modules (returns, production) add stock movements: fn(itemId) -> [{date, qty, src}]
+const extraFlows = itemId => (window.FITX_STOCK_FLOWS || []).reduce((a, fn) => { try { return a.concat(fn(itemId) || []); } catch (e) { return a; } }, []);
+const stockIn = itemId => db.moves.filter(m => m.itemId === itemId).reduce((s, m) => s + num(m.qty), 0) + purQtyOf(itemId) + extraFlows(itemId).reduce((s, x) => s + num(x.qty), 0);
 /* parts vs service per line; cost snapshot taken when the line is saved */
 /* sub items: a line with sub:true belongs to the main line above it; numbered 1.1, 1.2 … */
 function lineNos(lines) {
@@ -908,10 +914,13 @@ const purPaid = p => r2((p.payments || []).reduce((s, x) => s + num(x.amount), 0
 // Qatar withholding tax deducted from payments to non-resident suppliers (5% royalties & technical fees, 7% other services)
 const purWht = p => num(p.whtRate) ? r2(purTotal(p) * num(p.whtRate) / 100) : 0;
 const purNet = p => r2(purTotal(p) - purWht(p));
-const purBal = p => r2(purNet(p) - purPaid(p));
+const purDebit = p => window.FitxRet ? FitxRet.billDebit(p.id) : 0;
+const purDebitRefund = p => window.FitxRet ? FitxRet.billRefund(p.id) : 0;
+const purBal = p => r2(purNet(p) - purPaid(p) - purDebit(p) + purDebitRefund(p));
 const supBalance = sid => r2(db.purchases.filter(p => p.supplierId === sid).reduce((s, p) => s + purBal(p), 0));
 function purStatus(p) {
-  const t = purNet(p), pd = purPaid(p);
+  const t = purNet(p), dn = purDebit(p), pd = r2(purPaid(p) + dn - purDebitRefund(p));
+  if (t > 0 && dn >= t - 0.004) return ['Returned', 'b-grey'];
   if (t > 0 && pd >= t - 0.004) return ['Paid', 'b-green'];
   if (p.due && p.due < today()) return [pd > 0 ? 'Overdue · part paid' : 'Overdue', 'b-red'];
   if (pd > 0) return ['Part paid', 'b-yellow'];
@@ -1157,12 +1166,12 @@ function salesBarData() {
 /* "+ New" menu */
 function newMenu() {
   const G = [
-    ['Customers', [['inv', ICON.inv, 'Invoice'], ['rcv', ICON.pay, 'Payment In (receive)'], ['quo', ICON.quo, 'Quotation'], ['cus', ICON.user, 'Customer']]],
-    ['Suppliers', [['exp', ICON.exp, 'Expense'], ['po', ICON.quo, 'Purchase order'], ['bill', ICON.box, 'Bill (parts purchase)'], ['paybill', ICON.cash, 'Payment Out (pay bills)'], ['sup', ICON.truck, 'Supplier']]],
-    ['Other', [['item', ICON.wrench, 'Spare part / service'], ['tm', ICON.box, 'Find part by treadmill'], ['rep', ICON.chart, 'Reports'], ['bak', ICON.drive, 'Backup to Google Drive'], ['imp', ICON.box, 'Import entries']]]
+    ['Customers', [['inv', ICON.inv, 'Invoice'], ['rcv', ICON.pay, 'Payment In (receive)'], ['quo', ICON.quo, 'Quotation'], ['cn', ICON.inv, 'Sales return / Credit note'], ['cus', ICON.user, 'Customer']]],
+    ['Suppliers', [['exp', ICON.exp, 'Expense'], ['po', ICON.quo, 'Purchase order'], ['bill', ICON.box, 'Bill (parts purchase)'], ['paybill', ICON.cash, 'Payment Out (pay bills)'], ['dn', ICON.box, 'Purchase return / Debit note'], ['sup', ICON.truck, 'Supplier']]],
+    ['Other', [['item', ICON.wrench, 'Spare part / service'], ['tm', ICON.box, 'Find part by treadmill'], ['mk', ICON.wrench, 'Make belts (production)'], ['rep', ICON.chart, 'Reports'], ['bak', ICON.drive, 'Backup to Google Drive'], ['imp', ICON.box, 'Import entries']]]
   ];
   const ACT = {inv: () => editDoc('INV'), rcv: () => receivePayment(), quo: () => editDoc('QUO'), po: () => window.FitxPO && FitxPO.edit(), cus: () => editCustomer(), exp: () => editExpense(), bill: () => editPurchase(),
-    paybill: () => paySupplier(), sup: () => editSupplier(null, () => render()), item: () => editItem(), tm: () => treadmillFinder(), rep: () => goTab('reports'), bak: () => { backupToDrive(); render(); }, imp: () => window.FitxImport && FitxImport.start()};
+    paybill: () => paySupplier(), sup: () => editSupplier(null, () => render()), item: () => editItem(), tm: () => treadmillFinder(), rep: () => goTab('reports'), bak: () => { backupToDrive(); render(); }, imp: () => window.FitxImport && FitxImport.start(), cn: () => window.FitxRet && FitxRet.pickInvoice(), dn: () => window.FitxRet && FitxRet.pickBill(), mk: () => window.FitxProd && FitxProd.make(), prd: () => window.FitxProd && FitxProd.home()};
   openSheet('New', `<div class="newgrid">${G.map(([h, items]) => `<div><h4>${h}</h4><div class="list">${items.map(([k, ic, l]) => `<button type="button" class="item" data-nk="${k}">${ic}<div class="main">${l}</div></button>`).join('')}</div></div>`).join('')}</div>`, el => {
     el.querySelectorAll('[data-nk]').forEach(b => b.onclick = () => closeSheet(ACT[b.dataset.nk]));
   });
@@ -3096,6 +3105,7 @@ function editPurchase(id, prefill) {
         <label class="f"><span>Payment due</span><input class="in" type="date" name="due" value="${esc(draft.due)}"></label>
       </div>
       <label class="f"><span>Supplier invoice / ref no.</span><input class="in" name="ref" value="${esc(draft.ref)}" placeholder="Optional"></label>
+      <label class="f"><span>Lines without a stock item are</span><select class="in" name="assetAcc"><option value="">Direct job cost (normal)</option>${(db.accounts || []).filter(a => a.sub === 'fixed' && !a.archived).map(a => `<option value="${a.id}" ${draft.assetAcc === a.id ? 'selected' : ''}>Fixed asset – ${esc(a.name)} (machine / tool you keep)</option>`).join('')}</select></label>
       <div class="sec"><h2>Parts bought</h2></div>
       <p class="hint" style="margin-top:-2px">Lines linked to a spare part add to stock. Lines without one are booked as a direct job cost.</p>
       <div id="plines"></div>
@@ -3178,7 +3188,7 @@ function editPurchase(id, prefill) {
     el.querySelector('#purForm').onsubmit = e => {
       e.preventDefault(); const f = formData(e.target);
       draft.supplierId = f.supplierId; draft.date = f.date; draft.due = f.due; draft.ref = f.ref.trim(); draft.notes = f.notes;
-      draft.discount = num(f.discount); draft.updateCost = !!f.updateCost; draft.whtRate = f.whtRate || '';
+      draft.discount = num(f.discount); draft.updateCost = !!f.updateCost; draft.whtRate = f.whtRate || ''; draft.assetAcc = f.assetAcc || '';
       draft.lines = draft.lines.filter(l => (l.desc || '').trim() || l.itemId || num(l.cost)).map(l => ({itemId: l.itemId || '', desc: (l.desc || '').trim() || ((itemById(l.itemId) || {}).name || ''), qty: num(l.qty), cost: r2(l.cost)}));
       if (!draft.supplierId) { toast('Please select a supplier'); return; }
       if (!draft.lines.length) { toast('Add at least one line'); draft.lines.push({itemId: '', desc: '', qty: 1, cost: ''}); drawLines(); return; }
@@ -3282,7 +3292,7 @@ function acct(f, t) {
     if (p.date >= f && p.date <= t) {
       const tot = purTotal(p); a.purTot += tot;
       const g = (p.lines || []).reduce((s, l) => s + num(l.qty) * num(l.cost), 0); const k = g > 0 ? tot / g : 0;
-      (p.lines || []).forEach(l => { const v = num(l.qty) * num(l.cost) * k; const it2 = l.itemId && itemById(l.itemId); if (it2 && !it2.service) a.purStock += v; else a.directCost += v; });
+      (p.lines || []).forEach(l => { const v = num(l.qty) * num(l.cost) * k; const it2 = l.itemId && itemById(l.itemId); if (it2 && !it2.service) a.purStock += v; else if (p.assetAcc) a.capex = (a.capex || 0) + v; else a.directCost += v; });
     }
     (p.payments || []).forEach(x => { if (x.date >= f && x.date <= t) { a.supPaid += num(x.amount); addTo(a.outByMethod, x.method || 'Other', num(x.amount)); } });
   });
@@ -3325,6 +3335,7 @@ function itemFlows(id) {
   db.moves.forEach(m => { if (m.itemId === id) fl.push({date: m.date, qty: num(m.qty), src: 'move'}); });
   db.purchases.forEach(p => (p.lines || []).forEach(l => { if (l.itemId === id) fl.push({date: p.date, qty: num(l.qty), src: 'pur'}); }));
   activeInvoices().forEach(d => (d.lines || []).forEach(l => { if (l.itemId === id) fl.push({date: d.date, qty: -num(l.qty), src: 'sale'}); }));
+  extraFlows(id).forEach(x => fl.push(x));
   return fl;
 }
 function stockMovement(f, t) {
@@ -3353,6 +3364,7 @@ function custLedger(cid, f, t) {
     (d.payments || []).forEach((p, i) => { if (!p.adv) ev.push({date: p.date, sort: p.date + '1' + d.created + i, ref: d.number, desc: 'Payment · ' + (p.method || '') + (p.note ? ' · ' + p.note : ''), dr: 0, cr: num(p.amount)}); });
   });
   db.docs.filter(q => q.type === 'QUO' && q.customerId === cid).forEach(q => (q.advances || []).forEach((x, i) => ev.push({date: x.date, sort: x.date + '1' + q.created + 'a' + i, ref: String(q.number).replace(/^[A-Za-z]+/, 'PRO'), desc: 'Advance received · ' + (x.method || ''), dr: 0, cr: num(x.amount)})));
+  (window.FITX_LEDGER_EV || []).forEach(fn => { try { fn('cust', cid, ev); } catch (e) { console.error(e); } });
   return ledgerFrom(ev, f, t);
 }
 function supLedger(sid, f, t) {
@@ -3362,6 +3374,7 @@ function supLedger(sid, f, t) {
     if (purWht(p)) ev.push({date: p.date, sort: p.date + '0' + p.created + 'w', ref: p.number, desc: `Withholding tax ${p.whtRate}% (paid to GTA)`, dr: 0, cr: purWht(p)});
     (p.payments || []).forEach((x, i) => ev.push({date: x.date, sort: x.date + '1' + p.created + i, ref: p.number, desc: 'Payment · ' + (x.method || '') + (x.note ? ' · ' + x.note : ''), dr: 0, cr: num(x.amount)}));
   });
+  (window.FITX_LEDGER_EV || []).forEach(fn => { try { fn('sup', sid, ev); } catch (e) { console.error(e); } });
   return ledgerFrom(ev, f, t);
 }
 function ledgerFrom(ev, f, t) {
@@ -3678,7 +3691,7 @@ function custStmtPro(cid, f, t, sup) {
   const open = (sup ? db.purchases.filter(d => d.supplierId === cid) : activeInvoices().filter(d => d.customerId === cid)).filter(d => bal(d) > 0.004).sort((a, b) => String(a.date).localeCompare(String(b.date)));
   const age = [0, 0, 0, 0, 0];
   open.forEach(d => { const days = Math.floor((new Date(td) - new Date(d.due || d.date)) / 864e5); age[days <= 0 ? 0 : days <= 30 ? 1 : days <= 60 ? 2 : days <= 90 ? 3 : 4] += bal(d); });
-  const tag = e => e.cr ? (/^Withholding/.test(e.desc) ? '<span class="xtag l">WHT</span>' : '<span class="xtag p">PAYMENT</span>') : `<span class="xtag l">${sup ? 'BILL' : 'INVOICE'}</span>`;
+  const tag = e => /^Credit note/.test(e.desc) ? '<span class="xtag l">CREDIT NOTE</span>' : /^Debit note/.test(e.desc) ? '<span class="xtag l">DEBIT NOTE</span>' : /^Refund/.test(e.desc) ? '<span class="xtag l">REFUND</span>' : e.cr ? (/^Withholding/.test(e.desc) ? '<span class="xtag l">WHT</span>' : '<span class="xtag p">PAYMENT</span>') : `<span class="xtag l">${sup ? 'BILL' : 'INVOICE'}</span>`;
   const W = sup ? {who: 'Supplier', ar: 'المورد', dr: 'Billed', due: 'Balance owed', inv: 'Open bills', one: 'Bill'} : {who: 'Customer', ar: 'العميل', dr: 'Invoiced', due: 'Balance due', inv: 'Open invoices', one: 'Invoice'};
   const rows = `<tr class="xnote"><td></td><td colspan="3">Opening balance</td><td></td><td></td><td class="n"><b>${fmt(L.open)}</b></td></tr>` +
     L.rows.map(e => `<tr><td class="snw">${dfmt(e.date)}</td><td>${tag(e)}</td><td class="snw"><b>${esc(e.ref)}</b></td><td class="xd">${esc(e.desc)}</td><td class="n">${e.dr ? fmt(e.dr) : ''}</td><td class="n" style="color:#1e7f3e">${e.cr ? fmt(e.cr) : ''}</td><td class="n"><b>${fmt(e.bal)}</b></td></tr>`).join('');
@@ -4004,6 +4017,8 @@ render();
 <script src="stamp.js"></script>
 <script src="advance.js"></script>
 <script src="porders.js"></script>
+<script src="returns.js"></script>
+<script src="production.js"></script>
 <script src="prodicons.js"></script>
 <script src="voucher.js"></script>
 <script src="units.js"></script>
