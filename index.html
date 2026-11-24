@@ -3767,6 +3767,7 @@ function ledgers(f, t) {
   const ag = ageing('rec'); sh.push({name: 'Receivables', rows: [['Customer', ...AGE_B, 'Total'], ...ag.rows.map(r => [r.name, ...r.b.map(r2), r2(r.total)])]});
   const ap = ageing('pay'); sh.push({name: 'Payables', rows: [['Supplier', ...AGE_B, 'Total'], ...ap.rows.map(r => [r.name, ...r.b.map(r2), r2(r.total)])]});
   sh.push({name: 'Customers', rows: [['Name', 'Contact', 'Mobile', 'Email', 'Building', 'Zone', 'Street', 'Area', 'Balance due'], ...db.customers.map(c => [c.name, c.contact || '', c.phone || '', c.email || '', c.building || '', c.zone || '', c.street || '', c.area || '', custBalance(c.id)])]});
+  if (window.catalogRows) sh.push({name: 'Product catalog', rows: catalogRows()});
   sh.push({name: 'Suppliers', rows: [['Name', 'Contact', 'Phone', 'Email', 'Location', 'We owe'], ...db.suppliers.map(s => [s.name, s.contact || '', s.phone || '', s.email || '', s.area || '', supBalance(s.id)])]});
   return sh;
 }

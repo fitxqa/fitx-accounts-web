@@ -136,7 +136,53 @@
         const n = importCatalog(); render(); toast(n ? n + ' items added' : 'Catalog already complete');
       };
     }
+    const cb = document.getElementById('catImp');
+    if (cb && !document.getElementById('catExp')) {
+      cb.insertAdjacentHTML('afterend', `<button type="button" class="btn" id="catExp">${ICON.dl || ''}Export catalog</button>`);
+      document.getElementById('catExp').onclick = exportCatalogSheet;
+    }
   };
+
+  /* ---------- export the whole product & service catalog ---------- */
+  function catalogRows() {
+    const head = ['Name', 'Code / SKU', 'Main category', 'Sub-category', 'Type', 'Unit', 'Cost price', 'Sell price', 'In stock', 'Stock value', 'Min qty', 'Description'];
+    const rows = db.items.slice().sort((a, b) => String(a.category || '').localeCompare(String(b.category || '')) || String(a.name).localeCompare(String(b.name))).map(i => {
+      const [main, ...sub] = String(i.category || '').split(S_);
+      const q = i.service ? '' : stockQty(i.id);
+      return [i.name || '', i.sku || '', main || '', sub.join(S_), i.service ? 'Service' : 'Part', i.unit || '', r2(i.cost), r2(i.price), q, i.service ? '' : r2(num(q) * num(i.cost)), i.service ? '' : num(i.minQty), i.descr || ''];
+    });
+    return [head, ...rows];
+  }
+  window.catalogRows = catalogRows;
+  const stamp = () => today();
+  function exportCatalog(how) {
+    const rows = catalogRows(), name = 'FitX-Product-Catalog-' + stamp();
+    if (how === 'csv') {
+      download(name + '.csv', '\ufeff' + rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n'), 'text/csv');
+    } else if (how === 'json') {
+      const items = db.items.map(i => ({name: i.name, sku: i.sku || '', category: i.category || '', unit: i.unit || '', price: r2(i.price), cost: r2(i.cost), service: !!i.service, descr: i.descr || ''}));
+      download(name + '.json', JSON.stringify({fitx: 'import', v: 1, batch: 'Product catalog ' + stamp(), note: items.length + ' products & services', items}, null, 1), 'application/json');
+    } else {
+      const cell = v => typeof v === 'number' && isFinite(v) ? `<Cell ss:StyleID="n"><Data ss:Type="Number">${v}</Data></Cell>` : `<Cell><Data ss:Type="String">${xmlEsc(v)}</Data></Cell>`;
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<?mso-application progid="Excel.Sheet"?>\n<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+<Styles><Style ss:ID="h"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#FF6A00" ss:Pattern="Solid"/></Style><Style ss:ID="n"><NumberFormat ss:Format="#,##0.00"/></Style></Styles>
+<Worksheet ss:Name="Product catalog"><Table>${rows.map((r, i) => `<Row>${i === 0 ? r.map(v => `<Cell ss:StyleID="h"><Data ss:Type="String">${xmlEsc(v)}</Data></Cell>`).join('') : r.map(cell).join('')}</Row>`).join('')}</Table></Worksheet>
+</Workbook>`;
+      download(name + '.xls', xml, 'application/vnd.ms-excel');
+    }
+    toast('Catalog exported · ' + (rows.length - 1) + ' items');
+  }
+  function exportCatalogSheet() {
+    const parts = db.items.filter(i => !i.service).length, svc = db.items.length - parts;
+    openSheet('Export product catalog', `
+      <p class="hint" style="margin-top:0">${db.items.length} items: ${parts} spare parts and ${svc} services, with category, unit, cost, sell price and stock on hand.</p>
+      <div class="list">
+        <button type="button" class="item" data-h="xls"><span class="ic">${ICON.dl || ''}</span><div class="main"><div class="t">Excel file (.xls)</div><div class="s">Opens in Excel or Google Sheets</div></div></button>
+        <button type="button" class="item" data-h="csv"><span class="ic">${ICON.dl || ''}</span><div class="main"><div class="t">CSV file</div><div class="s">For any spreadsheet or other software</div></div></button>
+        <button type="button" class="item" data-h="json"><span class="ic">${ICON.box}</span><div class="main"><div class="t">FitX import file (.json)</div><div class="s">Load the same catalog in another FitX Accounts company with Import entries</div></div></button>
+      </div>`, el => el.querySelectorAll('[data-h]').forEach(b => b.onclick = () => exportCatalog(b.dataset.h)));
+  }
+  window.exportCatalogSheet = exportCatalogSheet;
 
   // signed in to the cloud: add the catalog to the company data once it has loaded
   (window.FITX_AFTER_SYNC = window.FITX_AFTER_SYNC || []).push(() => {
