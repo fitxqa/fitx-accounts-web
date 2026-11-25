@@ -130,7 +130,8 @@
     const partOpts = sel => '<option value="">Choose part…</option>' + db.items.filter(i => !i.service).sort((a, b) => a.name.localeCompare(b.name)).map(i => `<option value="${i.id}" ${i.id === sel ? 'selected' : ''}>${esc(i.name)} · stock ${fq(stockQty(i.id))}</option>`).join('');
     const jobs = (S().jobTypes || []);
     openSheet(ex ? 'Edit ' + ex.number : 'New work order', `<form id="woForm" autocomplete="off">
-      <div class="chips" id="woKind" style="margin-bottom:10px"><button type="button" data-k="customer" class="${w.kind !== 'home' ? 'on' : ''}">Customer (gym, hotel, company)</button><button type="button" data-k="home" class="${w.kind === 'home' ? 'on' : ''}">🏠 Home visit</button></div>
+      <div class="chips" id="woKind" style="display:grid;grid-template-columns:1fr 1fr;overflow:visible;margin-bottom:12px"><button type="button" data-k="customer" class="${w.kind !== 'home' ? 'on' : ''}" style="justify-content:center">🏢 Customer</button><button type="button" data-k="home" class="${w.kind === 'home' ? 'on' : ''}" style="justify-content:center">🏠 Home visit</button></div>
+      <p class="hint" style="margin:-6px 2px 10px" id="woKindH">${w.kind === 'home' ? 'Private home client – kept separate from your customers list.' : 'Gym, hotel, building or company from your customers list.'}</p>
       <div id="woCust" style="${w.kind === 'home' ? 'display:none' : ''}"><label class="f"><span>Customer</span><select class="in" name="customerId">${custOpts}</select></label>
       ${db.customers.length ? '' : '<p class="hint">Add the customer first in Customers.</p>'}</div>
       <div id="woHome" style="${w.kind === 'home' ? '' : 'display:none'}">
@@ -178,7 +179,7 @@
       el.querySelector('#woPAdd').onclick = () => { w.parts.push({itemId: '', desc: '', qty: 1, price: 0}); drawP(); };
       drawEq(); drawP();
       let kind = w.kind === 'home' ? 'home' : 'customer';
-      el.querySelectorAll('#woKind [data-k]').forEach(b => b.onclick = () => { kind = b.dataset.k; el.querySelectorAll('#woKind [data-k]').forEach(x => x.classList.toggle('on', x === b)); el.querySelector('#woCust').style.display = kind === 'home' ? 'none' : ''; el.querySelector('#woHome').style.display = kind === 'home' ? '' : 'none'; });
+      el.querySelectorAll('#woKind [data-k]').forEach(b => b.onclick = () => { kind = b.dataset.k; el.querySelectorAll('#woKind [data-k]').forEach(x => x.classList.toggle('on', x === b)); el.querySelector('#woCust').style.display = kind === 'home' ? 'none' : ''; el.querySelector('#woHome').style.display = kind === 'home' ? '' : 'none'; el.querySelector('#woKindH').textContent = kind === 'home' ? 'Private home client – kept separate from your customers list.' : 'Gym, hotel, building or company from your customers list.'; });
       // a known mobile fills in the saved name and address
       el.querySelector('#woHP').oninput = () => {
         const h = homeByPhone(el.querySelector('#woHP').value), info = el.querySelector('#woHFound');
