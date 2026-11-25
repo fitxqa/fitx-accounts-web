@@ -28,6 +28,8 @@
     sync: '<path d="M21 12a9 9 0 0 1-15.5 6.2M3 12A9 9 0 0 1 18.5 5.8"/><path d="M18 2v4h-4M6 22v-4h4"/>',
     tools: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
     users: '<path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-6h6v6"/><path d="M7 10h2M15 10h2"/>',
+    wrench: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>',
+    quo: '<path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h8M9 17h8"/>',
     set: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>'
   };
@@ -40,6 +42,8 @@
       ['Customers', 'customers', tab('customers'), () => editCustomer()],
       ['Suppliers', 'suppliers', tab('suppliers'), () => editSupplier()],
       ['Employees', 'payroll', tab('payroll'), window.FitxPayroll && FitxPayroll.editEmployee ? () => FitxPayroll.editEmployee() : null]]],
+    ['wrench', 'Work orders', {key: '', open: call(() => window.FitxWO && FitxWO.list()), add: () => window.FitxWO && FitxWO.edit()}],
+    ['quo', 'AMC contracts', {key: '', open: call(() => window.FitxAMC && FitxAMC.list()), add: () => window.FitxAMC && FitxAMC.edit()}],
     ['items', 'Products & services', {key: 'stock', open: tab('stock'), add: () => editItem()}],
     ['items', 'Belt production', {key: 'production', open: call(() => window.FitxProd && FitxProd.home()), add: () => window.FitxProd && FitxProd.make()}],
     ['sale', 'Sale', [
@@ -55,7 +59,8 @@
       ['Payment Out (pay bills)', '', call(() => paySupplier())],
       ['Purchase return / Debit note', '', call(() => window.FitxRet && FitxRet.listDN()), () => window.FitxRet && FitxRet.pickBill()],
       ['Expenses', 'expenses:exp', exp('exp'), () => editExpense()],
-      ['Purchase orders', 'porders', tab('porders'), window.FitxPO ? () => FitxPO.edit() : null]]],
+      ['Purchase orders', 'porders', tab('porders'), window.FitxPO ? () => FitxPO.edit() : null],
+      ['Cheques (print & register)', '', call(() => window.FitxChq && FitxChq.register()), () => window.FitxChq && FitxChq.print()]]],
     ['bank', 'Cash & Bank', {key: 'banking', open: tab('banking')}],
     ['pay', 'Payroll', [
       ['Payroll', 'payroll', tab('payroll')],
