@@ -14,7 +14,15 @@
 
   function woLines(list) {
     const act = list.filter(w => ACTIVE.includes(w.status)).sort((a, b) => String(b.date).localeCompare(String(a.date)));
-    const out = act.slice(0, 3).map(w => `🔧 ${w.number} · ${ST[w.status] || w.status}${emp(w.techId) ? ' · ' + emp(w.techId).split(' ')[0] : ''} · ${daysAgo(w.date)}`);
+    const out = [];
+    act.slice(0, 3).forEach(w => {
+      out.push(`🔧 ${w.number} · ${ST[w.status] || w.status}${emp(w.techId) ? ' · ' + emp(w.techId).split(' ')[0] : ''} · ${daysAgo(w.date)}`);
+      // machine and the problem the customer reported
+      (w.equipment || []).filter(e => e.desc || e.problem).slice(0, act.length > 1 ? 1 : 2).forEach(e => {
+        const m = [e.desc, e.brand, e.model].filter(Boolean).join(' ');
+        out.push('   ' + (m || 'Machine') + (e.problem ? ' – ' + e.problem : ''));
+      });
+    });
     if (!act.length) { const last = list.filter(w => w.status === 'done').sort((a, b) => String(b.doneDate || b.date).localeCompare(String(a.doneDate || a.date)))[0]; if (last) out.push(`Last job ${last.number} · completed ${dfmt(last.doneDate || last.date)}`); }
     return {lines: out, open: act[0]};
   }
