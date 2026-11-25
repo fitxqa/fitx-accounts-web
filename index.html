@@ -493,8 +493,11 @@ textarea.in{min-height:80px;resize:vertical}
 .paper .pstamp{display:flex;justify-content:flex-end;margin:6px 0 0;page-break-inside:avoid}
 .list .item.r2{padding:8px 16px;min-height:0;gap:12px}
 .item.r2 .main .t{font-size:14.5px;line-height:1.3}
-.item.r2 .main .s{font-size:12.5px;margin-top:2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.item.r2 .main .s .badge{font-size:10.5px;padding:1px 7px}
+.item.r2 .main{min-width:0}
+.item.r2 .main .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item.r2 .main .s{font-size:12.5px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item.r2 .main .s .bal{color:var(--orange);font-weight:600}
+.item.r2 .r .badge{font-size:10.5px;padding:1px 7px}
 .item.r2 .r{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
 .item.r2 .r .amt{font-size:14.5px;line-height:1.3}
 .item.r2 .r .s{font-size:12px;margin:0}
@@ -1237,8 +1240,8 @@ function docRow(d) {
 }
 function docRow2(d) {
   const c = custById(d.customerId); const [st, cls] = status(d);
-  const right = d.type === 'INV' && docBal(d) > 0.004 && !d.cancelled ? `<div class="s">Bal ${fmt(docBal(d))}</div>` : '';
-  return `<button type="button" class="item r2" data-doc="${d.id}"><div class="main"><div class="t">${esc(c ? c.name : 'No customer')}</div><div class="s"><span>${esc(d.number)} · ${dfmt(d.date)}</span><span class="badge ${cls}">${st}</span></div></div><div class="r"><div class="amt">${fmt(docTotal(d))}</div>${right}</div></button>`;
+  const bal = d.type === 'INV' && docBal(d) > 0.004 && !d.cancelled ? ` · <b class="bal">Bal ${fmt(docBal(d))}</b>` : '';
+  return `<button type="button" class="item r2" data-doc="${d.id}"><div class="main"><div class="t">${esc(c ? c.name : 'No customer')}</div><div class="s">${esc(d.number)} · ${dfmt(d.date)}${bal}</div></div><div class="r"><div class="amt">${fmt(docTotal(d))}</div><span class="badge ${cls}">${st}</span></div></button>`;
 }
 function bindDocRows(root) { root.querySelectorAll('[data-doc]').forEach(b => b.onclick = () => viewDoc(b.dataset.doc)); }
 const PAL = ['#ff6a00', '#1a73c8', '#21a366', '#8e5bd6', '#f2b600', '#00a3a3', '#e8559a', '#9aa0a8'];
