@@ -105,8 +105,8 @@
   function listWO() {
     openSheet('Work orders', `
       <button type="button" class="btn pri full" id="woNew" style="margin-bottom:12px">+ New work order</button>
-      <div class="chips" id="woTabs" style="margin-bottom:10px">${[['active', 'Open & in progress'], ['home', 'Home visits'], ['done', 'Completed'], ['all', 'All']].map(([k, l]) => `<button type="button" class="chip ${woTab === k ? 'on' : ''}" data-t="${k}">${l}</button>`).join('')}</div>
-      <input class="search" id="woQ" placeholder="Search customer, mobile, number, technician or machine" aria-label="Search">
+      <div class="chips" id="woTabs" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));overflow:visible;margin-bottom:10px">${[['active', 'Open'], ['home', '🏠 Home'], ['done', 'Done'], ['all', 'All']].map(([k, l]) => `<button type="button" class="chip ${woTab === k ? 'on' : ''}" data-t="${k}" style="justify-content:center;padding:7px 4px">${l}</button>`).join('')}</div>
+      <input class="search" id="woQ" placeholder="Search name, mobile, WO no." aria-label="Search">
       <div class="list" id="woList"></div>`, el => {
       const draw = () => {
         const q = el.querySelector('#woQ').value.trim().toLowerCase();
