@@ -42,7 +42,26 @@
   const top = () => { const a = document.querySelectorAll('.sheet'); return a[a.length - 1]; };
   const addMonths = (d, m) => { const x = new Date(d + 'T00:00:00'); const day = x.getDate(); x.setMonth(x.getMonth() + m); if (x.getDate() < day) x.setDate(0); return isoOf(x); };
   const daysBetween = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 864e5);
-  const ST = {open: ['Open', 'b-grey'], assigned: ['Assigned', 'b-blue'], progress: ['In progress', 'b-yellow'], done: ['Completed', 'b-green'], cancelled: ['Cancelled', 'b-red']};
+  const ST = {open: ['Open', 'b-grey'], assigned: ['Assigned', 'b-blue'], progress: ['In progress', 'b-yellow'], parts: ['Waiting for parts', 'b-yellow'], approval: ['Waiting for approval', 'b-blue'], hold: ['On hold', 'b-grey'], done: ['Completed', 'b-green'], cancelled: ['Cancelled', 'b-red']};
+  const ACTIVE = ['open', 'assigned', 'progress', 'parts', 'approval', 'hold'];
+  /* ---------- live tracking for the customer: a small public record track/{token} (status only, no prices) ---------- */
+  const TRACK_URL = 'https://fitxqa.github.io/fitx-accounts-web/track.html#';
+  const cloudOn = () => !!(window.FitxCloud && FitxCloud._fs && FitxCloud.cid && FitxCloud.user);
+  function pushTrack(w) {
+    if (!w.track || !cloudOn()) return;
+    const c = party(w), s = S(), first = n => String(n || '').trim().split(/\s+/)[0] || '';
+    const rec = {cid: FitxCloud.cid, no: w.number, status: w.status, label: (ST[w.status] || ST.open)[0], invoiced: !!woInvoice(w),
+      co: {name: s.name || '', phone: s.phone || '', web: s.web || ''}, cust: c.homeVisit ? first(c.name) : (c.name || ''), date: w.date || '', time: w.time || '',
+      machines: (w.equipment || []).map(e => [e.desc, e.brand, e.model].filter(Boolean).join(' · ')).filter(Boolean).slice(0, 8),
+      tech: first(empName(w.techId)), log: (w.log || []).slice(-20), updated: Date.now()};
+    try { FitxCloud._fs.collection('track').doc(w.track).set(rec).catch(e => console.warn('track', e && e.message)); } catch (e) {}
+  }
+  function setStatus(w, st) {
+    if (w.status === st) return;
+    w.status = st; if (st === 'done') w.doneDate = w.doneDate || today(); else delete w.doneDate;
+    (w.log = w.log || []).push({s: st, at: Date.now()});
+    save(); pushTrack(w); render();
+  }
   const woInvoice = w => db.docs.find(d => d.woId === w.id && d.type === 'INV' && !d.cancelled);
   const woStatus = w => w.status === 'done' && woInvoice(w) ? ['Invoiced', 'b-green'] : (ST[w.status] || ST.open);
   const woDone = w => w.status === 'done';
@@ -111,7 +130,7 @@
       const draw = () => {
         const q = el.querySelector('#woQ').value.trim().toLowerCase();
         let l = db.workorders.slice().sort((a, b) => String(b.date + b.number).localeCompare(String(a.date + a.number)));
-        if (woTab === 'active') l = l.filter(w => !['done', 'cancelled'].includes(w.status)); else if (woTab === 'done') l = l.filter(w => w.status === 'done'); else if (woTab === 'home') l = l.filter(w => w.kind === 'home');
+        if (woTab === 'active') l = l.filter(w => ACTIVE.includes(w.status)); else if (woTab === 'done') l = l.filter(w => w.status === 'done'); else if (woTab === 'home') l = l.filter(w => w.kind === 'home');
         if (q) l = l.filter(w => (w.number + ' ' + pname(w) + ' ' + ((w.home || {}).phone || '') + ' ' + empName(w.techId) + ' ' + (w.equipment || []).map(e => [e.desc, e.brand, e.model].join(' ')).join(' ')).toLowerCase().includes(q));
         el.querySelector('#woList').innerHTML = l.length ? l.map(w => { const [s, c] = woStatus(w); return `<button type="button" class="item r2" data-id="${w.id}"><div class="main"><div class="t">${w.kind === 'home' ? '<span title="Home visit">🏠 </span>' : ''}${esc(pname(w))}${w.priority === 'Urgent' ? ' <span style="color:var(--red)">●</span>' : ''}</div><div class="s">${esc(w.number)} · ${dfmt(w.date)}${w.time ? ' ' + esc(w.time) : ''}${empName(w.techId) ? ' · ' + esc(empName(w.techId)) : ''}</div></div><div class="r"><span class="badge ${c}">${s}</span></div></button>`; }).join('')
           : `<div class="empty">${db.workorders.length ? 'Nothing here.' : 'No work orders yet. Tap “+ New work order” for each job you send a technician to.'}</div>`;
@@ -209,8 +228,8 @@
           equipment: w.equipment.filter(x => x.desc || x.brand || x.model || x.problem), parts: w.parts.filter(p => p.itemId && num(p.qty) > 0)};
         let rec;
         if (ex) { Object.assign(ex, data, {updated: Date.now()}); if (ex.status === 'open' && ex.techId) ex.status = 'assigned'; if (ex.status === 'assigned' && !ex.techId) ex.status = 'open'; rec = ex; }
-        else { rec = Object.assign({id: uid(), number: nextNo('nextWO', S().woPrefix || 'WO'), status: data.techId ? 'assigned' : 'open', photos: [], created: String(Date.now()), amcId: w.amcId || '', visitNo: w.visitNo || ''}, data); db.workorders.push(rec); }
-        save(); closeSheet(() => { toast(rec.number + ' saved'); viewWO(rec.id); render(); });
+        else { rec = Object.assign({id: uid(), number: nextNo('nextWO', S().woPrefix || 'WO'), status: data.techId ? 'assigned' : 'open', photos: [], created: String(Date.now()), amcId: w.amcId || '', visitNo: w.visitNo || ''}, data); rec.log = [{s: rec.status, at: Date.now()}]; db.workorders.push(rec); }
+        save(); pushTrack(rec); closeSheet(() => { toast(rec.number + ' saved'); viewWO(rec.id); render(); });
       };
     });
   }
@@ -233,7 +252,7 @@
   function viewWO(id) {
     const w = woById(id); if (!w) return;
     const c = party(w), inv = woInvoice(w), [st, cls] = woStatus(w), map = pMap(c);
-    const next = {open: null, assigned: ['progress', 'Start job'], progress: ['done', 'Mark completed']}[w.status];
+    const next = {open: null, assigned: ['progress', 'Start job'], progress: ['done', 'Mark completed'], parts: ['progress', 'Resume job'], approval: ['progress', 'Resume job'], hold: ['progress', 'Resume job']}[w.status];
     openSheet(w.number, `${shareRow('wo')}
       <div class="card"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${c.homeVisit ? '🏠 ' : ''}${esc(c.name || 'No customer')}</b><span class="badge ${cls}">${st}</span></div>
         <div class="hint">${c.homeVisit ? 'Home visit · ' : ''}${esc(pAddr(c) || 'No address')}</div>
@@ -241,8 +260,10 @@
         <div class="hint">${esc(w.jobType || '')} · Priority: ${w.priority === 'Urgent' ? '<b style="color:var(--red)">Urgent</b>' : esc(w.priority || 'Normal')} · ${dfmt(w.date)}${w.time ? ' ' + esc(w.time) : ''}</div></div>
       <div class="sec"><h2>Assigned to</h2></div>
       <div class="card" style="display:flex;gap:10px;align-items:center">${w.techId ? `<div class="wo-av">${esc(initials(empName(w.techId)))}</div><div><b>${esc(empName(w.techId))}</b><div class="hint">Technician</div></div>` : '<div class="hint">Not assigned yet – tap Edit to choose a technician.</div>'}</div>
+      <div class="sec"><h2>Status</h2><span class="hint">tap to change</span></div>
+      <div class="chips" id="woSt" style="flex-wrap:wrap;overflow:visible">${Object.entries(ST).map(([k, [l]]) => `<button type="button" class="${w.status === k ? 'on' : ''}" data-st="${k}">${l}</button>`).join('')}</div>
+      <div class="card" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:180px"><b>Live tracking for the customer</b><div class="hint">${w.track ? 'Link shared – the customer sees each status change live.' : 'Send a link; the customer sees the job status update live (no prices).'}</div></div><button type="button" class="btn ${w.track ? '' : 'pri'}" id="woTrack" style="flex:0 0 auto;min-height:40px;padding:6px 14px">${ICON.wa}${w.track ? 'Send link again' : 'Share tracking link'}</button></div>
       <div class="btns" style="margin:12px 0">
-        ${w.status === 'open' && !w.techId ? '' : ''}
         ${next ? `<button type="button" class="btn pri" id="woNext">${next[1]}</button>` : ''}
         ${w.status === 'done' && !inv ? `<button type="button" class="btn pri" id="woInv">${ICON.inv}Make invoice</button>` : ''}
         ${inv ? `<button type="button" class="btn" id="woOpenInv">${ICON.inv}Open ${esc(inv.number)}</button>` : ''}
@@ -261,12 +282,27 @@
       const reopen = () => reopenWith(() => viewWO(id));
       bindDocShare(el, 'wo', () => woHTML(w), w.number + ' - ' + (c.name || ''), c, 'Work report ' + w.number, `Dear ${c.contact || c.name || ''},\n\nPlease find the work report *${w.number}* for the ${w.jobType || 'service'} on ${dfmt(w.date)}.\n\nThank you,\n${S().name}`);
       const b = s => el.querySelector(s);
-      if (b('#woNext')) b('#woNext').onclick = () => { w.status = next[0]; if (w.status === 'done') w.doneDate = today(); save(); reopen(); toast(next[1] === 'Start job' ? 'Job started' : 'Job completed'); render(); };
+      if (b('#woNext')) b('#woNext').onclick = () => { setStatus(w, next[0]); reopen(); toast(next[1] === 'Mark completed' ? 'Job completed' : 'Job started'); };
+      el.querySelectorAll('#woSt [data-st]').forEach(x => x.onclick = () => { if (x.dataset.st === 'cancelled' && !confirm('Cancel this job?')) return; setStatus(w, x.dataset.st); reopen(); toast('Status: ' + ST[x.dataset.st][0]); });
+      b('#woTrack').onclick = () => {
+        if (!cloudOn()) { openSheet('Live tracking', `<p>Live tracking works when this company is signed in to the <b>cloud</b> (Menu → Users &amp; passwords → sign in), because the customer's page reads the status from the cloud.</p><p class="hint">Your work orders on this phone are not changed.</p>`); return; }
+        if (!w.track) { w.track = (uid() + uid()).replace(/[^a-z0-9]/gi, '').slice(0, 22); save(); }
+        pushTrack(w);
+        const url = TRACK_URL + w.track, ph = c.phone || '';
+        const msg = `Dear ${c.contact || c.name || ''},\n\nYou can follow your service job *${w.number}* live here:\n${url}\n\n${S().name}\n${S().phone}`;
+        openSheet('Tracking link · ' + w.number, `<p class="hint" style="margin-top:0">The customer sees the job number, machines, technician's first name and each status change – no prices.</p>
+          <div class="card" style="word-break:break-all;font-family:monospace;font-size:13px" id="trUrl">${esc(url)}</div>
+          <div class="btns" style="margin-top:12px"><button type="button" class="btn pri" id="trWa">${ICON.wa}Send on WhatsApp</button><button type="button" class="btn" id="trCopy">Copy link</button><a class="btn" href="${url}" target="_blank" rel="noopener">Open page</a></div>`, e2 => {
+          e2.querySelector('#trWa').onclick = () => openLink(`https://wa.me/${waNumber(ph)}?text=` + encodeURIComponent(msg));
+          e2.querySelector('#trCopy').onclick = () => { try { navigator.clipboard.writeText(url).then(() => toast('Link copied'), () => toast('Select the link and copy it')); } catch (er) { toast('Select the link and copy it'); } };
+        });
+        reopen();
+      };
       if (b('#woInv')) b('#woInv').onclick = () => closeSheet(() => makeInvoice(w));
       if (b('#woOpenInv')) b('#woOpenInv').onclick = () => closeSheet(() => viewDoc(inv.id));
       b('#woEdit').onclick = () => closeSheet(() => editWO(id));
-      if (b('#woReopen')) b('#woReopen').onclick = () => { w.status = w.techId ? 'progress' : 'open'; delete w.doneDate; save(); reopen(); };
-      if (b('#woCancel')) b('#woCancel').onclick = () => { if (!confirm('Cancel this job?')) return; w.status = 'cancelled'; save(); reopen(); render(); };
+      if (b('#woReopen')) b('#woReopen').onclick = () => { setStatus(w, w.techId ? 'progress' : 'open'); reopen(); };
+      if (b('#woCancel')) b('#woCancel').onclick = () => { if (!confirm('Cancel this job?')) return; setStatus(w, 'cancelled'); reopen(); };
       el.querySelectorAll('[data-rm]').forEach(x => x.onclick = () => { w.photos.splice(+x.dataset.rm, 1); save(); reopen(); });
       const pin = b('#woPhIn'); if (pin) pin.onchange = async () => {
         const files = [...pin.files].slice(0, 6 - (w.photos || []).length);
@@ -458,7 +494,7 @@
     const r = origHome.apply(this, arguments);
     try {
       const main = document.getElementById('main'); if (!main || main.querySelector('#woHomeCard')) return r;
-      const act = db.workorders.filter(w => ['open', 'assigned', 'progress'].includes(w.status)).length;
+      const act = db.workorders.filter(w => ACTIVE.includes(w.status)).length;
       const vd = db.amcs.reduce((s, a) => s + visitsDue(a).length, 0), idue = db.amcs.reduce((s, a) => s + amcDue(a).length, 0);
       const ren = db.amcs.filter(a => !a.cancelled && a.end >= today() && daysBetween(today(), a.end) <= 30).length;
       if (!act && !vd && !idue && !ren) return r;

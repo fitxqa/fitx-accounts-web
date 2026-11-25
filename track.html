@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Service job tracking</title>
+<meta name="robots" content="noindex">
+<style>
+  :root{--bg:#f3f4f6;--card:#fff;--ink:#16181d;--muted:#6b7079;--line:#e6e8ec;--orange:#ff6a00;--green:#1e8e4e;--blue:#145ea8;--yellow:#9a5800;--red:#b3261e}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+  header{background:#000;color:#fff;padding:18px max(16px,env(safe-area-inset-left)) 16px}
+  .logo{font-weight:900;font-size:26px;letter-spacing:-.5px}.logo span{color:var(--orange)}
+  header small{display:block;color:#bbb;font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+  main{max-width:560px;margin:0 auto;padding:16px max(16px,env(safe-area-inset-left)) 40px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+  .no{font-size:13px;color:var(--muted)}.big{font-size:24px;font-weight:800;margin:2px 0 6px}
+  .pill{display:inline-block;padding:4px 12px;border-radius:999px;font-weight:700;font-size:13px;background:#eef0f3}
+  .pill.green{background:#e3f4ea;color:var(--green)}.pill.blue{background:#e5f0fb;color:var(--blue)}.pill.yellow{background:#fff3dc;color:var(--yellow)}.pill.red{background:#fde8e6;color:var(--red)}
+  ol{list-style:none;margin:6px 0 0;padding:0}
+  ol li{position:relative;padding:0 0 18px 34px;color:var(--muted)}
+  ol li:last-child{padding-bottom:0}
+  ol li::before{content:"";position:absolute;left:8px;top:4px;width:14px;height:14px;border-radius:50%;border:2px solid #c9ccd2;background:#fff}
+  ol li::after{content:"";position:absolute;left:15px;top:20px;bottom:-2px;width:2px;background:#e1e3e7}
+  ol li:last-child::after{display:none}
+  ol li.done{color:var(--ink)}ol li.done::before{background:var(--orange);border-color:var(--orange)}ol li.done::after{background:var(--orange)}
+  ol li.now{color:var(--ink);font-weight:700}ol li.now::before{background:#fff;border-color:var(--orange);box-shadow:0 0 0 4px #ffe3cf}
+  ol li small{display:block;font-weight:400;color:var(--muted);font-size:12.5px}
+  .note{background:#fff7ef;border:1px solid #ffd9bd;border-radius:12px;padding:10px 12px;margin-top:12px}
+  dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}dt{color:var(--muted)}dd{margin:0;font-weight:600}
+  .live{font-size:12px;color:var(--muted);text-align:center}.live b{color:var(--green)}
+  a{color:var(--orange);font-weight:700}
+  .err{text-align:center;color:var(--muted);padding:30px 10px}
+</style>
+</head>
+<body>
+<header><div class="logo" id="lg">Fit<span>X</span></div><small id="cn">Service job tracking</small></header>
+<main id="m"><div class="card err">Loading your job…</div></main>
+<script src="firebase-config.js"></script>
+<script src="vendor/firebase-app-compat.js"></script>
+<script src="vendor/firebase-firestore-compat.js"></script>
+<script>
+(function () {
+  const m = document.getElementById('m');
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  const token = (location.hash || '').replace(/^#/, '').trim();
+  const fail = t => { m.innerHTML = '<div class="card err">' + t + '</div>'; };
+  if (!token || !/^[a-z0-9]{10,40}$/i.test(token)) { fail('This tracking link is not complete. Please open the full link you received.'); return; }
+  let fs;
+  try { firebase.initializeApp(window.FITX_FIREBASE); fs = firebase.firestore(); } catch (e) { fail('Tracking is not available right now.'); return; }
+  const STEPS = [['open', 'Job received'], ['assigned', 'Technician assigned'], ['progress', 'Work in progress'], ['done', 'Completed']];
+  const SIDE = {parts: ['Waiting for spare parts', 'yellow', 'We are waiting for spare parts for your machine. We will continue as soon as they arrive.'],
+    approval: ['Waiting for your approval', 'blue', 'We have sent you the quotation. Please confirm so we can continue the work.'],
+    hold: ['On hold', '', 'This job is on hold or being rescheduled. We will contact you.'], cancelled: ['Cancelled', 'red', 'This job has been cancelled.']};
+  const PILL = {open: ['Received', ''], assigned: ['Technician assigned', 'blue'], progress: ['In progress', 'yellow'], done: ['Completed', 'green']};
+  const when = t => { try { return new Date(t).toLocaleString('en-GB', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}); } catch (e) { return ''; } };
+  const dmy = d => { try { return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'}); } catch (e) { return d; } };
+  function draw(r) {
+    document.title = r.no + ' · ' + (r.co && r.co.name || 'Service job');
+    document.getElementById('cn').textContent = (r.co && r.co.name) || 'Service job tracking';
+    if (r.co && r.co.name && !/fitx/i.test(r.co.name)) { document.getElementById('lg').textContent = r.co.name; document.getElementById('cn').textContent = 'Service job tracking'; }
+    const st = r.status || 'open', side = SIDE[st];
+    const atOf = s => { const x = (r.log || []).filter(l => l.s === s).pop(); return x ? when(x.at) : ''; };
+    // how far along the main steps the job is (side statuses keep the last main step reached)
+    let reached = STEPS.findIndex(s => s[0] === st);
+    if (reached < 0) { const done = (r.log || []).map(l => STEPS.findIndex(s => s[0] === l.s)).filter(i => i >= 0); reached = done.length ? Math.max(...done) : 0; }
+    const pill = side ? [side[0], side[1]] : (r.invoiced && st === 'done' ? ['Completed', 'green'] : PILL[st] || PILL.open);
+    m.innerHTML = `
+      <div class="card"><div class="no">Job ${esc(r.no)}${r.cust ? ' · ' + esc(r.cust) : ''}</div><div class="big">${esc(pill[0])}</div><span class="pill ${pill[1]}">${esc(r.label || pill[0])}</span>
+        ${side ? `<div class="note">${esc(side[2])}</div>` : ''}</div>
+      ${st !== 'cancelled' ? `<div class="card"><ol>${STEPS.map(([k, l], i) => `<li class="${i < reached || (i === reached && k === 'done') ? 'done' : i === reached && !side ? 'now' : i === reached ? 'done' : ''}">${l}${atOf(k) ? '<small>' + esc(atOf(k)) + '</small>' : ''}</li>`).join('')}</ol></div>` : ''}
+      <div class="card"><dl>
+        ${r.date ? `<dt>Visit</dt><dd>${esc(dmy(r.date))}${r.time ? ' · ' + esc(r.time) : ''}</dd>` : ''}
+        ${r.tech ? `<dt>Technician</dt><dd>${esc(r.tech)}</dd>` : ''}
+        ${(r.machines || []).length ? `<dt>Equipment</dt><dd>${r.machines.map(esc).join('<br>')}</dd>` : ''}
+      </dl></div>
+      <div class="card" style="text-align:center">Questions? Call <a href="tel:${esc((r.co || {}).phone)}">${esc((r.co || {}).phone)}</a>${(r.co || {}).web ? ` · <a href="https://${esc(String(r.co.web).replace(/^https?:\/\//, ''))}" target="_blank" rel="noopener">${esc(r.co.web)}</a>` : ''}</div>
+      <p class="live"><b>●</b> Live – this page updates by itself · last change ${esc(when(r.updated))}</p>`;
+  }
+  fs.collection('track').doc(token).onSnapshot(s => { if (!s.exists) { fail('We could not find this job. The link may have expired – please contact us.'); return; } draw(s.data()); },
+    () => fail('Tracking is not available right now. Please try again later or contact us.'));
+})();
+</script>
+</body>
+</html>

@@ -17,8 +17,8 @@
   };
   // collections synced record-by-record (any other array in db is synced too)
   const BASE_COLS = ['customers', 'items', 'moves', 'docs', 'expenses', 'suppliers', 'purchases', 'treadmills'];
-  const TECH_READ = ['customers', 'items', 'docs', 'moves', 'treadmills'];
-  const TECH_WRITE = ['customers', 'docs', 'moves', 'items'];
+  const TECH_READ = ['customers', 'items', 'docs', 'moves', 'treadmills', 'workorders', 'homeclients', 'amcs'];
+  const TECH_WRITE = ['customers', 'docs', 'moves', 'items', 'workorders', 'homeclients'];
   // settings are compared with sorted keys so two devices never ping-pong the same values
   const sortKeys = v => Array.isArray(v) ? v.map(sortKeys) : (v && typeof v === 'object') ? Object.keys(v).sort().reduce((o, k) => (o[k] = sortKeys(v[k]), o), {}) : v;
   const stable = v => JSON.stringify(sortKeys(v));
