@@ -75,12 +75,22 @@
           ${row(s.notif, 'Notifications', 'Used when the card cannot be shown', 'Allow', 'ciNt')}</div>
         <div class="sec"><h2>Try it</h2></div>
         <div class="row" style="align-items:end"><label class="f"><span>Customer mobile</span><input class="in" id="ciNum" inputmode="tel" placeholder="e.g. 5555 1234"></label><button type="button" class="btn" id="ciTest" style="margin-bottom:12px;flex:0 0 auto">Show card</button></div>
+        <div class="hint" id="ciRes" style="margin:-4px 2px 10px;color:var(--text)"></div>
         <p class="hint">Works for calls to this phone's SIM numbers. Calls that come in through the Linkus (Yeastar) app are internet calls and can't be read by other apps.</p>`;
       el.querySelector('#ciOn').onchange = e => { AB.callerEnable(e.target.checked); toast(e.target.checked ? 'Caller card on' : 'Caller card off'); };
       const ph = el.querySelector('#ciPhone'); if (ph) ph.onclick = () => AB.callerAskPhone();
       const nt = el.querySelector('#ciNt'); if (nt) nt.onclick = () => AB.callerAskPhone();
       const ov = el.querySelector('#ciOv'); if (ov) ov.onclick = () => AB.callerAskOverlay();
-      el.querySelector('#ciTest').onclick = () => { try { AB.setCallers(JSON.stringify(build())); } catch (e) {} const v = el.querySelector('#ciNum').value; if (!AB.callerTest(v)) toast('That number is not in FitX yet'); };
+      el.querySelector('#ciTest').onclick = () => {
+        try { AB.setCallers(JSON.stringify(build())); } catch (e) {}
+        const v = el.querySelector('#ciNum').value.trim(); if (!v) { toast('Type a customer mobile number first'); return; }
+        const r = String(AB.callerTest(v));
+        const msg = r === 'nomatch' || r === 'false' ? 'That number is not saved on any customer, home client, supplier or employee in FitX.'
+          : r === 'notification' ? 'Shown as a notification – switch on “Display over other apps” to get the card on the call screen.'
+          : r.startsWith('error') ? 'Android blocked the card (' + r.slice(6).trim() + '). A notification was shown instead.'
+          : 'Card shown at the top of the screen.';
+        el.querySelector('#ciRes').textContent = msg;
+      };
     };
     openSheet('Caller ID', '<div id="ciBody"></div>', el => {
       draw(el);
