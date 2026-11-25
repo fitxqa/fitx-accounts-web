@@ -30,6 +30,13 @@
   const party = w => w.kind === 'home' ? Object.assign({}, w.home || {}, {name: (w.home || {}).name || (w.home || {}).phone || 'Home visit', homeVisit: true}) : (custById(w.customerId) || {});
   const pname = w => w.kind === 'home' ? ((w.home || {}).name || (w.home || {}).phone || 'Home visit') : cname(w.customerId);
   const pAddr = c => c.homeVisit ? blueBoard(c) : addrText(c);
+  // list line: area + the machine and problem reported
+  const woExtra = w => {
+    const area = String(party(w).area || '').trim();
+    const e = (w.equipment || []).find(x => String(x.problem || '').trim()) || (w.equipment || []).find(x => x.desc);
+    const m = e ? [e.desc, String(e.problem || '').trim()].map(x => String(x || '').trim()).filter(Boolean).join(' – ') : '';
+    return (area ? ' · <span style="white-space:nowrap">📍 ' + esc(area) + '</span>' : '') + (m ? ' · <b style="font-weight:600;color:var(--text)">' + esc(m.length > 70 ? m.slice(0, 68) + '…' : m) + '</b>' : '');
+  };
   const pMap = c => c.maps || (pAddr(c) ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(pAddr(c) + ', Qatar') : '');
   // the single customers-list account home-visit invoices are booked to (the person's details stay on the invoice)
   function homeAccount() {
@@ -133,7 +140,7 @@
         let l = db.workorders.slice().sort((a, b) => String(b.date + b.number).localeCompare(String(a.date + a.number)));
         if (ST[woTab]) l = l.filter(w => w.status === woTab); else if (woTab === 'active') l = l.filter(w => ACTIVE.includes(w.status)); else if (woTab === 'home') l = l.filter(w => w.kind === 'home');
         if (q) l = l.filter(w => (w.number + ' ' + pname(w) + ' ' + ((w.home || {}).phone || '') + ' ' + empName(w.techId) + ' ' + (w.equipment || []).map(e => [e.desc, e.brand, e.model].join(' ')).join(' ')).toLowerCase().includes(q));
-        el.querySelector('#woList').innerHTML = l.length ? l.map(w => { const [s, c] = woStatus(w); return `<button type="button" class="item r2" data-id="${w.id}"><div class="main"><div class="t">${w.kind === 'home' ? '<span title="Home visit">🏠 </span>' : ''}${esc(pname(w))}${w.priority === 'Urgent' ? ' <span style="color:var(--red)">●</span>' : ''}</div><div class="s">${esc(w.number)} · ${dfmt(w.date)}${w.time ? ' ' + esc(w.time) : ''}${empName(w.techId) ? ' · ' + esc(empName(w.techId)) : ''}</div></div><div class="r"><span class="badge ${c}">${s}</span></div></button>`; }).join('')
+        el.querySelector('#woList').innerHTML = l.length ? l.map(w => { const [s, c] = woStatus(w); return `<button type="button" class="item r2" data-id="${w.id}"><div class="main"><div class="t">${w.kind === 'home' ? '<span title="Home visit">🏠 </span>' : ''}${esc(pname(w))}${w.priority === 'Urgent' ? ' <span style="color:var(--red)">●</span>' : ''}</div><div class="s">${esc(w.number)} · ${dfmt(w.date)}${w.time ? ' ' + esc(w.time) : ''}${empName(w.techId) ? ' · ' + esc(empName(w.techId)) : ''}${woExtra(w)}</div></div><div class="r"><span class="badge ${c}">${s}</span></div></button>`; }).join('')
           : `<div class="empty">${db.workorders.length ? 'Nothing here.' : 'No work orders yet. Tap “+ New work order” for each job you send a technician to.'}</div>`;
         el.querySelectorAll('[data-id]').forEach(b => b.onclick = () => viewWO(b.dataset.id));
       };
@@ -507,7 +514,7 @@
           <div style="display:flex;gap:6px"><button type="button" class="btn" id="woHomeAll" style="min-height:34px;padding:4px 12px">See all</button><button type="button" class="btn pri" id="woHomeNew" style="min-height:34px;padding:4px 12px">+ New</button></div></div>
         <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">${tiles.map(([k, l, n]) => `<button type="button" data-ws="${k}" style="border:1px solid var(--line);border-radius:12px;background:${n && k !== 'done' ? 'var(--orange-l,#fff3ea)' : 'var(--card,#fff)'};padding:8px 6px;text-align:center;cursor:pointer;font:inherit;color:inherit">
           <div style="font-size:20px;font-weight:800;color:${n ? (k === 'done' ? 'var(--green,#1e8e4e)' : 'var(--orange-d,#c2410c)') : 'var(--muted)'}">${n}</div><div style="font-size:11.5px;color:var(--muted);line-height:1.2">${l}</div></button>`).join('')}</div>
-        ${act.length ? `<div class="list" style="margin:12px 0 0;box-shadow:none">${act.slice(0, 5).map(w => { const [st, c] = woStatus(w); return `<button type="button" class="item r2" data-wo="${w.id}"><div class="main"><div class="t">${w.kind === 'home' ? '🏠 ' : ''}${esc(pname(w))}${w.priority === 'Urgent' ? ' <span style="color:var(--red)">●</span>' : ''}</div><div class="s">${esc(w.number)} · ${dfmt(w.date)}${w.time ? ' ' + esc(w.time) : ''}${empName(w.techId) ? ' · ' + esc(empName(w.techId)) : ''}</div></div><div class="r"><span class="badge ${c}">${st}</span></div></button>`; }).join('')}</div>${act.length > 5 ? `<button type="button" class="lnk" id="woHomeMore" style="margin-top:8px">+ ${act.length - 5} more open</button>` : ''}`
+        ${act.length ? `<div class="list" style="margin:12px 0 0;box-shadow:none">${act.slice(0, 5).map(w => { const [st, c] = woStatus(w); return `<button type="button" class="item r2" data-wo="${w.id}"><div class="main"><div class="t">${w.kind === 'home' ? '🏠 ' : ''}${esc(pname(w))}${w.priority === 'Urgent' ? ' <span style="color:var(--red)">●</span>' : ''}</div><div class="s">${esc(w.number)} · ${dfmt(w.date)}${w.time ? ' ' + esc(w.time) : ''}${empName(w.techId) ? ' · ' + esc(empName(w.techId)) : ''}${woExtra(w)}</div></div><div class="r"><span class="badge ${c}">${st}</span></div></button>`; }).join('')}</div>${act.length > 5 ? `<button type="button" class="lnk" id="woHomeMore" style="margin-top:8px">+ ${act.length - 5} more open</button>` : ''}`
           : `<p class="hint" style="margin:12px 2px 0">No open work orders. Tap “+ New” when a job comes in.</p>`}
         ${amcLine ? `<div class="hint" style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span>${esc(amcLine)}</span><button type="button" class="lnk" id="woHomeA">Open AMC</button></div>` : ''}`;
       // place it just before "Recent invoices & quotes" (or near the top if that section isn't there)
