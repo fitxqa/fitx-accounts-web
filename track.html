@@ -47,7 +47,7 @@
   const fail = t => { m.innerHTML = '<div class="card err">' + t + '</div>'; };
   if (!token || !/^[a-z0-9]{10,40}$/i.test(token)) { fail('This tracking link is not complete. Please open the full link you received.'); return; }
   let fs;
-  try { firebase.initializeApp(window.FITX_FIREBASE); fs = firebase.firestore(); } catch (e) { fail('Tracking is not available right now.'); return; }
+  try { firebase.initializeApp(window.FITX_FIREBASE); fs = firebase.firestore(); } catch (e) { fail('Tracking is not available right now.<br><small style="color:#aaa">(start: ' + esc(e && e.message) + ')</small>'); return; }
   const STEPS = [['open', 'Job received'], ['assigned', 'Technician assigned'], ['progress', 'Work in progress'], ['done', 'Completed']];
   const SIDE = {parts: ['Waiting for spare parts', 'yellow', 'We are waiting for spare parts for your machine. We will continue as soon as they arrive.'],
     approval: ['Waiting for your approval', 'blue', 'We have sent you the quotation. Please confirm so we can continue the work.'],
@@ -78,7 +78,7 @@
       <p class="live"><b>●</b> Live – this page updates by itself · last change ${esc(when(r.updated))}</p>`;
   }
   fs.collection('track').doc(token).onSnapshot(s => { if (!s.exists) { fail('We could not find this job. The link may have expired – please contact us.'); return; } draw(s.data()); },
-    () => fail('Tracking is not available right now. Please try again later or contact us.'));
+    e => fail('Tracking is not available right now. Please try again later or contact us.<br><small style="color:#aaa">(' + esc((e && (e.code || e.message)) || 'error') + ')</small>'));
 })();
 </script>
 </body>
