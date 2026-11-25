@@ -22,6 +22,9 @@
         const m = [e.desc, e.brand, e.model].map(x => String(x || '').trim()).filter(Boolean).join(' ');
         out.push('   ' + (m || 'Machine') + (String(e.problem || '').trim() ? ' – ' + String(e.problem).trim() : ''));
       });
+      // what the technician has done so far
+      const done = String(w.work || '').trim().split('\n')[0];
+      if (done) out.push('   ✔ ' + (done.length > 90 ? done.slice(0, 88) + '…' : done));
     });
     if (!act.length) { const last = list.filter(w => w.status === 'done').sort((a, b) => String(b.doneDate || b.date).localeCompare(String(a.doneDate || a.date)))[0]; if (last) out.push(`Last job ${last.number} · completed ${dfmt(last.doneDate || last.date)}`); }
     return {lines: out, open: act[0]};
@@ -42,8 +45,7 @@
     (db.homeclients || []).forEach(h => {
       const w = woLines(wos.filter(x => x.kind === 'home' && key((x.home || {}).phone) === key(h.phone)));
       const lines = w.lines.slice();
-      const lab = (v, l) => { v = String(v || '').trim(); return !v ? '' : /^\d+[a-z]?$/i.test(v) ? l + ' ' + v : v; };   // add Bldg / St / Zone only to a bare number
-      const addr = [lab(h.building, 'Bldg'), lab(h.street, 'St'), lab(h.zone, 'Zone'), (h.area || '').trim()].filter(Boolean).join(' · '); if (addr) lines.push('🏠 ' + addr);
+      if (String(h.area || '').trim()) lines.push('📍 ' + String(h.area).trim());   // area only – the full address is on the work order
       if (!lines.length) lines.push('Home visit client');
       put(h.phone, {n: h.name || h.phone, k: 'Home visit client', l: lines, o: w.open ? 'wo:' + w.open.id : 'newwo:' + h.phone});
     });
