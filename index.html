@@ -786,7 +786,14 @@ const ICON = {
 };
 
 /* ---------- data ---------- */
-const KEY = 'fitx_accounts_v1';
+// Several companies on one device (e.g. FitX, Expert Solutions, GYM FiX): each company keeps its own data
+// under its own storage key, and its own cloud link. "main" is the original company (key unchanged).
+const CO_LIST_KEY = 'fitx_companies', CO_ACTIVE_KEY = 'fitx_companies_active';
+const coList = () => { let l = null; try { l = JSON.parse(localStorage.getItem(CO_LIST_KEY)); } catch (e) {} if (!Array.isArray(l) || !l.some(c => c.id === 'main')) l = [{id: 'main', name: ''}].concat(Array.isArray(l) ? l.filter(c => c.id !== 'main') : []); return l; };
+const ACTIVE_CO = (() => { let a = 'main'; try { a = localStorage.getItem(CO_ACTIVE_KEY) || 'main'; } catch (e) {} return coList().some(c => c.id === a) ? a : 'main'; })();
+const KEY = ACTIVE_CO === 'main' ? 'fitx_accounts_v1' : 'fitx_accounts_v1__' + ACTIVE_CO;
+// logo mark on documents when no logo is uploaded: the FitX mark for FitX only
+function plogoHTML(sub) { return ACTIVE_CO === 'main' ? '<div class="plogo">Fit<span>X</span></div>' + (sub ? '<div class="psub">SPORTS EQUIPMENT SERVICES</div>' : '') : ''; }
 const INV_TERMS = `1. Payment is due by the due date shown. Pay via Fawran to CR No. 227216, cash or bank transfer.
 2. Goods supplied remain the property of FitX until paid in full.
 3. Spare parts carry the manufacturer's warranty; labour is warranted for 30 days from the service date.
@@ -812,14 +819,25 @@ const DEFAULT = () => ({
   },
   customers: [], items: [], moves: [], docs: [], expenses: [], suppliers: [], purchases: [], accounts: [], journals: [], recons: []
 });
+// a newly added company starts with its own name and none of FitX's contact details, stamp or terms
+const DEFAULT_MAIN = DEFAULT;
+function coDefault() {
+  const d = DEFAULT_MAIN();
+  if (ACTIVE_CO === 'main') return d;
+  const co = coList().find(c => c.id === ACTIVE_CO) || {};
+  const nm = co.name || 'My company';
+  const clean = t => String(t).replace(/ to CR No\. 227216/g, '').replace(/FitX Sports Equipment Services|FitX/g, nm);
+  Object.assign(d.settings, {name: nm, phone: '', email: '', web: '', cr: '', address: 'Doha, Qatar', logo: '', payNote: '', stampOn: false, invTerms: clean(d.settings.invTerms), quoTerms: clean(d.settings.quoTerms)});
+  return d;
+}
 let db;
 function load() {
   try {
     const raw = localStorage.getItem(KEY);
     const d = raw ? JSON.parse(raw) : null;
-    const def = DEFAULT();
+    const def = coDefault();
     db = d ? Object.assign(def, d, {settings: Object.assign(def.settings, d.settings || {})}) : def;
-  } catch (e) { db = DEFAULT(); }
+  } catch (e) { db = coDefault(); }
   const st = db.settings;
   if (st.terms !== undefined) { const oldDefault = 'Thank you for your business.\nWarranty on parts as per manufacturer terms. Labour warranty 30 days.';
     if (st.terms.trim() && st.terms !== oldDefault && st.invTerms === INV_TERMS) st.invTerms = st.terms; delete st.terms; }
@@ -2014,7 +2032,7 @@ function reportHTML(d, kind) {
   const s = S(); const c = custById(d.customerId) || {};
   const ins = kind === 'insp'; const R = (ins ? d.insp : d.wcr) || {};
   const title = ins ? 'INSPECTION REPORT' : 'WORK COMPLETION REPORT', ar = ins ? 'تقرير الفحص' : 'تقرير إنجاز العمل';
-  const brand = `<div class="pbrand">${s.logo ? `<img class="logoimg" src="${s.logo}" alt="${esc(s.name)}">` : '<div class="plogo">Fit<span>X</span></div>'}<div class="pname">${esc(s.name)}</div></div>`;
+  const brand = `<div class="pbrand">${s.logo ? `<img class="logoimg" src="${s.logo}" alt="${esc(s.name)}">` : plogoHTML()}<div class="pname">${esc(s.name)}</div></div>`;
   const coLines = `${esc(s.address)}<br>Tel: ${esc(s.phone)} · ${esc(s.email)}<br>${esc(s.web)}${s.cr ? '<br>CR No. ' + esc(s.cr) : ''}`;
   const custLines = `<b>${esc(c.name || '')}</b>${c.contact ? '<br>Attn: ' + esc(c.contact) : ''}${addrText(c) ? '<br>' + esc(addrText(c)) : ''}${c.phone ? '<br>Tel: ' + esc(c.phone) : ''}`;
   const lines = d.lines || [];
@@ -2108,7 +2126,7 @@ function docHTML(d, layout) {
   if (d._pro) st = d._advPaid >= d._advReq - 0.004 ? 'Advance paid' : 'Advance due';
   if (d._so) st = d.status === 'Converted' ? 'Invoiced' : 'Confirmed';
   const stampColor = st === 'Paid' || st === 'Advance paid' ? '#1a9e5f' : st.startsWith('Overdue') ? '#d62828' : st === 'Cancelled' ? '#777' : '#ff6a00';
-  const brand = `<div class="pbrand">${s.logo ? `<img class="logoimg" src="${s.logo}" alt="${esc(s.name)}">` : '<div class="plogo">Fit<span>X</span></div>'}<div class="pname">${esc(s.name)}</div></div>`;
+  const brand = `<div class="pbrand">${s.logo ? `<img class="logoimg" src="${s.logo}" alt="${esc(s.name)}">` : plogoHTML()}<div class="pname">${esc(s.name)}</div></div>`;
   const cashInv = isInv && d.payType === 'cash', creditInv = isInv && d.payType === 'credit';
   const title = d._so ? 'SALES ORDER' : d._pro ? 'PROFORMA INVOICE' : cashInv ? 'CASH INVOICE' : creditInv ? 'CREDIT INVOICE' : isInv ? 'INVOICE' : 'QUOTATION';
   const arTitle = d._so ? 'أمر بيع' : d._pro ? 'فاتورة مبدئية' : cashInv ? 'فاتورة نقدية' : creditInv ? 'فاتورة آجلة' : isInv ? 'فاتورة' : 'عرض سعر';
@@ -3563,9 +3581,9 @@ function secLedger(L, P, who) {
 /* printable wrapper with FitX letterhead */
 function reportPaper(title, arTitle, sub, body) {
   const s = S();
-  const logo = s.logo ? `<img class="logoimg" src="${s.logo}" alt="${esc(s.name)}">` : `<div class="plogo">Fit<span>X</span></div><div class="psub">SPORTS EQUIPMENT SERVICES</div>`;
+  const logo = s.logo ? `<img class="logoimg" src="${s.logo}" alt="${esc(s.name)}">` : plogoHTML(true);
   return `<div class="paper">
-    <div class="ph"><div class="pbrand">${s.logo ? `<img class="logoimg" src="${s.logo}" alt="${esc(s.name)}">` : '<div class="plogo">Fit<span>X</span></div>'}<div class="pname">${esc(s.name)}</div></div><div class="pco">${esc(s.address)}<br>Tel: ${esc(s.phone)} · ${esc(s.email)}<br>${esc(s.web)}${s.cr ? '<br>CR No. ' + esc(s.cr) : ''}</div></div>
+    <div class="ph"><div class="pbrand">${s.logo ? `<img class="logoimg" src="${s.logo}" alt="${esc(s.name)}">` : plogoHTML()}<div class="pname">${esc(s.name)}</div></div><div class="pco">${esc(s.address)}<br>Tel: ${esc(s.phone)} · ${esc(s.email)}<br>${esc(s.web)}${s.cr ? '<br>CR No. ' + esc(s.cr) : ''}</div></div>
     <div class="ptitle"><div><h2>${esc(title.toUpperCase())}</h2>${arTitle ? `<div class="ar" dir="rtl" lang="ar">${arTitle}</div>` : ''}</div><div style="text-align:right;font-size:11px;color:#555">${esc(sub)}<br>Generated ${dfmt(today())}</div></div>
     ${body}
     <div class="pf">${esc(s.name)} · ${esc(s.phone)} · ${esc(s.email)} · ${esc(s.web)}</div>
@@ -3684,7 +3702,7 @@ function stmtPaper(kind, id, f, t) {
 /* customer statement – FitX Pro style */
 function custStmtPro(cid, f, t, sup) {
   const s = S(), c = (sup ? supById(cid) : custById(cid)) || {}, L = sup ? supLedger(cid, f, t) : custLedger(cid, f, t), td = today();
-  const brand = `<div class="pbrand">${s.logo ? `<img class="logoimg" src="${s.logo}" alt="${esc(s.name)}">` : '<div class="plogo">Fit<span>X</span></div>'}<div class="pname">${esc(s.name)}</div></div>`;
+  const brand = `<div class="pbrand">${s.logo ? `<img class="logoimg" src="${s.logo}" alt="${esc(s.name)}">` : plogoHTML()}<div class="pname">${esc(s.name)}</div></div>`;
   const coLines = `${esc(s.address)}<br>Tel: ${esc(s.phone)} · ${esc(s.email)}<br>${esc(s.web)}${s.cr ? '<br>CR No. ' + esc(s.cr) : ''}`;
   const custLines = `<b>${esc(c.name || '')}</b>${c.contact ? '<br>Attn: ' + esc(c.contact) : ''}${addrText(c) ? '<br>' + esc(addrText(c)) : ''}${c.phone ? '<br>Tel: ' + esc(c.phone) : ''}${c.email ? '<br>' + esc(c.email) : ''}`;
   const bal = d => sup ? purBal(d) : docBal(d), tot = d => sup ? purNet(d) : docTotal(d);
@@ -3991,7 +4009,7 @@ function viewBackup() {
     el.querySelector('#bReset').onclick = () => {
       if (!confirm('Erase ALL data on this phone? Make a backup first.')) return;
       if (prompt('Type DELETE to confirm') !== 'DELETE') return;
-      db = DEFAULT(); save(); closeSheet(() => { state.tab = 'home'; render(); toast('All data erased'); });
+      db = coDefault(); save(); closeSheet(() => { state.tab = 'home'; render(); toast('All data erased'); });
     };
   });
 }
@@ -4020,6 +4038,7 @@ render();
 <script src="porders.js"></script>
 <script src="returns.js"></script>
 <script src="production.js"></script>
+<script src="companies.js"></script>
 <script src="prodicons.js"></script>
 <script src="voucher.js"></script>
 <script src="units.js"></script>

@@ -124,7 +124,7 @@
     const party = cn ? (custById(n.customerId) || {}) : (supById(n.supplierId) || {});
     const par = cn ? docById(n.invoiceId) : purById(n.purchaseId);
     const T = cn ? cnTotal(n) : dnTotal(n), R = refunded(n);
-    const brand = `<div class="pbrand">${s.logo ? `<img class="logoimg" src="${s.logo}" alt="${esc(s.name)}">` : '<div class="plogo">Fit<span>X</span></div>'}<div class="pname">${esc(s.name)}</div></div>`;
+    const brand = `<div class="pbrand">${s.logo ? `<img class="logoimg" src="${s.logo}" alt="${esc(s.name)}">` : plogoHTML()}<div class="pname">${esc(s.name)}</div></div>`;
     const coLines = `${esc(s.address)}<br>Tel: ${esc(s.phone)} · ${esc(s.email)}<br>${esc(s.web)}${s.cr ? '<br>CR No. ' + esc(s.cr) : ''}`;
     const who = `<b>${esc(party.name || '')}</b>${party.contact ? '<br>Attn: ' + esc(party.contact) : ''}${party.phone ? '<br>Tel: ' + esc(party.phone) : ''}${party.email ? '<br>' + esc(party.email) : ''}`;
     const rows = (n.lines || []).map((l, i) => {

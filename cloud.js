@@ -22,6 +22,9 @@
   // settings are compared with sorted keys so two devices never ping-pong the same values
   const sortKeys = v => Array.isArray(v) ? v.map(sortKeys) : (v && typeof v === 'object') ? Object.keys(v).sort().reduce((o, k) => (o[k] = sortKeys(v[k]), o), {}) : v;
   const stable = v => JSON.stringify(sortKeys(v));
+  // which cloud company this device's active company uses: the original company keeps users/{uid}.cid,
+  // other companies are kept in users/{uid}.cids[localCompanyId]
+  const coLink = (cid, email) => ACTIVE_CO === 'main' ? {cid, email} : {cids: {[ACTIVE_CO]: cid}, email};
   const lsGet = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } };
   const lsSet = (k, v) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 
@@ -188,7 +191,7 @@
 
   /* adopt the cloud copy as this device's data */
   function adoptInitial() {
-    const fresh = DEFAULT();
+    const fresh = (window.coDefault || DEFAULT)();
     const merged = Object.assign(fresh, {settings: Object.assign(fresh.settings, C._initialSettings || {}, C._initialCounters || {})});
     cols.forEach(col => { merged[col] = (C._initial[col] || []).sort((a, b) => String(a.id).localeCompare(String(b.id))); });
     // a technician cannot read every collection: keep their local copy of the rest empty
@@ -494,16 +497,20 @@
         <div class="cl-err" id="clErr" role="alert"></div>
         ${inv ? '' : '<p class="hint">Joining someone else\'s company? Ask the owner to invite <b>' + esc(C.user.email) + '</b> in Menu → Cloud &amp; team, then tap “Check again”.</p><button type="button" class="btn full" id="clAgain">Check again</button>'}
       </div>
+      ${ACTIVE_CO !== 'main' ? '<button type="button" class="btn full" id="clLocal" style="margin-top:10px">Keep this company on this device only (no cloud)</button>' : ''}
+      ${window.FitxCo && FitxCo.list().length > 1 ? '<button type="button" class="btn full" id="clSwitch" style="margin-top:10px">Switch company</button>' : ''}
       <button type="button" class="btn full" id="clOut" style="margin-top:10px">Sign out</button>`, w => {
       const er = w.querySelector('#clErr');
       w.querySelector('#clOut').onclick = () => auth.signOut();
+      const lo = w.querySelector('#clLocal'); if (lo) lo.onclick = () => { lsSet(LS_OFFLINE, true); closeWrap(); render(); };
+      const sw = w.querySelector('#clSwitch'); if (sw) sw.onclick = () => { closeWrap(); FitxCo.open(); };
       const again = w.querySelector('#clAgain'); if (again) again.onclick = () => companyScreen();
       const join = w.querySelector('#clJoin');
       if (join) join.onclick = async () => {
         join.disabled = true;
         try {
           await fs.collection('companies').doc(inv.cid).collection('members').doc(C.user.uid).set({role: inv.role, email: em, name: C.user.displayName || '', joined: firebase.firestore.FieldValue.serverTimestamp()});
-          await fs.collection('users').doc(C.user.uid).set({cid: inv.cid, email: em}, {merge: true});
+          await fs.collection('users').doc(C.user.uid).set(coLink(inv.cid, em), {merge: true});
           try { await fs.collection('invites').doc(em).delete(); } catch (e) {}
           closeWrap(); attach(inv.cid, inv.role, 'download');
         } catch (e) { er.textContent = fbErr(e); join.disabled = false; }
@@ -514,7 +521,7 @@
           const ref = fs.collection('companies').doc();
           await ref.set({name: S().name, owner: C.user.uid, created: firebase.firestore.FieldValue.serverTimestamp()});
           await ref.collection('members').doc(C.user.uid).set({role: 'owner', email: em, name: C.user.displayName || '', joined: firebase.firestore.FieldValue.serverTimestamp()});
-          await fs.collection('users').doc(C.user.uid).set({cid: ref.id, email: em}, {merge: true});
+          await fs.collection('users').doc(C.user.uid).set(coLink(ref.id, em), {merge: true});
           closeWrap(); attach(ref.id, 'owner', 'upload');
         } catch (e) { er.textContent = fbErr(e); ev.target.disabled = false; }
       };
@@ -692,7 +699,7 @@
     let cid = null, role = null;
     try {
       const u = await fs.collection('users').doc(user.uid).get();
-      cid = u.exists ? u.data().cid : null;
+      cid = u.exists ? (ACTIVE_CO === 'main' ? u.data().cid : (u.data().cids || {})[ACTIVE_CO]) || null : null;
       if (cid) {
         const m = await fs.collection('companies').doc(cid).collection('members').doc(user.uid).get();
         role = m.exists ? m.data().role : null;
@@ -703,7 +710,7 @@
       const l = lsGet(LS_LINK);
       if (l && l.uid === user.uid) { cid = l.cid; role = l.role || null; }
     }
-    if (!cid) { companyScreen(); return; }
+    if (!cid) { if (ACTIVE_CO !== 'main' && lsGet(LS_OFFLINE)) { render(); return; } companyScreen(); return; }
     attach(cid, role, 'auto'); // remembers the link once the data is in place
   });
 })();
