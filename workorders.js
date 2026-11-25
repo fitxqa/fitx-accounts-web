@@ -87,6 +87,7 @@
     .wo-ph .ph img{width:100%;height:100%;object-fit:cover}.wo-ph .ph button{position:absolute;top:2px;right:2px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:12px;cursor:pointer}
     .wo-ph label.add{width:76px;height:76px;border-radius:10px;border:2px dashed var(--line2);display:grid;place-items:center;color:var(--muted);font-size:26px;cursor:pointer}
     .wo-sig{width:100%;height:150px;border:1px solid var(--line2);border-radius:10px;background:#fff;touch-action:none;display:block}
+    .wo-hc svg,#woHomeCard svg{width:22px;height:22px}
     .wo-av{width:36px;height:36px;border-radius:50%;background:var(--orange);color:#fff;display:grid;place-items:center;font-weight:700;flex:0 0 auto}
     .wo-eq{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;background:var(--card,#fff)}
     .paper .wo-photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}.paper .wo-photos img{width:100%;height:150px;object-fit:cover;border-radius:6px;border:1px solid #ebebef}
@@ -463,7 +464,7 @@
       if (!act && !vd && !idue && !ren) return r;
       const parts = [act && `<b>${act}</b> open work order${act > 1 ? 's' : ''}`, vd && `<b>${vd}</b> AMC visit${vd > 1 ? 's' : ''} to schedule`, idue && `<b>${idue}</b> AMC invoice${idue > 1 ? 's' : ''} due`, ren && `<b>${ren}</b> contract${ren > 1 ? 's' : ''} to renew`].filter(Boolean);
       const card = document.createElement('div'); card.id = 'woHomeCard'; card.className = 'card'; card.style.cssText = 'margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap';
-      card.innerHTML = `<div style="flex:1;min-width:200px">${ICON.wrench || ''} ${parts.join(' · ')}</div><button type="button" class="btn" id="woHomeW">Work orders</button>${db.amcs.length ? '<button type="button" class="btn" id="woHomeA">AMC</button>' : ''}`;
+      card.innerHTML = `<div style="flex:1;min-width:200px;display:flex;gap:8px;align-items:center"><span style="width:22px;height:22px;flex:0 0 22px;color:var(--orange);display:inline-flex">${ICON.wrench || ''}</span><span>${parts.join(' · ')}</span></div><button type="button" class="btn" id="woHomeW">Work orders</button>${db.amcs.length ? '<button type="button" class="btn" id="woHomeA">AMC</button>' : ''}`;
       main.insertBefore(card, main.firstElementChild ? main.firstElementChild.nextSibling : null);
       card.querySelector('#woHomeW').onclick = listWO; const ha = card.querySelector('#woHomeA'); if (ha) ha.onclick = listAMC;
     } catch (e) {}
