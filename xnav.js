@@ -119,6 +119,16 @@
     body.xstyle.side-mini .xi .xc,body.xstyle.side-mini .xi .xadd,body.xstyle.side-mini .xsub{display:none!important}
     body.xstyle.side-mini .xnav{margin:0 -8px}
     body.xstyle.side-mini .xi>span.xl{display:none}
+    body.xstyle.side-mini .xi.xhov{background:#1f1f2a;color:#fff}
+    .xfly{position:fixed;z-index:300;min-width:240px;max-width:320px;max-height:calc(100vh - 16px);overflow-y:auto;background:#17171f;border:1px solid #2c2c3a;border-radius:12px;box-shadow:0 16px 40px rgba(0,0,0,.45);padding:6px 0;animation:xflyIn .12s ease-out}
+    @keyframes xflyIn{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}
+    .xfly .xft{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:8px 12px 8px 16px;color:#fff;font:700 14px inherit;text-align:left;border-bottom:1px solid #2a2a38;margin-bottom:4px}
+    .xfly .xft svg{color:var(--orange);flex-shrink:0}
+    .xfly .xft .xl{flex:1;white-space:nowrap}
+    .xfly.xone{padding:0}.xfly.xone .xft{border-bottom:0;margin:0;padding:10px 12px 10px 16px;cursor:pointer;border-radius:12px}
+    .xfly.xone .xft:hover{background:#1f1f2a}
+    .xfly .xs{padding:8px 12px 8px 16px}
+    .xfly .xs .xl{white-space:nowrap}
     body.xstyle:not(.side-mini){--side:256px}
     body.xstyle .xi>span.xl,body.xstyle .xs>span.xl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     body.xstyle .xsearch{white-space:nowrap}
@@ -153,15 +163,19 @@
     const k = curKey(), M = MENU();
     if (openGroup === null) { const g = M.find(m => Array.isArray(m[2]) && m[2].some(s => s[1] && s[1] === k)); openGroup = g ? g[1] : ''; }
     nav.innerHTML = `<button type="button" class="xsearch" data-xs="1" title="Open anything (Ctrl+F)">${svg('search', 15)}Open anything<kbd>Ctrl+F</kbd></button>` + M.map(([ic, label, x], gi) => {
-      if (!Array.isArray(x)) return `<div class="xg"><button type="button" class="xi${x.key && x.key === k ? ' on' : ''}" data-g="${gi}" title="${esc(label)}">${svg(ic)}<span class="xl">${esc(label)}</span>${x.add ? `<span class="xadd" data-ga="${gi}" title="New">+</span>` : ''}</button></div>`;
+      if (!Array.isArray(x)) return `<div class="xg"><button type="button" class="xi${x.key && x.key === k ? ' on' : ''}" data-g="${gi}" aria-label="${esc(label)}">${svg(ic)}<span class="xl">${esc(label)}</span>${x.add ? `<span class="xadd" data-ga="${gi}" title="New">+</span>` : ''}</button></div>`;
       const hasOn = x.some(s => s[1] && s[1] === k), open = openGroup === label;
-      return `<div class="xg${open ? ' open' : ''}${hasOn ? ' has-on' : ''}"><button type="button" class="xi" data-g="${gi}" title="${esc(label)}" aria-expanded="${open}">${svg(ic)}<span class="xl">${esc(label)}</span><span class="xc"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></span></button>
+      return `<div class="xg${open ? ' open' : ''}${hasOn ? ' has-on' : ''}"><button type="button" class="xi" data-g="${gi}" aria-label="${esc(label)}" aria-expanded="${open}">${svg(ic)}<span class="xl">${esc(label)}</span><span class="xc"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></span></button>
         <div class="xsub">${x.map((s, si) => `<button type="button" class="xs${s[1] && s[1] === k ? ' on' : ''}" data-g="${gi}" data-s="${si}"><span class="xl">${esc(s[0])}</span>${s[3] ? `<span class="xadd" data-g="${gi}" data-sa="${si}" title="New ${esc(s[0])}">+</span>` : ''}</button>`).join('')}</div></div>`;
     }).join('');
   }
   function onClick(e) {
     const nav = e.target.closest('.xnav'); if (!nav) return;
     e.stopPropagation();
+    act(e.target);
+  }
+  function act(target) {
+    const e = {target};
     if (e.target.closest('[data-xs]')) { openAnything(); setTimeout(collapse, 0); return; }
     const M = MENU();
     const a = e.target.closest('[data-sa]'), ga = e.target.closest('[data-ga]');
@@ -172,9 +186,47 @@
     const g = e.target.closest('[data-g]'); if (!g) return;
     const item = M[g.dataset.g];
     if (!Array.isArray(item[2])) { openGroup = ''; item[2].open(); setTimeout(collapse, 0); return; }
-    if (document.body.classList.contains('side-mini')) { const t = document.getElementById('sideTog'); if (t) t.click(); openGroup = item[1]; build(); return; }
+    if (document.body.classList.contains('side-mini')) { flyShow(g.closest('.xi') || g, true); return; }   // icons only: show the group beside the icon, keep the menu small
     openGroup = openGroup === item[1] ? '' : item[1]; build();
   }
+
+  /* icons-only menu: hover an icon → its sub-menu opens beside it (click a name to open, + to create) */
+  let fly = null, flyFor = null, flyTimer = null;
+  const isMini = () => document.body.classList.contains('side-mini') && innerWidth >= 768 && getStyle() === 'x';
+  function flyHide() { clearTimeout(flyTimer); if (fly) { fly.remove(); fly = null; } if (flyFor) flyFor.classList.remove('xhov'); flyFor = null; }
+  const flyLater = () => { clearTimeout(flyTimer); flyTimer = setTimeout(flyHide, 280); };
+  function flyShow(xi, keep) {
+    clearTimeout(flyTimer);
+    if (!xi || !isMini()) return;
+    if (flyFor === xi && fly) return;
+    flyHide();
+    const gi = +xi.dataset.g, item = MENU()[gi]; if (!item) return;
+    const [ic, label, x] = item, k = curKey();
+    let html;
+    if (Array.isArray(x)) html = `<div class="xft">${svg(ic)}<span class="xl">${esc(label)}</span></div>` +
+      x.map((s, si) => `<button type="button" class="xs${s[1] && s[1] === k ? ' on' : ''}" data-g="${gi}" data-s="${si}"><span class="xl">${esc(s[0])}</span>${s[3] ? `<span class="xadd" data-g="${gi}" data-sa="${si}" title="New">+</span>` : ''}</button>`).join('');
+    else html = `<button type="button" class="xft one" data-g="${gi}">${svg(ic)}<span class="xl">${esc(label)}</span>${x.add ? `<span class="xadd" data-ga="${gi}" title="New">+</span>` : ''}</button>`;
+    fly = document.createElement('div'); fly.className = 'xfly' + (Array.isArray(x) ? '' : ' xone'); fly.innerHTML = html;
+    document.body.appendChild(fly);
+    const r = xi.getBoundingClientRect(), h = fly.offsetHeight;
+    let top = Array.isArray(x) ? r.top - 6 : r.top + r.height / 2 - h / 2;
+    top = Math.max(8, Math.min(top, innerHeight - h - 8));
+    fly.style.left = (r.right + 10) + 'px'; fly.style.top = top + 'px';
+    fly.style.setProperty('--ay', Math.max(10, Math.min(h - 22, r.top + r.height / 2 - top - 6)) + 'px');
+    flyFor = xi; xi.classList.add('xhov');
+    fly.addEventListener('mouseenter', () => clearTimeout(flyTimer));
+    fly.addEventListener('mouseleave', flyLater);
+    fly.addEventListener('click', ev => { if (!ev.target.closest('[data-g],[data-ga]')) return; ev.stopPropagation(); const t = ev.target; flyHide(); act(t); });
+  }
+  const sideEl = document.getElementById('side');
+  if (sideEl) {
+    sideEl.addEventListener('mouseover', e => { const xi = e.target.closest('.xnav .xi'); if (xi) flyShow(xi); else if (fly) flyLater(); });
+    sideEl.addEventListener('mouseleave', () => { if (fly) flyLater(); });
+    sideEl.addEventListener('scroll', flyHide, true);
+  }
+  window.addEventListener('resize', flyHide);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && fly) { e.stopPropagation(); flyHide(); } }, true);
+  document.addEventListener('click', e => { if (fly && !e.target.closest('.xfly') && !e.target.closest('.xnav .xi')) flyHide(); }, true);
 
   /* Open anything: pages + the normal search (customers, invoices, parts, suppliers) */
   function openAnything() {
