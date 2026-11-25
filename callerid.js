@@ -19,8 +19,8 @@
       out.push(`🔧 ${w.number} · ${ST[w.status] || w.status}${emp(w.techId) ? ' · ' + emp(w.techId).split(' ')[0] : ''} · ${daysAgo(w.date)}`);
       // machine and the problem the customer reported
       (w.equipment || []).filter(e => e.desc || e.problem).slice(0, act.length > 1 ? 1 : 2).forEach(e => {
-        const m = [e.desc, e.brand, e.model].filter(Boolean).join(' ');
-        out.push('   ' + (m || 'Machine') + (e.problem ? ' – ' + e.problem : ''));
+        const m = [e.desc, e.brand, e.model].map(x => String(x || '').trim()).filter(Boolean).join(' ');
+        out.push('   ' + (m || 'Machine') + (String(e.problem || '').trim() ? ' – ' + String(e.problem).trim() : ''));
       });
     });
     if (!act.length) { const last = list.filter(w => w.status === 'done').sort((a, b) => String(b.doneDate || b.date).localeCompare(String(a.doneDate || a.date)))[0]; if (last) out.push(`Last job ${last.number} · completed ${dfmt(last.doneDate || last.date)}`); }
@@ -42,7 +42,8 @@
     (db.homeclients || []).forEach(h => {
       const w = woLines(wos.filter(x => x.kind === 'home' && key((x.home || {}).phone) === key(h.phone)));
       const lines = w.lines.slice();
-      const addr = [h.building && 'Bldg ' + h.building, h.street && 'St ' + h.street, h.zone && 'Zone ' + h.zone].filter(Boolean).join(' · '); if (addr) lines.push('🏠 ' + addr);
+      const lab = (v, l) => { v = String(v || '').trim(); return !v ? '' : /^\d+[a-z]?$/i.test(v) ? l + ' ' + v : v; };   // add Bldg / St / Zone only to a bare number
+      const addr = [lab(h.building, 'Bldg'), lab(h.street, 'St'), lab(h.zone, 'Zone'), (h.area || '').trim()].filter(Boolean).join(' · '); if (addr) lines.push('🏠 ' + addr);
       if (!lines.length) lines.push('Home visit client');
       put(h.phone, {n: h.name || h.phone, k: 'Home visit client', l: lines, o: w.open ? 'wo:' + w.open.id : 'newwo:' + h.phone});
     });

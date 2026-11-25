@@ -25,7 +25,7 @@
   /* home visits: private people identified by mobile, kept in db.homeclients – never mixed into Customers */
   const digits = v => String(v || '').replace(/\D/g, '').replace(/^00974|^974/, '');
   const homeByPhone = ph => { const d = digits(ph); return d ? db.homeclients.find(h => digits(h.phone) === d) : null; };
-  const blueBoard = h => [h.building && 'Building ' + h.building, h.street && 'Street ' + h.street, h.zone && 'Zone ' + h.zone, h.area].filter(Boolean).join(', ');
+  const blueBoard = h => { const lab = (v, l) => { v = String(v || '').trim(); return !v ? '' : /^\d+[a-z]?$/i.test(v) ? l + ' ' + v : v; }; return [lab(h.building, 'Building'), lab(h.street, 'Street'), lab(h.zone, 'Zone'), (h.area || '').trim()].filter(Boolean).join(', '); };
   // the person / company a job is for, in the shape of a customer record
   const party = w => w.kind === 'home' ? Object.assign({}, w.home || {}, {name: (w.home || {}).name || (w.home || {}).phone || 'Home visit', homeVisit: true}) : (custById(w.customerId) || {});
   const pname = w => w.kind === 'home' ? ((w.home || {}).name || (w.home || {}).phone || 'Home visit') : cname(w.customerId);
