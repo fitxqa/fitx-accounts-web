@@ -121,16 +121,17 @@
 
   /* =================== WORK ORDERS =================== */
   let woTab = 'active';
-  function listWO() {
+  function listWO(tab) {
+    if (typeof tab === 'string') woTab = tab;
     openSheet('Work orders', `
       <button type="button" class="btn pri full" id="woNew" style="margin-bottom:12px">+ New work order</button>
-      <div class="chips" id="woTabs" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));overflow:visible;margin-bottom:10px">${[['active', 'Open'], ['home', '🏠 Home'], ['done', 'Done'], ['all', 'All']].map(([k, l]) => `<button type="button" class="chip ${woTab === k ? 'on' : ''}" data-t="${k}" style="justify-content:center;padding:7px 4px">${l}</button>`).join('')}</div>
+      <div class="chips" id="woTabs" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));overflow:visible;margin-bottom:10px">${[['active', 'Open'], ['home', '🏠 Home'], ['done', 'Done'], ['all', 'All']].map(([k, l]) => `<button type="button" class="chip ${woTab === k || (k === 'active' && ST[woTab] && woTab !== 'done' && woTab !== 'cancelled') ? 'on' : ''}" data-t="${k}" style="justify-content:center;padding:7px 4px">${l}</button>`).join('')}</div>
       <input class="search" id="woQ" placeholder="Search name, mobile, WO no." aria-label="Search">
       <div class="list" id="woList"></div>`, el => {
       const draw = () => {
         const q = el.querySelector('#woQ').value.trim().toLowerCase();
         let l = db.workorders.slice().sort((a, b) => String(b.date + b.number).localeCompare(String(a.date + a.number)));
-        if (woTab === 'active') l = l.filter(w => ACTIVE.includes(w.status)); else if (woTab === 'done') l = l.filter(w => w.status === 'done'); else if (woTab === 'home') l = l.filter(w => w.kind === 'home');
+        if (ST[woTab]) l = l.filter(w => w.status === woTab); else if (woTab === 'active') l = l.filter(w => ACTIVE.includes(w.status)); else if (woTab === 'home') l = l.filter(w => w.kind === 'home');
         if (q) l = l.filter(w => (w.number + ' ' + pname(w) + ' ' + ((w.home || {}).phone || '') + ' ' + empName(w.techId) + ' ' + (w.equipment || []).map(e => [e.desc, e.brand, e.model].join(' ')).join(' ')).toLowerCase().includes(q));
         el.querySelector('#woList').innerHTML = l.length ? l.map(w => { const [s, c] = woStatus(w); return `<button type="button" class="item r2" data-id="${w.id}"><div class="main"><div class="t">${w.kind === 'home' ? '<span title="Home visit">🏠 </span>' : ''}${esc(pname(w))}${w.priority === 'Urgent' ? ' <span style="color:var(--red)">●</span>' : ''}</div><div class="s">${esc(w.number)} · ${dfmt(w.date)}${w.time ? ' ' + esc(w.time) : ''}${empName(w.techId) ? ' · ' + esc(empName(w.techId)) : ''}</div></div><div class="r"><span class="badge ${c}">${s}</span></div></button>`; }).join('')
           : `<div class="empty">${db.workorders.length ? 'Nothing here.' : 'No work orders yet. Tap “+ New work order” for each job you send a technician to.'}</div>`;
@@ -494,16 +495,31 @@
     const r = origHome.apply(this, arguments);
     try {
       const main = document.getElementById('main'); if (!main || main.querySelector('#woHomeCard')) return r;
-      const act = db.workorders.filter(w => ACTIVE.includes(w.status)).length;
-      const vd = db.amcs.reduce((s, a) => s + visitsDue(a).length, 0), idue = db.amcs.reduce((s, a) => s + amcDue(a).length, 0);
-      const ren = db.amcs.filter(a => !a.cancelled && a.end >= today() && daysBetween(today(), a.end) <= 30).length;
-      if (!act && !vd && !idue && !ren) return r;
-      const parts = [act && `<b>${act}</b> open work order${act > 1 ? 's' : ''}`, vd && `<b>${vd}</b> AMC visit${vd > 1 ? 's' : ''} to schedule`, idue && `<b>${idue}</b> AMC invoice${idue > 1 ? 's' : ''} due`, ren && `<b>${ren}</b> contract${ren > 1 ? 's' : ''} to renew`].filter(Boolean);
-      const card = document.createElement('div'); card.id = 'woHomeCard'; card.className = 'card'; card.style.cssText = 'margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap';
-      card.innerHTML = `<div style="flex:1;min-width:200px;display:flex;gap:8px;align-items:center"><span style="width:22px;height:22px;flex:0 0 22px;color:var(--orange);display:inline-flex">${ICON.wrench || ''}</span><span>${parts.join(' · ')}</span></div><button type="button" class="btn" id="woHomeW">Work orders</button>${db.amcs.length ? '<button type="button" class="btn" id="woHomeA">AMC</button>' : ''}`;
-      main.insertBefore(card, main.firstElementChild ? main.firstElementChild.nextSibling : null);
-      card.querySelector('#woHomeW').onclick = listWO; const ha = card.querySelector('#woHomeA'); if (ha) ha.onclick = listAMC;
-    } catch (e) {}
+      const t = today(), cnt = k => db.workorders.filter(w => w.status === k).length;
+      const doneToday = db.workorders.filter(w => w.status === 'done' && (w.doneDate || '') === t).length;
+      const act = db.workorders.filter(w => ACTIVE.includes(w.status)).sort((a, b) => (b.priority === 'Urgent') - (a.priority === 'Urgent') || String(a.date + (a.time || '')).localeCompare(String(b.date + (b.time || ''))));
+      const vd = db.amcs.reduce((n, a) => n + visitsDue(a).length, 0), idue = db.amcs.reduce((n, a) => n + amcDue(a).length, 0);
+      const ren = db.amcs.filter(a => !a.cancelled && a.end >= t && daysBetween(t, a.end) <= 30).length;
+      const tiles = [['open', 'Open', cnt('open') + cnt('assigned')], ['progress', 'In progress', cnt('progress')], ['parts', 'Waiting parts', cnt('parts')], ['approval', 'Waiting approval', cnt('approval')], ['hold', 'On hold', cnt('hold')], ['done', 'Done today', doneToday]];
+      const amcLine = [vd && `${vd} AMC visit${vd > 1 ? 's' : ''} to schedule`, idue && `${idue} AMC invoice${idue > 1 ? 's' : ''} due`, ren && `${ren} contract${ren > 1 ? 's' : ''} to renew`].filter(Boolean).join(' · ');
+      const card = document.createElement('div'); card.id = 'woHomeCard'; card.className = 'card'; card.style.marginBottom = '14px';
+      card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px"><b style="font-size:12.5px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase">Work orders</b>
+          <div style="display:flex;gap:6px"><button type="button" class="btn" id="woHomeAll" style="min-height:34px;padding:4px 12px">See all</button><button type="button" class="btn pri" id="woHomeNew" style="min-height:34px;padding:4px 12px">+ New</button></div></div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">${tiles.map(([k, l, n]) => `<button type="button" data-ws="${k}" style="border:1px solid var(--line);border-radius:12px;background:${n && k !== 'done' ? 'var(--orange-l,#fff3ea)' : 'var(--card,#fff)'};padding:8px 6px;text-align:center;cursor:pointer;font:inherit;color:inherit">
+          <div style="font-size:20px;font-weight:800;color:${n ? (k === 'done' ? 'var(--green,#1e8e4e)' : 'var(--orange-d,#c2410c)') : 'var(--muted)'}">${n}</div><div style="font-size:11.5px;color:var(--muted);line-height:1.2">${l}</div></button>`).join('')}</div>
+        ${act.length ? `<div class="list" style="margin:12px 0 0;box-shadow:none">${act.slice(0, 5).map(w => { const [st, c] = woStatus(w); return `<button type="button" class="item r2" data-wo="${w.id}"><div class="main"><div class="t">${w.kind === 'home' ? '🏠 ' : ''}${esc(pname(w))}${w.priority === 'Urgent' ? ' <span style="color:var(--red)">●</span>' : ''}</div><div class="s">${esc(w.number)} · ${dfmt(w.date)}${w.time ? ' ' + esc(w.time) : ''}${empName(w.techId) ? ' · ' + esc(empName(w.techId)) : ''}</div></div><div class="r"><span class="badge ${c}">${st}</span></div></button>`; }).join('')}</div>${act.length > 5 ? `<button type="button" class="lnk" id="woHomeMore" style="margin-top:8px">+ ${act.length - 5} more open</button>` : ''}`
+          : `<p class="hint" style="margin:12px 2px 0">No open work orders. Tap “+ New” when a job comes in.</p>`}
+        ${amcLine ? `<div class="hint" style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span>${esc(amcLine)}</span><button type="button" class="lnk" id="woHomeA">Open AMC</button></div>` : ''}`;
+      // place it just before "Recent invoices & quotes" (or near the top if that section isn't there)
+      const rec = [...main.querySelectorAll('.sec')].find(x => /recent invoices/i.test(x.textContent));
+      if (rec) rec.parentNode.insertBefore(card, rec); else main.insertBefore(card, main.firstElementChild ? main.firstElementChild.nextSibling : null);
+      card.querySelector('#woHomeAll').onclick = () => listWO('active');
+      card.querySelector('#woHomeNew').onclick = () => editWO();
+      card.querySelectorAll('[data-ws]').forEach(b => b.onclick = () => listWO(b.dataset.ws === 'open' ? 'active' : b.dataset.ws));
+      card.querySelectorAll('[data-wo]').forEach(b => b.onclick = () => viewWO(b.dataset.wo));
+      const mo = card.querySelector('#woHomeMore'); if (mo) mo.onclick = () => listWO('active');
+      const ha = card.querySelector('#woHomeA'); if (ha) ha.onclick = listAMC;
+    } catch (e) { console.error(e); }
     return r;
   };
   const origMore = window.viewMore;
