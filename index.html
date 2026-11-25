@@ -536,9 +536,15 @@ textarea.in{min-height:80px;resize:vertical}
 .catact .btn svg{width:16px;height:16px}
 .pdfhost{position:fixed;left:-10000px;top:0;width:794px;background:#fff;z-index:-1}
 .pdfhost .paper{border:0!important;box-shadow:none!important;border-radius:0!important;margin:0;overflow:visible;padding:36px 38px}
-.btns.sharebar{grid-template-columns:repeat(4,1fr)}
+.btns.sharebar{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}
+/* odd number of buttons: the last one takes the full row instead of sitting half-width alone */
+.btns:not(.sharebar):not(.layseg)>:last-child:nth-child(odd):not(:first-child){grid-column:1/-1}
+@media (min-width:700px){.btns.prbtns>:last-child{grid-column:auto!important}}
+a.btn{text-decoration:none}
+.badge{align-self:flex-start}
 .btns.sharebar .btn{flex-direction:column;gap:3px;font-size:12px;padding:8px 4px;min-height:58px}
-@media (max-width:360px){.btns.sharebar .btn{font-size:11px}}
+@media (max-width:480px){.btns.sharebar{gap:6px}.btns.sharebar .btn{font-size:11px;padding:8px 2px;line-height:1.15}}
+@media (max-width:360px){.btns.sharebar .btn{font-size:10.5px}}
 .layseg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
 @media (min-width:700px){.layseg{grid-template-columns:repeat(6,1fr)}}
 .layseg button{background:var(--card,#fff);border:1.5px solid var(--line,#ddd);border-radius:12px;padding:8px 6px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;font-weight:600;font-size:12.5px;min-height:44px;color:inherit}
