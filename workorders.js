@@ -289,6 +289,7 @@
         if (!cloudOn()) { openSheet('Live tracking', `<p>Live tracking works when this company is signed in to the <b>cloud</b> (Menu → Users &amp; passwords → sign in), because the customer's page reads the status from the cloud.</p><p class="hint">Your work orders on this phone are not changed.</p>`); return; }
         if (!w.track) { w.track = (uid() + uid()).replace(/[^a-z0-9]/gi, '').slice(0, 22); save(); }
         pushTrack(w);
+        reopen();   // refresh the job screen first, then show the link on top of it (refreshing after closed the link screen)
         const url = TRACK_URL + w.track, ph = c.phone || '';
         const msg = `Dear ${c.contact || c.name || ''},\n\nYou can follow your service job *${w.number}* live here:\n${url}\n\n${S().name}\n${S().phone}`;
         openSheet('Tracking link · ' + w.number, `<p class="hint" style="margin-top:0">The customer sees the job number, machines, technician's first name and each status change – no prices.</p>
@@ -297,7 +298,6 @@
           e2.querySelector('#trWa').onclick = () => openLink(`https://wa.me/${waNumber(ph)}?text=` + encodeURIComponent(msg));
           e2.querySelector('#trCopy').onclick = () => { try { navigator.clipboard.writeText(url).then(() => toast('Link copied'), () => toast('Select the link and copy it')); } catch (er) { toast('Select the link and copy it'); } };
         });
-        reopen();
       };
       if (b('#woInv')) b('#woInv').onclick = () => closeSheet(() => makeInvoice(w));
       if (b('#woOpenInv')) b('#woOpenInv').onclick = () => closeSheet(() => viewDoc(inv.id));
