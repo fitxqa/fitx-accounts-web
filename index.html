@@ -1207,7 +1207,7 @@ function globalSearch() {
       if (!q) { el.querySelector('#gr').innerHTML = '<p class="hint" style="text-align:center">Type a name, number, phone, part code or serial no.</p>'; return; }
       const has = (...v) => v.join(' ').toLowerCase().includes(q);
       const cus = db.customers.filter(c => has(c.name, c.phone, c.contact, c.area, c.zone)).slice(0, 8);
-      const docs = db.docs.filter(d => has(d.number, d.subject, (custById(d.customerId) || {}).name, ...docEquip(d).map(eqLabel))).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
+      const docs = db.docs.filter(d => has(d.number, d.subject, (docParty(d)).name, ...docEquip(d).map(eqLabel))).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
       const items = db.items.filter(i => has(i.name, i.sku, i.category, ...(i.fits || []))).slice(0, 8);
       const sups = db.suppliers.filter(s => has(s.name, s.phone, s.contact)).slice(0, 6);
       const purs = db.purchases.filter(p => has(p.number, p.ref, (supById(p.supplierId) || {}).name)).slice(0, 6);
@@ -1239,7 +1239,7 @@ function docRow(d) {
   return `<button type="button" class="item" data-doc="${d.id}"><div class="main"><div class="t">${esc(c ? c.name : 'No customer')}</div><div class="s">${esc(d.number)} · ${dfmt(d.date)}</div></div><div class="r"><div class="amt">${fmt(docTotal(d))}</div>${right}<span class="badge ${cls}">${st}</span></div></button>`;
 }
 function docRow2(d) {
-  const c = custById(d.customerId); const [st, cls] = status(d);
+  const c = d.walkin ? docParty(d) : custById(d.customerId); const [st, cls] = status(d);
   const bal = d.type === 'INV' && docBal(d) > 0.004 && !d.cancelled ? ` · <b class="bal">Bal ${fmt(docBal(d))}</b>` : '';
   return `<button type="button" class="item r2" data-doc="${d.id}"><div class="main"><div class="t">${esc(c ? c.name : 'No customer')}</div><div class="s">${esc(d.number)} · ${dfmt(d.date)}${bal}</div></div><div class="r"><div class="amt">${fmt(docTotal(d))}</div><span class="badge ${cls}">${st}</span></div></button>`;
 }
@@ -1338,7 +1338,7 @@ function viewHome() {
 
 /* ---------- SALES (invoices & quotations) ---------- */
 function salesRow(d) {
-  const c = custById(d.customerId) || {}; const [st, cls] = status(d); const isInv = d.type === 'INV'; const bal = docBal(d);
+  const c = docParty(d); const [st, cls] = status(d); const isInv = d.type === 'INV'; const bal = docBal(d);
   let act = '';
   if (isInv && !d.cancelled && bal > 0.004) act = `<button type="button" class="lnk pri" data-act="pay">Receive payment</button>`;
   else if (!isInv && d.status !== 'Converted' && st !== 'Declined') act = `<button type="button" class="lnk pri" data-act="conv">Convert to invoice</button>`;
@@ -1382,7 +1382,7 @@ function viewSales() {
   const draw = () => {
     const q = state.q.toLowerCase(); const t = today(), d30 = addDays(t, -30);
     let list = db.docs.filter(d => d.type === DT);
-    if (q) list = list.filter(d => [d.number, d.subject, d.jobType, (custById(d.customerId) || {}).name, ...docEquip(d).map(eqLabel)].join(' ').toLowerCase().includes(q));
+    if (q) list = list.filter(d => [d.number, d.subject, d.jobType, (docParty(d)).name, ...docEquip(d).map(eqLabel)].join(' ').toLowerCase().includes(q));
     const f = state.salesFilter;
     if (f !== 'All') list = list.filter(d => {
       const st = status(d)[0];
@@ -1975,7 +1975,7 @@ async function sendPdf(o, how) {
   else toast('PDF downloaded: ' + name);
 }
 function docMailBody(d, kind) {
-  const c = custById(d.customerId) || {}; const s = S(); const m = s.mail || {};
+  const c = docParty(d); const s = S(); const m = s.mail || {};
   const isInv = d.type === 'INV';
   const what = kind === 'insp' ? `Inspection Report ${repNo(d, kind)}` : kind === 'wcr' ? `Work Completion Report ${repNo(d, kind)}` : `${isInv ? 'Invoice' : 'Quotation'} ${d.number}`;
   const L = [];
@@ -2002,7 +2002,7 @@ function docMailBody(d, kind) {
   return {subject: `${what}${d.subject && !kind ? ' – ' + d.subject : ''} | ${s.name}`, body: m.textSig === false ? main : main + '\n' + sig, main, sig};
 }
 function docPdfOpts(d, kind) {
-  const c = custById(d.customerId) || {};
+  const c = docParty(d);
   const m = docMailBody(d, kind);
   return {
     html: kind ? reportHTML(d, kind) : docHTML(d),
@@ -2032,7 +2032,7 @@ const repNo = (d, kind) => String(d.number || '').replace(/^[A-Za-z]+/, kind ===
 const condColor = c => /^Good/.test(c) ? '#1a9e5f' : /Needs|Worn/.test(c) ? '#e07000' : c ? '#d62828' : '#888';
 const doneColor = c => c === 'Completed' ? '#1a9e5f' : c === 'Partly done' ? '#e07000' : c === 'Pending' ? '#d62828' : '#888';
 function reportHTML(d, kind) {
-  const s = S(); const c = custById(d.customerId) || {};
+  const s = S(); const c = docParty(d);
   const ins = kind === 'insp'; const R = (ins ? d.insp : d.wcr) || {};
   const title = ins ? 'INSPECTION REPORT' : 'WORK COMPLETION REPORT', ar = ins ? 'تقرير الفحص' : 'تقرير إنجاز العمل';
   const brand = `<div class="pbrand">${s.logo ? `<img class="logoimg" src="${s.logo}" alt="${esc(s.name)}">` : plogoHTML()}<div class="pname">${esc(s.name)}</div></div>`;
@@ -2075,11 +2075,11 @@ function reportHTML(d, kind) {
 }
 function printReport(d, kind) {
   $('#printArea').innerHTML = reportHTML(d, kind);
-  const old = document.title; document.title = repNo(d, kind) + ' - ' + ((custById(d.customerId) || {}).name || '');
+  const old = document.title; document.title = repNo(d, kind) + ' - ' + ((docParty(d)).name || '');
   setTimeout(() => { window.print(); document.title = old; }, 100);
 }
 function waReport(d, kind) {
-  const c = custById(d.customerId) || {}; const s = S(); const ins = kind === 'insp'; const R = (ins ? d.insp : d.wcr) || {};
+  const c = docParty(d); const s = S(); const ins = kind === 'insp'; const R = (ins ? d.insp : d.wcr) || {};
   let m = `Dear ${c.name || 'Customer'},\n\n*${ins ? 'Inspection Report' : 'Work Completion Report'}* ${repNo(d, kind)}\nDate: ${dfmt(R.date || d.date)}${R.by ? '\n' + (ins ? 'Inspected by' : 'Technician') + ': ' + R.by : ''}\n`;
   if (R.summary) m += `\n${R.summary}\n`;
   m += '\n' + (d.lines || []).map((l, i) => {
@@ -2121,8 +2121,11 @@ function qarWords(v) {
   const x = Math.round(Math.abs(num(v)) * 100), r = Math.floor(x / 100), dh = x % 100;
   return 'Qatari Riyals ' + words(r) + (dh ? ' and ' + words(dh) + ' Dirhams' : '') + ' Only';
 }
+// the customer shown on a document; home-visit jobs keep the person's own name / mobile / address on the document (d.walkin)
+// while the invoice itself is booked to the one "Home visit customers" account
+function docParty(d) { const c = custById(d.customerId) || {}; return d.walkin ? Object.assign({}, c, d.walkin, {name: d.walkin.name || d.walkin.phone || c.name}) : c; }
 function docHTML(d, layout) {
-  const s = S(); const c = custById(d.customerId) || {};
+  const s = S(); const c = docParty(d);
   const isInv = d.type === 'INV';
   const lay = layout || docLayout(d);
   let [st] = status(d);
@@ -2288,11 +2291,11 @@ function docHTML(d, layout) {
 }
 function printDoc(d) {
   $('#printArea').innerHTML = docHTML(d);
-  const old = document.title; document.title = d.number + ' - ' + ((custById(d.customerId) || {}).name || '');
+  const old = document.title; document.title = d.number + ' - ' + ((docParty(d)).name || '');
   setTimeout(() => { window.print(); document.title = old; }, 100);
 }
 function waDoc(d) {
-  const c = custById(d.customerId) || {}; const s = S(); const isInv = d.type === 'INV';
+  const c = docParty(d); const s = S(); const isInv = d.type === 'INV';
   let m = `Dear ${c.name || 'Customer'},\n\n${isInv ? 'Invoice' : 'Quotation'} *${d.number}* dated ${dfmt(d.date)}${d.subject ? '\nRe: ' + d.subject : ''}\n\n`;
   if ((d.equipment || []).length) m += '*Equipment*\n' + (d.equipment || []).map(e => `• ${[e.name, e.brand, e.model].filter(Boolean).join(' ')}${e.sn ? ' — SN: ' + e.sn : ''}`).join('\n') + '\n\n';
   m += (d.lines || []).map((l, i) => l.kind === 'equip' ? `\n🛠 *${l.desc || 'Equipment'}*${lineEq(l) ? ' – ' + eqText(l) : ''}${l.sell ? ' — ' + num(l.qty) + ' × ' + fmt(l.price) : num(l.qty) > 1 ? ' × ' + num(l.qty) : ''}` : `${l.sub && i ? '    ◦' : '•'} ${l.desc} — ${l.qty}${window.unitSfx ? unitSfx(l) : ''}${l.sub && i && !num(l.price) ? '' : ' × ' + fmt(l.price)}${lineEq(l) ? '\n   ' + eqText(l) : ''}${l.note ? '\n   ' + l.note.replace(/\n/g, '\n   ') : ''}${window.dimsText ? dimsText(l) : ''}`).join('\n');
@@ -2875,7 +2878,7 @@ function editItem(id, after, prefill) {
 function viewItem(id) {
   const i = itemById(id); if (!i) return;
   const sales = [];
-  activeInvoices().forEach(d => (d.lines || []).forEach(l => { if (l.itemId === id) sales.push({date: d.date, qty: -num(l.qty), note: d.number + ' · ' + ((custById(d.customerId) || {}).name || '')}); }));
+  activeInvoices().forEach(d => (d.lines || []).forEach(l => { if (l.itemId === id) sales.push({date: d.date, qty: -num(l.qty), note: d.number + ' · ' + ((docParty(d)).name || '')}); }));
   const purs = [];
   db.purchases.forEach(p => (p.lines || []).forEach(l => { if (l.itemId === id) purs.push({date: p.date, qty: num(l.qty), note: 'Purchase ' + p.number + ' · ' + ((supById(p.supplierId) || {}).name || '') + ' @ ' + fmt(l.cost)}); }));
   const hist = db.moves.filter(m => m.itemId === id).map(m => ({date: m.date, qty: num(m.qty), note: m.note, mid: m.id})).concat(sales, purs).sort((a, b) => b.date.localeCompare(a.date));
@@ -3304,7 +3307,7 @@ function acct(f, t) {
     });
     const jt = d.jobType || 'Not specified';
     const j = a.byJob[jt] = a.byJob[jt] || {count: 0, total: 0}; j.count++; j.total += docTotal(d);
-    const cn = (custById(d.customerId) || {}).name || '—';
+    const cn = (docParty(d)).name || '—';
     const c = a.byCust[cn] = a.byCust[cn] || {count: 0, total: 0}; c.count++; c.total += docTotal(d);
   });
   a.grossSales = a.servGross + a.partsGross; a.revenue = a.servRev + a.partsRev; a.discount = a.grossSales - a.revenue;
@@ -3342,7 +3345,7 @@ const ageIdx = ref => { const d = daysBetween(ref, today()); return d <= 0 ? 0 :
 function ageing(kind) {
   const rows = {}; const tot = [0, 0, 0, 0, 0];
   const src = kind === 'pay' ? db.purchases.map(p => ({id: p.supplierId, name: (supById(p.supplierId) || {}).name || '—', bal: purBal(p), ref: p.due || p.date}))
-    : activeInvoices().map(d => ({id: d.customerId, name: (custById(d.customerId) || {}).name || '—', bal: docBal(d), ref: d.due || d.date}));
+    : activeInvoices().map(d => ({id: d.customerId, name: (docParty(d)).name || '—', bal: docBal(d), ref: d.due || d.date}));
   src.forEach(x => {
     if (x.bal <= 0.004) return;
     const r = rows[x.id] = rows[x.id] || {name: x.name, b: [0, 0, 0, 0, 0], total: 0};
@@ -3408,7 +3411,7 @@ function ledgerFrom(ev, f, t) {
 function cashBook(f, t) {
   const ev = [];
   db.docs.forEach(q => { if (q.type === 'QUO') (q.advances || []).forEach(x => { if (x.date >= f && x.date <= t) ev.push({date: x.date, desc: 'Advance received · ' + ((custById(q.customerId) || {}).name || '') + ' · ' + String(q.number).replace(/^[A-Za-z]+/, 'PRO'), method: x.method || '', inA: num(x.amount), outA: 0}); }); });
-  activeInvoices().forEach(d => (d.payments || []).forEach(p => { if (!p.adv && p.date >= f && p.date <= t) ev.push({date: p.date, desc: 'Received · ' + ((custById(d.customerId) || {}).name || '') + ' · ' + d.number, method: p.method || '', inA: num(p.amount), outA: 0}); }));
+  activeInvoices().forEach(d => (d.payments || []).forEach(p => { if (!p.adv && p.date >= f && p.date <= t) ev.push({date: p.date, desc: 'Received · ' + ((docParty(d)).name || '') + ' · ' + d.number, method: p.method || '', inA: num(p.amount), outA: 0}); }));
   db.purchases.forEach(p => (p.payments || []).forEach(x => { if (x.date >= f && x.date <= t) ev.push({date: x.date, desc: 'Paid supplier · ' + ((supById(p.supplierId) || {}).name || '') + ' · ' + p.number, method: x.method || '', inA: 0, outA: num(x.amount)}); }));
   db.expenses.forEach(x => { if (x.date >= f && x.date <= t) ev.push({date: x.date, desc: 'Expense · ' + (x.category || '') + (x.desc ? ' · ' + x.desc : ''), method: x.method || '', inA: 0, outA: num(x.amount)}); });
   // everything else that moves bank / cash in the ledger: salaries, social insurance, tax payments, money in / out,
@@ -3554,7 +3557,7 @@ function secCustomers(a, P) {
 function secInvoices(a, P) {
   const inv = a.inv.slice().sort((x, y) => x.date.localeCompare(y.date));
   return H('Sales register (invoices)', P) + TB([['Date'], ['Invoice'], ['Customer'], ['Job type'], ['Total', 1], ['Paid', 1], ['Balance', 1]],
-    inv.map(d => [dfmt(d.date), esc(d.number), esc((custById(d.customerId) || {}).name || ''), esc(d.jobType || ''), fmt(docTotal(d)), fmt(docPaid(d)), fmt(docBal(d))]),
+    inv.map(d => [dfmt(d.date), esc(d.number), esc((docParty(d)).name || ''), esc(d.jobType || ''), fmt(docTotal(d)), fmt(docPaid(d)), fmt(docBal(d))]),
     inv.length ? ['Total', '', '', '', fmt(a.revenue), fmt(inv.reduce((s, d) => s + docPaid(d), 0)), fmt(inv.reduce((s, d) => s + docBal(d), 0))] : null, P);
 }
 function secPurchases(a, P) {
@@ -3686,7 +3689,7 @@ function reportStock() { openReport({title: 'Stock movement & valuation', ar: '�
 function reportAR() { openReport({title: 'Receivables ageing', ar: 'أعمار الذمم المدينة', period: false, body: (ctx, P) => {
   const od = activeInvoices().filter(d => docBal(d) > 0.004).sort((a, b) => (a.due || a.date).localeCompare(b.due || b.date));
   return KP([['Total receivable', fmt(receivables()), 'var(--yellow)', true], ['Overdue', fmt(od.filter(d => ageIdx(d.due || d.date) > 0).reduce((s, d) => s + docBal(d), 0)), 'var(--red)'], ['Open invoices', String(od.length)], ['Over 90 days', fmt(ageing('rec').tot[4])]], P) +
-    secAgeing('rec', P) + (() => { const cr = Object.entries(customerCredits()); return cr.length ? H('Customer credits (overpaid – refund or use on next invoice)', P) + TB([['Customer'], ['Credit', 1]], cr.map(([c, v]) => [esc((custById(c) || {}).name || ''), fmt(v)]), ['Total credits', fmt(cr.reduce((s, x) => s + x[1], 0))], P) : ''; })() + H('Open invoices', P) + TB([['Invoice'], ['Customer'], ['Due'], ['Days late', 1], ['Balance', 1]], od.map(d => [esc(d.number), esc((custById(d.customerId) || {}).name || ''), dfmt(d.due || d.date), Math.max(0, daysBetween(d.due || d.date, today())), fmt(docBal(d))]), null, P, 'Nothing outstanding.'); }}); }
+    secAgeing('rec', P) + (() => { const cr = Object.entries(customerCredits()); return cr.length ? H('Customer credits (overpaid – refund or use on next invoice)', P) + TB([['Customer'], ['Credit', 1]], cr.map(([c, v]) => [esc((custById(c) || {}).name || ''), fmt(v)]), ['Total credits', fmt(cr.reduce((s, x) => s + x[1], 0))], P) : ''; })() + H('Open invoices', P) + TB([['Invoice'], ['Customer'], ['Due'], ['Days late', 1], ['Balance', 1]], od.map(d => [esc(d.number), esc((docParty(d)).name || ''), dfmt(d.due || d.date), Math.max(0, daysBetween(d.due || d.date, today())), fmt(docBal(d))]), null, P, 'Nothing outstanding.'); }}); }
 function reportAP() { openReport({title: 'Payables & purchases', ar: 'الذمم الدائنة والمشتريات', body: (ctx, P) => { const a = acct(ctx.f, ctx.t);
   return KP([['Owed to suppliers', fmt(payables()), 'var(--yellow)', true], ['Purchases in period', fmt(a.purTot)], ['Paid to suppliers', fmt(a.supPaid)], ['Suppliers', String(db.suppliers.length)]], P) + secAgeing('pay', P) + secPurchases(a, P); }}); }
 function reportCash() { openReport({title: 'Cash book', ar: 'دفتر النقدية', body: (ctx, P) => { const a = acct(ctx.f, ctx.t);

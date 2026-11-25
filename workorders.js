@@ -11,8 +11,8 @@
               equipment:[{desc, brand, model, qty}], covers, notes, cancelled, renewedFrom, created}] */
 (function () {
   'use strict';
-  window.FITX_EXTRA_COLS = (window.FITX_EXTRA_COLS || []).concat(['workorders', 'amcs']);
-  const ensure = () => { if (!Array.isArray(db.workorders)) db.workorders = []; if (!Array.isArray(db.amcs)) db.amcs = []; };
+  window.FITX_EXTRA_COLS = (window.FITX_EXTRA_COLS || []).concat(['workorders', 'amcs', 'homeclients']);
+  const ensure = () => { if (!Array.isArray(db.workorders)) db.workorders = []; if (!Array.isArray(db.amcs)) db.amcs = []; if (!Array.isArray(db.homeclients)) db.homeclients = []; };
   ensure();
   (window.FITX_AFTER_SYNC = window.FITX_AFTER_SYNC || []).push(ensure);
 
@@ -22,6 +22,21 @@
   const empName = id => ((db.employees || []).find(e => e.id === id) || {}).name || '';
   const initials = n => String(n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0].toUpperCase()).join('');
   const cname = id => (custById(id) || {}).name || 'No customer';
+  /* home visits: private people identified by mobile, kept in db.homeclients – never mixed into Customers */
+  const digits = v => String(v || '').replace(/\D/g, '').replace(/^00974|^974/, '');
+  const homeByPhone = ph => { const d = digits(ph); return d ? db.homeclients.find(h => digits(h.phone) === d) : null; };
+  const blueBoard = h => [h.building && 'Building ' + h.building, h.street && 'Street ' + h.street, h.zone && 'Zone ' + h.zone, h.area].filter(Boolean).join(', ');
+  // the person / company a job is for, in the shape of a customer record
+  const party = w => w.kind === 'home' ? Object.assign({}, w.home || {}, {name: (w.home || {}).name || (w.home || {}).phone || 'Home visit', homeVisit: true}) : (custById(w.customerId) || {});
+  const pname = w => w.kind === 'home' ? ((w.home || {}).name || (w.home || {}).phone || 'Home visit') : cname(w.customerId);
+  const pAddr = c => c.homeVisit ? blueBoard(c) : addrText(c);
+  const pMap = c => c.maps || (pAddr(c) ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(pAddr(c) + ', Qatar') : '');
+  // the single customers-list account home-visit invoices are booked to (the person's details stay on the invoice)
+  function homeAccount() {
+    let c = db.customers.find(x => x.homeVisits);
+    if (!c) { c = {id: uid(), name: 'Home visit customers', homeVisits: true, phone: '', email: '', notes: 'Invoices for home-visit jobs. Each invoice shows the client\'s own name, mobile and address.'}; db.customers.push(c); }
+    return c;
+  }
   const fq = q => String(+num(q).toFixed(3));
   const nextNo = (key, pre) => { const s = S(); const n = s[key] || 1; s[key] = n + 1; return `${pre}-${new Date().getFullYear()}-${String(n).padStart(4, '0')}`; };
   const top = () => { const a = document.querySelectorAll('.sheet'); return a[a.length - 1]; };
@@ -45,7 +60,7 @@
       if (!woDone(w) || woInvoice(w)) return;
       const c = r2((w.parts || []).reduce((s, l) => s + (isStock(l.itemId) ? partCost(l) : 0), 0)); if (c <= 0) return;
       const open = () => viewWO(w.id), d = w.doneDate || w.date;
-      add('wo:' + w.id + ':cogs', d, A(5000), c, 'Parts used · ' + w.number + ' · ' + cname(w.customerId), w.number, open);
+      add('wo:' + w.id + ':cogs', d, A(5000), c, 'Parts used · ' + w.number + ' · ' + pname(w), w.number, open);
       add('wo:' + w.id + ':inv', d, A(1300), -c, 'Parts used · ' + w.number, w.number, open);
     });
   });
@@ -61,7 +76,7 @@
       <div class="xtt"><h2>${title}</h2><div class="ar" dir="rtl" lang="ar">${ar}</div><div class="xnum">${esc(no)}</div>${box || ''}<div></div></div></div>`;
   };
   const stampHTML = () => { const s = S(); return s.stampOn === false ? '' : `<div class="pstamp"><div class="pstin"><img src="${s.stampImg || window.FITX_STAMP_DATA || 'icons/stamp.png'}" alt="Company stamp"><div class="pstl">For ${esc(s.name)}<br><span>Authorised signature &amp; stamp</span></div></div></div>`; };
-  const custBlock = c => `<b>${esc(c.name || '')}</b>${c.contact ? '<br>Attn: ' + esc(c.contact) : ''}${addrText(c) ? '<br>' + esc(addrText(c)) : ''}${c.phone ? '<br>Tel: ' + esc(c.phone) : ''}${c.email ? '<br>' + esc(c.email) : ''}`;
+  const custBlock = c => `<b>${esc(c.name || '')}</b>${c.contact ? '<br>Attn: ' + esc(c.contact) : ''}${pAddr(c) ? '<br>' + esc(pAddr(c)) : ''}${c.phone ? '<br>Tel: ' + esc(c.phone) : ''}${c.email ? '<br>' + esc(c.email) : ''}`;
   const shareRow = p => `<div class="btns sharebar" style="margin-bottom:12px"><button type="button" class="btn pri" id="${p}Share">${ICON.share}Share PDF</button><button type="button" class="btn" id="${p}Wa">${ICON.wa}WhatsApp</button><button type="button" class="btn" id="${p}Mail">${ICON.mail}Email</button><button type="button" class="btn" id="${p}Print">${ICON.print}Print</button><button type="button" class="btn" id="${p}Pv">PDF preview</button></div>`;
   const bindDocShare = (el, p, html, name, c, subject, wa) => {
     bindShare(el, p, () => ({html: html(), name, phone: c.phone, email: c.email, subject, body: '', wa}), () => printHTML(html(), name));
@@ -89,15 +104,15 @@
   function listWO() {
     openSheet('Work orders', `
       <button type="button" class="btn pri full" id="woNew" style="margin-bottom:12px">+ New work order</button>
-      <div class="chips" id="woTabs" style="margin-bottom:10px">${[['active', 'Open & in progress'], ['done', 'Completed'], ['all', 'All']].map(([k, l]) => `<button type="button" class="chip ${woTab === k ? 'on' : ''}" data-t="${k}">${l}</button>`).join('')}</div>
-      <input class="search" id="woQ" placeholder="Search customer, number, technician or machine" aria-label="Search">
+      <div class="chips" id="woTabs" style="margin-bottom:10px">${[['active', 'Open & in progress'], ['home', 'Home visits'], ['done', 'Completed'], ['all', 'All']].map(([k, l]) => `<button type="button" class="chip ${woTab === k ? 'on' : ''}" data-t="${k}">${l}</button>`).join('')}</div>
+      <input class="search" id="woQ" placeholder="Search customer, mobile, number, technician or machine" aria-label="Search">
       <div class="list" id="woList"></div>`, el => {
       const draw = () => {
         const q = el.querySelector('#woQ').value.trim().toLowerCase();
         let l = db.workorders.slice().sort((a, b) => String(b.date + b.number).localeCompare(String(a.date + a.number)));
-        if (woTab === 'active') l = l.filter(w => !['done', 'cancelled'].includes(w.status)); else if (woTab === 'done') l = l.filter(w => w.status === 'done');
-        if (q) l = l.filter(w => (w.number + ' ' + cname(w.customerId) + ' ' + empName(w.techId) + ' ' + (w.equipment || []).map(e => [e.desc, e.brand, e.model].join(' ')).join(' ')).toLowerCase().includes(q));
-        el.querySelector('#woList').innerHTML = l.length ? l.map(w => { const [s, c] = woStatus(w); return `<button type="button" class="item r2" data-id="${w.id}"><div class="main"><div class="t">${esc(cname(w.customerId))}${w.priority === 'Urgent' ? ' <span style="color:var(--red)">●</span>' : ''}</div><div class="s">${esc(w.number)} · ${dfmt(w.date)}${w.time ? ' ' + esc(w.time) : ''}${empName(w.techId) ? ' · ' + esc(empName(w.techId)) : ''}</div></div><div class="r"><span class="badge ${c}">${s}</span></div></button>`; }).join('')
+        if (woTab === 'active') l = l.filter(w => !['done', 'cancelled'].includes(w.status)); else if (woTab === 'done') l = l.filter(w => w.status === 'done'); else if (woTab === 'home') l = l.filter(w => w.kind === 'home');
+        if (q) l = l.filter(w => (w.number + ' ' + pname(w) + ' ' + ((w.home || {}).phone || '') + ' ' + empName(w.techId) + ' ' + (w.equipment || []).map(e => [e.desc, e.brand, e.model].join(' ')).join(' ')).toLowerCase().includes(q));
+        el.querySelector('#woList').innerHTML = l.length ? l.map(w => { const [s, c] = woStatus(w); return `<button type="button" class="item r2" data-id="${w.id}"><div class="main"><div class="t">${w.kind === 'home' ? '<span title="Home visit">🏠 </span>' : ''}${esc(pname(w))}${w.priority === 'Urgent' ? ' <span style="color:var(--red)">●</span>' : ''}</div><div class="s">${esc(w.number)} · ${dfmt(w.date)}${w.time ? ' ' + esc(w.time) : ''}${empName(w.techId) ? ' · ' + esc(empName(w.techId)) : ''}</div></div><div class="r"><span class="badge ${c}">${s}</span></div></button>`; }).join('')
           : `<div class="empty">${db.workorders.length ? 'Nothing here.' : 'No work orders yet. Tap “+ New work order” for each job you send a technician to.'}</div>`;
         el.querySelectorAll('[data-id]').forEach(b => b.onclick = () => viewWO(b.dataset.id));
       };
@@ -109,14 +124,27 @@
 
   function editWO(id, preset) {
     const ex = id ? woById(id) : null;
-    const w = ex ? JSON.parse(JSON.stringify(ex)) : Object.assign({date: today(), time: '', customerId: '', jobType: 'Repair / breakdown', priority: 'Normal', techId: '', status: 'open', equipment: [{desc: '', brand: '', model: '', sn: '', problem: ''}], work: '', labour: '', parts: [], notes: ''}, preset || {});
-    const custOpts = '<option value="">Choose customer…</option>' + db.customers.slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => `<option value="${c.id}" ${c.id === w.customerId ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+    const w = ex ? JSON.parse(JSON.stringify(ex)) : Object.assign({kind: 'customer', home: {}, date: today(), time: '', customerId: '', jobType: 'Repair / breakdown', priority: 'Normal', techId: '', status: 'open', equipment: [{desc: '', brand: '', model: '', sn: '', problem: ''}], work: '', labour: '', parts: [], notes: ''}, preset || {});
+    const custOpts = '<option value="">Choose customer…</option>' + db.customers.filter(c => !c.homeVisits).sort((a, b) => a.name.localeCompare(b.name)).map(c => `<option value="${c.id}" ${c.id === w.customerId ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
     const techOpts = '<option value="">Not assigned yet</option>' + emps().map(e => `<option value="${e.id}" ${e.id === w.techId ? 'selected' : ''}>${esc(e.name)}${e.job ? ' · ' + esc(e.job) : ''}</option>`).join('');
     const partOpts = sel => '<option value="">Choose part…</option>' + db.items.filter(i => !i.service).sort((a, b) => a.name.localeCompare(b.name)).map(i => `<option value="${i.id}" ${i.id === sel ? 'selected' : ''}>${esc(i.name)} · stock ${fq(stockQty(i.id))}</option>`).join('');
     const jobs = (S().jobTypes || []);
     openSheet(ex ? 'Edit ' + ex.number : 'New work order', `<form id="woForm" autocomplete="off">
-      <label class="f"><span>Customer</span><select class="in" name="customerId" required>${custOpts}</select></label>
-      ${db.customers.length ? '' : '<p class="hint">Add the customer first in Customers.</p>'}
+      <div class="chips" id="woKind" style="margin-bottom:10px"><button type="button" data-k="customer" class="${w.kind !== 'home' ? 'on' : ''}">Customer (gym, hotel, company)</button><button type="button" data-k="home" class="${w.kind === 'home' ? 'on' : ''}">🏠 Home visit</button></div>
+      <div id="woCust" style="${w.kind === 'home' ? 'display:none' : ''}"><label class="f"><span>Customer</span><select class="in" name="customerId">${custOpts}</select></label>
+      ${db.customers.length ? '' : '<p class="hint">Add the customer first in Customers.</p>'}</div>
+      <div id="woHome" style="${w.kind === 'home' ? '' : 'display:none'}">
+        <div class="row"><label class="f"><span>Mobile *</span><input class="in" type="tel" inputmode="tel" name="hPhone" id="woHP" value="${esc((w.home || {}).phone || '')}" placeholder="e.g. 5555 1234"></label>
+        <label class="f"><span>Name (optional)</span><input class="in" name="hName" id="woHN" value="${esc((w.home || {}).name || '')}" placeholder="Client name"></label></div>
+        <div class="hint" id="woHFound" style="margin:-4px 2px 8px"></div>
+        <div class="sec" style="margin-top:2px"><h2>Address · blue plate</h2></div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px"><label class="f"><span>Building no.</span><input class="in" inputmode="numeric" name="hBuilding" id="woHB" value="${esc((w.home || {}).building || '')}"></label>
+        <label class="f"><span>Street no.</span><input class="in" inputmode="numeric" name="hStreet" id="woHS" value="${esc((w.home || {}).street || '')}"></label>
+        <label class="f"><span>Zone no.</span><input class="in" inputmode="numeric" name="hZone" id="woHZ" value="${esc((w.home || {}).zone || '')}"></label></div>
+        <label class="f"><span>Area (optional)</span><input class="in" name="hArea" id="woHA" value="${esc((w.home || {}).area || '')}" placeholder="e.g. Al Wakrah, Villa 12"></label>
+        <label class="f"><span>Location (Google Maps link)</span><input class="in" name="hMaps" id="woHM" value="${esc((w.home || {}).maps || '')}" placeholder="Paste a shared location link"></label>
+        <button type="button" class="btn full" id="woHGps" style="margin:-4px 0 12px">📍 Use my current location</button>
+      </div>
       <div class="row"><label class="f"><span>Date</span><input class="in" type="date" name="date" value="${esc(w.date)}" required></label><label class="f"><span>Time</span><input class="in" type="time" name="time" value="${esc(w.time || '')}"></label></div>
       <div class="row"><label class="f"><span>Job type</span><select class="in" name="jobType">${jobs.map(j => `<option ${j === w.jobType ? 'selected' : ''}>${esc(j)}</option>`).join('')}</select></label>
       <label class="f"><span>Priority</span><select class="in" name="priority">${['Normal', 'Urgent', 'Low'].map(p => `<option ${p === w.priority ? 'selected' : ''}>${p}</option>`).join('')}</select></label></div>
@@ -149,11 +177,33 @@
       el.querySelector('#woEqAdd').onclick = () => { w.equipment.push({desc: '', brand: '', model: '', sn: '', problem: ''}); drawEq(); };
       el.querySelector('#woPAdd').onclick = () => { w.parts.push({itemId: '', desc: '', qty: 1, price: 0}); drawP(); };
       drawEq(); drawP();
+      let kind = w.kind === 'home' ? 'home' : 'customer';
+      el.querySelectorAll('#woKind [data-k]').forEach(b => b.onclick = () => { kind = b.dataset.k; el.querySelectorAll('#woKind [data-k]').forEach(x => x.classList.toggle('on', x === b)); el.querySelector('#woCust').style.display = kind === 'home' ? 'none' : ''; el.querySelector('#woHome').style.display = kind === 'home' ? '' : 'none'; });
+      // a known mobile fills in the saved name and address
+      el.querySelector('#woHP').oninput = () => {
+        const h = homeByPhone(el.querySelector('#woHP').value), info = el.querySelector('#woHFound');
+        if (!h) { info.textContent = ''; return; }
+        const n = db.workorders.filter(x => x.kind === 'home' && digits((x.home || {}).phone) === digits(h.phone)).length;
+        info.textContent = `Known client${n ? ' · ' + n + ' earlier visit' + (n > 1 ? 's' : '') : ''} – details filled in.`;
+        [['#woHN', 'name'], ['#woHB', 'building'], ['#woHS', 'street'], ['#woHZ', 'zone'], ['#woHA', 'area'], ['#woHM', 'maps']].forEach(([sel, k]) => { const i = el.querySelector(sel); if (!i.value && h[k]) i.value = h[k]; });
+      };
+      el.querySelector('#woHGps').onclick = () => {
+        if (!navigator.geolocation) { toast('Location is not available on this device'); return; }
+        const b = el.querySelector('#woHGps'); b.disabled = true; b.textContent = 'Finding location…';
+        navigator.geolocation.getCurrentPosition(pos => { el.querySelector('#woHM').value = `https://www.google.com/maps?q=${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`; b.disabled = false; b.textContent = '📍 Location saved – tap again to update'; },
+          () => { b.disabled = false; b.textContent = '📍 Use my current location'; toast('Could not get the location – allow location for the app, or paste a link'); }, {enableHighAccuracy: true, timeout: 15000});
+      };
       const del = el.querySelector('#woDel'); if (del) del.onclick = () => { if (!confirm(`Delete ${ex.number}?`)) return; db.workorders = db.workorders.filter(x => x.id !== id); save(); while (sheets.length) closeTopSheet(); render(); toast('Deleted'); };
       el.querySelector('#woForm').onsubmit = e => {
         e.preventDefault(); const f = formData(e.target);
-        if (!f.customerId) { toast('Choose the customer'); return; }
-        const data = {date: f.date, time: f.time, customerId: f.customerId, jobType: f.jobType, priority: f.priority, techId: f.techId, work: (f.work || '').trim(), labour: num(f.labour) || '', notes: (f.notes || '').trim(),
+        let home = null;
+        if (kind === 'home') {
+          if (digits(f.hPhone).length < 7) { toast('Enter the client\'s mobile number'); return; }
+          home = {phone: f.hPhone.trim(), name: (f.hName || '').trim(), building: (f.hBuilding || '').trim(), street: (f.hStreet || '').trim(), zone: (f.hZone || '').trim(), area: (f.hArea || '').trim(), maps: (f.hMaps || '').trim()};
+          const hc = homeByPhone(home.phone);
+          if (hc) Object.assign(hc, Object.fromEntries(Object.entries(home).filter(([, v]) => v)), {updated: Date.now()}); else db.homeclients.push(Object.assign({id: uid(), created: String(Date.now())}, home));
+        } else if (!f.customerId) { toast('Choose the customer'); return; }
+        const data = {kind, home: home || {}, date: f.date, time: f.time, customerId: kind === 'home' ? '' : f.customerId, jobType: f.jobType, priority: f.priority, techId: f.techId, work: (f.work || '').trim(), labour: num(f.labour) || '', notes: (f.notes || '').trim(),
           equipment: w.equipment.filter(x => x.desc || x.brand || x.model || x.problem), parts: w.parts.filter(p => p.itemId && num(p.qty) > 0)};
         let rec;
         if (ex) { Object.assign(ex, data, {updated: Date.now()}); if (ex.status === 'open' && ex.techId) ex.status = 'assigned'; if (ex.status === 'assigned' && !ex.techId) ex.status = 'open'; rec = ex; }
@@ -164,11 +214,11 @@
   }
 
   function woHTML(w) {
-    const c = custById(w.customerId) || {}, inv = woInvoice(w), amc = w.amcId ? amcById(w.amcId) : null;
+    const c = party(w), inv = woInvoice(w), amc = w.amcId ? amcById(w.amcId) : null;
     const eqRows = (w.equipment || []).map((e, i) => `<tr><td>${i + 1}</td><td><b>${esc(e.desc || '')}</b>${[e.brand, e.model].filter(Boolean).length ? '<div class="xd">' + esc([e.brand, e.model].filter(Boolean).join(' · ')) + '</div>' : ''}</td><td>${esc(e.sn || '')}</td><td>${esc(e.problem || '')}</td></tr>`).join('');
     const pRows = (w.parts || []).map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.desc || (itemById(p.itemId) || {}).name || '')}</td><td class="n">${fq(p.qty)}</td></tr>`).join('');
     return `<div class="paper lay-pro stmt">${brandHead('WORK REPORT', 'تقرير إنجاز العمل', w.number, `<div class="xdue"><small>STATUS</small><b>${esc(woStatus(w)[0].toUpperCase())}</b></div>`)}
-      <div class="xmeta two"><div><span class="xl">Customer <span dir="rtl" lang="ar">· العميل</span></span>${custBlock(c)}</div>
+      <div class="xmeta two"><div><span class="xl">${c.homeVisit ? 'Home visit' : 'Customer'} <span dir="rtl" lang="ar">· العميل</span></span>${custBlock(c)}${c.homeVisit && c.maps ? '<br>Location: ' + esc(c.maps) : ''}</div>
         <div class="xdg"><span>Date</span><span>${dfmt(w.date)}${w.time ? ' · ' + esc(w.time) : ''}</span><span>Job type</span><span>${esc(w.jobType || '')}</span><span>Technician</span><span>${esc(empName(w.techId) || '—')}</span>${w.doneDate ? `<span>Completed</span><span>${dfmt(w.doneDate)}</span>` : ''}${amc ? `<span>Contract</span><span>${esc(amc.number)}${w.visitNo ? ' · visit ' + w.visitNo : ''}</span>` : ''}${inv ? `<span>Invoice</span><span>${esc(inv.number)}</span>` : ''}</div></div>
       ${eqRows ? `<table class="xitems"><thead><tr><th style="width:28px">#</th><th>Equipment</th><th style="width:110px">Serial no.</th><th>Problem reported</th></tr></thead><tbody>${eqRows}</tbody></table>` : ''}
       ${w.work ? `<h4>Work done</h4><div class="wo-box">${esc(w.work)}</div>` : ''}
@@ -180,11 +230,11 @@
 
   function viewWO(id) {
     const w = woById(id); if (!w) return;
-    const c = custById(w.customerId) || {}, inv = woInvoice(w), [st, cls] = woStatus(w), map = mapUrl(c);
+    const c = party(w), inv = woInvoice(w), [st, cls] = woStatus(w), map = pMap(c);
     const next = {open: null, assigned: ['progress', 'Start job'], progress: ['done', 'Mark completed']}[w.status];
     openSheet(w.number, `${shareRow('wo')}
-      <div class="card"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${esc(c.name || 'No customer')}</b><span class="badge ${cls}">${st}</span></div>
-        <div class="hint">${esc(addrText(c) || 'No address')}${map ? ` · <a href="${map}" target="_blank" rel="noopener" style="color:var(--orange);font-weight:600">Open in Maps</a>` : ''}${c.phone ? ` · <a href="tel:${esc(c.phone)}" style="color:var(--orange)">${esc(c.phone)}</a>` : ''}</div>
+      <div class="card"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${c.homeVisit ? '🏠 ' : ''}${esc(c.name || 'No customer')}</b><span class="badge ${cls}">${st}</span></div>
+        <div class="hint">${c.homeVisit ? 'Home visit · ' : ''}${esc(pAddr(c) || 'No address')}${map ? ` · <a href="${map}" target="_blank" rel="noopener" style="color:var(--orange);font-weight:600">Open in Maps</a>` : ''}${c.phone ? ` · <a href="tel:${esc(c.phone)}" style="color:var(--orange)">${esc(c.phone)}</a>` : ''}</div>
         <div class="hint">${esc(w.jobType || '')} · Priority: ${w.priority === 'Urgent' ? '<b style="color:var(--red)">Urgent</b>' : esc(w.priority || 'Normal')} · ${dfmt(w.date)}${w.time ? ' ' + esc(w.time) : ''}</div></div>
       <div class="sec"><h2>Assigned to</h2></div>
       <div class="card" style="display:flex;gap:10px;align-items:center">${w.techId ? `<div class="wo-av">${esc(initials(empName(w.techId)))}</div><div><b>${esc(empName(w.techId))}</b><div class="hint">Technician</div></div>` : '<div class="hint">Not assigned yet – tap Edit to choose a technician.</div>'}</div>
@@ -248,7 +298,9 @@
     if (num(w.labour) || !(w.parts || []).length) lines.push({kind: 'service', itemId: '', desc: (w.jobType || 'Service') + (w.work ? ' – ' + w.work.split('\n')[0].slice(0, 80) : ''), qty: 1, price: num(w.labour)});
     (w.parts || []).forEach(p => { const it = itemById(p.itemId) || {}; lines.push({kind: 'part', itemId: p.itemId, desc: p.desc || it.name || '', qty: num(p.qty), price: num(p.price), cost: num(it.cost)}); });
     if (amc && amc.billing === 'visit' && num(amc.perVisit)) lines.unshift({kind: 'service', desc: `AMC ${amc.number} – service visit ${w.visitNo || ''}`.trim(), qty: 1, price: num(amc.perVisit)});
-    const draft = {type: 'INV', customerId: w.customerId, date: today(), lines, discount: 0, notes: '', subject: (w.jobType || 'Service') + ' · ' + w.number, jobType: w.jobType, svc: eqs.length > 0, woId: w.id};
+    const hc = w.kind === 'home' ? homeAccount() : null;
+    const draft = {type: 'INV', customerId: hc ? hc.id : w.customerId, date: today(), lines, discount: 0, notes: '', subject: (w.jobType || 'Service') + ' · ' + w.number, jobType: w.jobType, svc: eqs.length > 0, woId: w.id};
+    if (hc) { const h = w.home || {}; draft.walkin = {name: h.name || '', phone: h.phone || '', building: h.building || '', street: h.street || '', zone: h.zone || '', area: h.area || '', maps: h.maps || ''}; draft.payType = 'cash'; }
     if (amc && amc.billing === 'visit') { draft.amcId = amc.id; draft.amcKey = 'V' + (w.visitNo || w.id); }
     editDoc('INV', null, draft);
   }
