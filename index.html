@@ -228,6 +228,8 @@ button.item:active{background:#f6f7f9}
 .quick button{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:6px 5px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:5px;font-size:11.5px;font-weight:600;line-height:1.15;letter-spacing:-.1px;text-align:left;min-height:48px;box-shadow:var(--sh);min-width:0;white-space:nowrap;overflow:hidden}
 .quick .qi{width:26px;height:26px;flex-shrink:0;border-radius:50%;background:var(--orange-l);color:var(--orange-d);display:flex;align-items:center;justify-content:center}
 .quick .ql{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.quick [data-q=apt] .ql{font-size:.92em;letter-spacing:-.2px}
+.quick button[data-q=apt]{background:#111;color:#fff;border-color:#111}.quick [data-q=apt] .qi{background:rgba(255,106,0,.2);color:#ff8a33}
 .quick svg{width:15px;height:15px}
 @media (min-width:600px){.quick{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}}
 
@@ -1298,7 +1300,7 @@ function viewHome() {
       <button type="button" data-q="cus"><span class="qi">${ICON.user}</span><span class="ql">Customer</span></button>
       ${window.FitxWO ? `<button type="button" data-q="wo"><span class="qi">${ICON.wrench}</span><span class="ql">Work order</span></button>` : ''}
       ${window.FitxAMC ? `<button type="button" data-q="amc"><span class="qi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m9 16 2 2 4-4"/></svg></span><span class="ql">AMC</span></button>` : ''}
-      <button type="button" data-q="rep"><span class="qi">${ICON.chart}</span><span class="ql">Reports</span></button>
+      ${window.FitxSchedule ? `<button type="button" data-q="apt"><span class="qi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><circle cx="12" cy="16" r="2.5"/></svg></span><span class="ql">Appointment</span></button>` : ''}
     </div>
     <div class="dash">
       <div class="w"><div class="wh"><b>Profit & loss</b><span>${esc(pName)}</span></div>
@@ -1339,7 +1341,7 @@ function viewHome() {
   $('#dPer').onchange = e => { state.dash = e.target.value; render(); };
   const qb = $('#qBak'); if (qb) qb.onclick = () => { backupToDrive(); setTimeout(render, 500); };
   const Q = {inv: () => editDoc('INV'), rcv: () => receivePayment(), quo: () => editDoc('QUO'), exp: () => editExpense(), bill: () => editPurchase(), cus: () => editCustomer(),
-    wo: () => FitxWO.edit(), amc: () => FitxAMC.edit(), rep: () => goTab('reports')};
+    wo: () => FitxWO.edit(), amc: () => FitxAMC.edit(), apt: () => FitxSchedule.open()};
   $$('#main [data-q]').forEach(b => b.onclick = Q[b.dataset.q]);
   const withDash = fn => () => { state.rep = state.dash; fn(); };
   const GO = {pl: withDash(reportPL), exp: withDash(reportExpenses), inv: () => { state.salesType = 'INV'; state.salesFilter = 'All'; goTab('sales'); }, sales: withDash(reportSales), parts: withDash(reportParts), paybill: () => paySupplier(), stock: () => goTab('stock')};
