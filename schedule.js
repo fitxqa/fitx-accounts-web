@@ -177,11 +177,16 @@
   const BOOK = {from: 9, to: 21, closed: [5]};   // 9 AM – 9 PM, Friday closed, one team
   const cloudOn = () => !!(window.FitxCloud && FitxCloud._fs && FitxCloud.cid && FitxCloud.user && FitxCloud.role !== 'technician');
   const bookUrl = () => 'https://fitxqa.github.io/fitx-accounts-web/book.html#' + (window.FitxCloud && FitxCloud.cid || '');
+  let lastAreas = {};
   function busyMap() {
     const out = {}, start = today(), end = addD(start, 45);
     const jobs = [];
-    (db.workorders || []).forEach(w => { if (w.date >= start && w.date <= end && !['cancelled', 'done'].includes(w.status) && mins(w.time) != null) jobs.push([w.date, mins(w.time)]); });
-    (db.appointments || []).forEach(a => { if (a.date >= start && a.date <= end && a.status !== 'cancelled' && !apptWO(a) && mins(a.time) != null) jobs.push([a.date, mins(a.time)]); });
+    const areaOf = x => String(((x.kind === 'home' ? x.home : cust(x.customerId)) || {}).area || '').trim();
+    (db.workorders || []).forEach(w => { if (w.date >= start && w.date <= end && !['cancelled', 'done'].includes(w.status) && mins(w.time) != null) jobs.push([w.date, mins(w.time), areaOf(w)]); });
+    (db.appointments || []).forEach(a => { if (a.date >= start && a.date <= end && a.status !== 'cancelled' && !apptWO(a) && mins(a.time) != null) jobs.push([a.date, mins(a.time), areaOf(a)]); });
+    // where the team will be (area name only, no names) – the booking page suggests the slot next to a visit in the same area
+    lastAreas = {};
+    jobs.forEach(([d, m, ar]) => { if (!ar) return; const t = String(Math.floor(m / 60)).padStart(2, '0') + ':00'; (lastAreas[d] = lastAreas[d] || {})[t] = ar; });
     jobs.forEach(([d, m]) => { for (let h = BOOK.from; h < BOOK.to; h++) if (Math.abs(h * 60 - m) < LEN) { (out[d] = out[d] || []); const t = String(h).padStart(2, '0') + ':00'; if (!out[d].includes(t)) out[d].push(t); } });
     return out;
   }
@@ -190,7 +195,7 @@
     if (!cloudOn()) return;
     clearTimeout(pubTimer);
     pubTimer = setTimeout(() => {
-      const st = S(), rec = {cid: FitxCloud.cid, co: {name: st.name || '', phone: st.phone || ''}, from: BOOK.from, to: BOOK.to, closed: BOOK.closed, busy: busyMap()};
+      const st = S(), rec = {cid: FitxCloud.cid, co: {name: st.name || '', phone: st.phone || ''}, from: BOOK.from, to: BOOK.to, closed: BOOK.closed, busy: busyMap(), areas: lastAreas};
       const key = JSON.stringify(rec); if (key === lastPub) return; lastPub = key;
       try { FitxCloud._fs.collection('slots').doc(FitxCloud.cid).set(Object.assign(rec, {updated: Date.now()})).catch(e => { lastPub = ''; console.warn('slots', e && e.message); }); } catch (e) {}
     }, 2500);
@@ -207,7 +212,7 @@
         if (!db.appointments.some(a => a.bookingId === doc.id)) {
           db.appointments.push({id: uid(), number: nextAp(), status: 'requested', source: 'online', bookingId: doc.id, created: String(b.created || Date.now()), kind: 'home', customerId: '',
             home: {phone: String(b.phone || '').slice(0, 20), name: String(b.name || '').slice(0, 60), area: String(b.area || '').slice(0, 40), building: String(b.building || '').slice(0, 10), street: String(b.street || '').slice(0, 10), zone: String(b.zone || '').slice(0, 10), maps: String(b.maps || '').slice(0, 200)},
-            date: String(b.date || ''), time: String(b.time || ''), techId: '', machine: [b.machine, b.brand].filter(Boolean).join(' · ').slice(0, 80), problem: String(b.problem || '').slice(0, 300), notes: 'Booked online', photo: typeof b.photo === 'string' && b.photo.startsWith('data:image/') ? b.photo : ''});
+            date: String(b.date || today()), time: /^\d\d:\d\d$/.test(String(b.time || '')) ? b.time : '', techId: '', machine: [b.machine, b.brand].filter(Boolean).join(' · ').slice(0, 80), problem: String(b.problem || '').slice(0, 300), notes: 'Booked online' + (/^\d\d:\d\d$/.test(String(b.time || '')) ? '' : ' · Customer wants another time: ' + String(b.time || '').replace(/^Other:\s*/, '').slice(0, 80)), wantsOther: !/^\d\d:\d\d$/.test(String(b.time || '')), photo: typeof b.photo === 'string' && b.photo.startsWith('data:image/') ? b.photo : ''});
           n++;
         }
         doc.ref.delete().catch(() => {});

@@ -43,11 +43,23 @@
   .days{display:flex;gap:6px;overflow-x:auto;padding:2px 0 4px;scrollbar-width:none;margin:0 -16px;padding-left:16px;padding-right:16px}.days::-webkit-scrollbar{display:none}
   .days button{flex:0 0 auto;width:50px;height:54px;border:1px solid var(--ln);background:#fff;border-radius:12px;font:inherit;font-size:11.5px;color:var(--mu);font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
   .days button b{font-size:18px;color:var(--ink);line-height:1.1}.days button.on{background:var(--o);border-color:var(--o);color:#ffe2cc}.days button.on b{color:#fff}
-  .slots{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin-top:8px}
-  .s{height:40px;font-size:13px!important;border:1px solid var(--ln);background:#fff;border-radius:12px;font:inherit;font-weight:600;font-size:14px;color:var(--ink);cursor:pointer}
+  .slots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:8px}
+  .s{height:42px;font-size:13px!important;line-height:1.1;border:1px solid var(--ln);background:#fff;border-radius:12px;font:inherit;font-weight:600;font-size:14px;color:var(--ink);cursor:pointer}
   .s.on{background:var(--o);color:#fff;border-color:var(--o)}
   .s:disabled{background:transparent;color:#c3c5ca;border-style:dashed;text-decoration:line-through;cursor:not-allowed}
   .hint{font-size:12px;color:var(--mu);margin:6px 0 0}
+  .othbtn{display:block;width:100%;margin-top:8px;background:none;border:1px dashed #cfd2d8;border-radius:12px;height:42px;font:inherit;font-size:13px;color:var(--mu);cursor:pointer}.othbtn b{color:var(--od);font-weight:600}.othbtn.on{border-style:solid;border-color:var(--o);background:var(--ol)}
+  #near{background:#fff4ec;border:1px solid #ffd2b0;border-radius:12px;padding:10px 12px;color:var(--ink);font-size:13px;line-height:1.4;margin-top:8px}
+  #near b{color:var(--od)}#near button{margin-top:8px;height:38px;border:0;border-radius:10px;background:var(--ink);color:#fff;font:inherit;font-weight:600;font-size:13.5px;padding:0 14px;cursor:pointer}
+  .s.p1{background:var(--o);border-color:var(--o);color:#fff}
+  .s.p2{background:var(--ink);border-color:var(--ink);color:#fff}
+  .slots.prio .s.on{outline:3px solid var(--o);outline-offset:2px;position:relative}
+  .slots.prio .s.on:not(.p1):not(.p2){background:#fff;color:var(--ink);border-color:var(--o)}
+  .slots.prio .s.on::before{content:"✓";position:absolute;top:-8px;right:-6px;width:18px;height:18px;border-radius:50%;background:var(--green);color:#fff;font-size:11px;line-height:18px;text-align:center;font-weight:800}
+  .legend{display:none;gap:14px;align-items:center;font-size:12px;color:var(--mu);margin-top:8px}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:4px;margin-right:5px;vertical-align:-1px}
+  .days button.near{position:relative}.days button.near::after{content:"";position:absolute;top:5px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--o)}
+  .days button.on.near::after{background:#fff}
   .bar{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);backdrop-filter:blur(8px);border-top:1px solid var(--ln);padding:8px max(20px,env(safe-area-inset-left)) calc(12px + env(safe-area-inset-bottom))}
   .bar>div{max-width:520px;margin:0 auto}
   .btn{display:block;width:100%;height:48px;border:0;border-radius:14px;background:var(--o);color:#fff;font:inherit;font-weight:700;font-size:16px;cursor:pointer}
@@ -87,8 +99,42 @@
   let fs; try { firebase.initializeApp(window.FITX_FIREBASE); fs = firebase.firestore(); } catch (e) { fail('Booking is not available right now. Please call us.'); return; }
   const pad = n => String(n).padStart(2, '0');
   const iso = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  const h12 = h => h % 12 || 12;
+  const rng = h => { const a = h < 12 ? 'am' : 'pm', b = (h + 1) < 12 || h + 1 === 24 ? 'am' : 'pm'; return h12(h) + '–' + h12(h + 1) + '<span style="font-size:10.5px;font-weight:600;opacity:.75;margin-left:2px">' + b + '</span>'; };
+  const rngTxt = h => h12(h) + '–' + h12(h + 1) + ' ' + ((h + 1) < 12 ? 'AM' : 'PM');
   const t12 = h => { const ap = h >= 12 ? 'PM' : 'AM'; return [(h % 12 || 12) + ':00', ap]; };
-  let cfg, day = '', slot = '', loc = '', photo = '';
+  let cfg, day = '', slot = '', loc = '', photo = '', myArea = '', other = false;
+  // approximate centres, used when the map service does not name a known area
+  const CENT = {'West Bay':[25.322,51.530],'The Pearl':[25.371,51.551],'Al Dafna':[25.326,51.522],'Katara':[25.360,51.526],'Al Sadd':[25.285,51.501],'Msheireb':[25.287,51.527],'Al Souq':[25.288,51.532],'Corniche':[25.300,51.535],'Old Airport':[25.255,51.553],'Al Hilal':[25.262,51.545],'Najma':[25.270,51.548],'Al Mansoura':[25.270,51.536],'Fereej Bin Mahmoud':[25.277,51.511],'Fereej Abdel Aziz':[25.278,51.522],'Al Muntazah':[25.271,51.523],'Al Doha Al Jadeeda':[25.282,51.540],'Umm Ghuwailina':[25.279,51.548],'Al Markhiya':[25.333,51.488],'Madinat Khalifa North':[25.320,51.477],'Madinat Khalifa South':[25.305,51.483],'Duhail':[25.348,51.474],'Al Gharrafa':[25.338,51.442],'Al Waab':[25.265,51.471],'Al Aziziya':[25.250,51.450],'Al Sailiya':[25.228,51.365],'Abu Hamour':[25.235,51.498],'Al Thumama':[25.225,51.540],'Nuaija':[25.250,51.526],'Al Hitmi':[25.258,51.512],'Ain Khaled':[25.215,51.457],'Al Maamoura':[25.244,51.506],'Industrial Area':[25.190,51.430],'Al Rayyan Al Jadeed':[25.290,51.430],'Al Rayyan Al Qadeem':[25.300,51.420],'Muaither':[25.275,51.395],'Al Luqta':[25.315,51.455],'Al Shagub':[25.315,51.433],'Education City':[25.315,51.440],'Aspire Zone':[25.263,51.448],'Bani Hajer':[25.330,51.390],'Izghawa':[25.360,51.430],'Umm Al Seneem':[25.250,51.400],'Mebaireek':[25.190,51.370],'Al Soudan':[25.274,51.477],'Fereej Al Murra':[25.280,51.455],'Murraikh':[25.260,51.420],'Lusail':[25.420,51.490],'Al Kharaitiyat':[25.385,51.430],'Umm Qarn':[25.495,51.430],'Simaisma':[25.570,51.480],'Rawdat Al Hamama':[25.440,51.450],'Leabaib':[25.400,51.460],'Jeryan Jenaihat':[25.410,51.410],'Umm Salal Mohammed':[25.410,51.405],'Umm Salal Ali':[25.475,51.400],'Al Kheesa':[25.380,51.470],'Al Ebb':[25.385,51.455],'Al Wakrah':[25.166,51.604],'Al Wukair':[25.150,51.540],'Al Mashaf':[25.200,51.570],'Barwa City':[25.170,51.555],'Mesaieed':[24.990,51.550],'Ezdan Village':[25.180,51.560],'Sealine':[24.880,51.500],'Birkat Al Awamer':[25.090,51.490],'Al Khor':[25.684,51.497],'Al Thakhira':[25.735,51.550],'Ras Laffan':[25.900,51.540],'Madinat Al Shamal':[26.120,51.220],'Al Ruwais':[26.140,51.210],'Fuwairit':[26.030,51.370],'Al Shahaniya':[25.400,51.200],'Dukhan':[25.430,50.780],'Umm Bab':[25.210,50.810],'Al Kharsaah':[25.220,51.050]};
+  const GROUP = {}; Object.entries(AREAS).forEach(([g, l]) => l.forEach(a => GROUP[a] = g));
+  const norm = x => String(x || '').toLowerCase().replace(/^(al|el)[\s-]+/, '').replace(/[^a-z]/g, '');
+  const ALLA = [].concat(...Object.values(AREAS));
+  function matchName(n) { const k = norm(n); if (!k) return ''; return ALLA.find(a => norm(a) === k) || ALLA.find(a => k.length > 3 && (norm(a).includes(k) || k.includes(norm(a)))) || ''; }
+  function nearestCent(lat, lng) { let best = '', bd = 1e9; Object.entries(CENT).forEach(([a, [y, x]]) => { const d = Math.hypot((y - lat) * 111, (x - lng) * 101); if (d < bd) { bd = d; best = a; } }); return bd < 12 ? best : ''; }
+  async function detectArea(lat, lng) {
+    try {
+      const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 5000);
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=16&accept-language=en&lat=${lat}&lon=${lng}`, {signal: ctl.signal}); clearTimeout(t);
+      const j = await r.json(), ad = j.address || {};
+      for (const k of ['neighbourhood', 'suburb', 'quarter', 'city_district', 'village', 'town', 'city', 'municipality']) { const m = matchName(ad[k]); if (m) return m; }
+    } catch (e) {}
+    return nearestCent(lat, lng);
+  }
+  // visits already planned in the same area (or a nearby one in the same municipality) → the free slot right before / after
+  function prio(ds) {
+    const best = [], good = [];
+    if (!myArea || !cfg || !cfg.areas || !cfg.areas[ds]) return {best, good};
+    const g = GROUP[myArea], free = t => allSlots(ds).some(s => s.t === t && !s.busy);
+    Object.entries(cfg.areas[ds]).forEach(([t, ar]) => {
+      const h = +t.slice(0, 2), same = ar === myArea, sameMun = !same && g && GROUP[ar] === g;
+      if (same) { [h - 1, h + 1].forEach(x => { const tt = pad(x) + ':00'; if (free(tt) && !best.includes(tt)) best.push(tt); });
+        [h - 2, h + 2].forEach(x => { const tt = pad(x) + ':00'; if (free(tt) && !good.includes(tt)) good.push(tt); }); }
+      else if (sameMun) [h - 1, h + 1].forEach(x => { const tt = pad(x) + ':00'; if (free(tt) && !good.includes(tt)) good.push(tt); });
+    });
+    return {best: best.sort(), good: good.filter(t => !best.includes(t)).sort()};
+  }
+  const nearSlots = ds => prio(ds).best;
+
 
   fs.collection('slots').doc(cid).get().then(snap => {
     if (!snap.exists) { fail('Online booking is not open yet. Please call or WhatsApp us.'); return; }
@@ -123,22 +169,27 @@
     m.innerHTML = `
     <form id="f" autocomplete="on" novalidate>
     <div class="intro"><h1>Book a service visit</h1><p>We'll confirm on WhatsApp.</p></div>
-    <div class="sec"><h3><i>1</i>Your details</h3>
-      <div class="row2 f"><div><label for="nm">Name</label><input class="in" id="nm" name="name" autocomplete="name" maxlength="60" placeholder="Your name"></div>
-      <div><label for="ph">Mobile</label><input class="in" id="ph" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="5555 1234" maxlength="20"></div></div></div>
-    <div class="sec"><h3><i>2</i>Address</h3>
+    <div class="sec"><h3><i>1</i>Date &amp; time</h3>
+      ${ds.length ? `<div class="days">${ds.map(d => `<button type="button" data-d="${iso(d)}" class="${iso(d) === day ? 'on' : ''}">${d.toLocaleDateString('en-GB', {weekday: 'short'})}<b>${d.getDate()}</b></button>`).join('')}</div>
+      <div class="slots" id="sl"></div>
+      <div class="legend" id="legend"><span><i style="background:var(--o)"></i>Best – we're near you</span><span><i style="background:var(--ink)"></i>Good</span><span><i style="background:#fff;border:1px solid var(--ln)"></i>Free</span></div>
+      <button type="button" class="othbtn" id="oth">None of these times suit me? <b>Request another time</b></button>
+      <div id="othBox" style="display:none;margin-top:8px"><label for="othT">When are you available?</label><input class="in" id="othT" maxlength="80" placeholder="e.g. Friday morning, or any day after 7 pm"><p class="hint">We'll call or WhatsApp you to fix the time.</p></div>
+      <p class="hint">Sat – Thu · 9 AM – 9 PM · about 1 hour</p>` : '<div class="closed">No free times in the next two weeks. Please call or WhatsApp us.</div>'}</div>
+    <div class="sec"><h3><i>2</i>Location</h3>
+      <button type="button" class="locbtn" id="pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Share My Location</span></button>
+      <p class="hint" id="near" style="display:none"></p>
+      <div style="height:10px"></div>
       <div class="f"><label for="ar">Area</label><select class="in ph" id="ar"><option value="">Select area</option>${Object.entries(AREAS).map(([g, l]) => `<optgroup label="${esc(g)}">${l.slice().sort().map(a => `<option>${esc(a)}</option>`).join('')}</optgroup>`).join('')}<option>Other</option></select></div>
       <div class="row f"><div><label for="bd">Building</label><input class="in" id="bd" inputmode="numeric" maxlength="10"></div><div><label for="st">Street</label><input class="in" id="st" inputmode="numeric" maxlength="10"></div><div><label for="zn">Zone</label><input class="in" id="zn" inputmode="numeric" maxlength="10"></div></div>
-      <button type="button" class="locbtn" id="pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Share My Location</span></button>
 </div>
-    <div class="sec"><h3><i>3</i>Machine &amp; problem</h3>
+    <div class="sec"><h3><i>3</i>Your details</h3>
+      <div class="row2 f"><div><label for="nm">Name</label><input class="in" id="nm" name="name" autocomplete="name" maxlength="60" placeholder="Your name"></div>
+      <div><label for="ph">Mobile</label><input class="in" id="ph" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="5555 1234" maxlength="20"></div></div></div>
+    <div class="sec"><h3><i>4</i>Machine &amp; problem</h3>
       <div class="row2 f"><div><label for="mc">Machine</label><select class="in ph" id="mc"><option value="">Select</option>${MACHINES.map(x => `<option>${esc(x)}</option>`).join('')}</select></div>
       <div><label for="br">Brand</label><input class="in" id="br" maxlength="40" placeholder="Optional"></div></div>
       <label for="pr">Problem</label><div class="pp"><input class="in" id="pr" maxlength="300" placeholder="What is wrong?"><input type="file" id="ph1" accept="image/*" hidden><button type="button" class="photo" id="phb" title="Add a photo (optional)" aria-label="Add a photo"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button></div></div>
-    <div class="sec"><h3><i>4</i>Date &amp; time</h3>
-      ${ds.length ? `<div class="days">${ds.map(d => `<button type="button" data-d="${iso(d)}" class="${iso(d) === day ? 'on' : ''}">${d.toLocaleDateString('en-GB', {weekday: 'short'})}<b>${d.getDate()}</b></button>`).join('')}</div>
-      <div class="slots" id="sl"></div>
-      <p class="hint">Sat – Thu · 9 AM – 9 PM · about 1 hour</p>` : '<div class="closed">No free times in the next two weeks. Please call or WhatsApp us.</div>'}</div>
     ${co.phone ? `<p class="note">Questions? Call <a href="tel:${esc(co.phone)}">${esc(co.phone)}</a></p>` : ''}
     <div class="bar"><div><p class="err" id="er"></p><p class="sum" id="sum"></p><button type="submit" class="btn" id="go" ${ds.length ? '' : 'disabled'}>Book visit</button></div></div>
     </form>`;
@@ -146,20 +197,41 @@
     const drawSlots = () => {
       const box = document.getElementById('sl'); if (!box) return;
       if (slot && !freeSlots(day).some(s => s.t === slot)) slot = '';
-      box.innerHTML = allSlots(day).map(s => { const [h, ap] = t12(s.h); return `<button type="button" class="s${s.t === slot ? ' on' : ''}" data-t="${s.t}" ${s.busy ? 'disabled title="' + (s.past ? 'Passed' : 'Booked') + '"' : ''}>${h.replace(':00', '')}<span style="font-size:10.5px;font-weight:600;opacity:.75">${ap.toLowerCase()}</span></button>`; }).join('');
-      box.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { slot = b.dataset.t; drawSlots(); label(); });
+      const pr = prio(day), anyP = pr.best.length || pr.good.length;
+      box.classList.toggle('prio', !!anyP);
+      box.innerHTML = allSlots(day).map(s => { const [h, ap] = t12(s.h); return `<button type="button" class="s${s.t === slot ? ' on' : ''}${pr.best.includes(s.t) ? ' p1' : pr.good.includes(s.t) ? ' p2' : ''}" data-t="${s.t}" ${s.busy ? 'disabled title="' + (s.past ? 'Passed' : 'Booked') + '"' : ''}>${rng(s.h)}</button>`; }).join('');
+      box.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { slot = b.dataset.t; other = false; const ob = document.getElementById('othBox'); if (ob) { ob.style.display = 'none'; document.getElementById('oth').classList.remove('on'); } drawSlots(); label(); });
+      document.querySelectorAll('.days [data-d]').forEach(b => b.classList.toggle('near', nearSlots(b.dataset.d).length > 0));
+      const lg = document.getElementById('legend'); if (lg) lg.style.display = anyP ? 'flex' : 'none';
       label();
     };
-    const label = () => { const sm = document.getElementById('sum'); if (!sm || !day) return; const d = new Date(day + 'T00:00:00'); sm.textContent = slot ? d.toLocaleDateString('en-GB', {weekday: 'long', day: 'numeric', month: 'short'}) + ' · ' + t12(+slot.slice(0, 2)).join(' ') : 'Choose a date and time'; };
+    const label = () => { const sm = document.getElementById('sum'); if (!sm || !day) return; const d = new Date(day + 'T00:00:00'); sm.textContent = other ? 'Other time – we will contact you' : slot ? d.toLocaleDateString('en-GB', {weekday: 'long', day: 'numeric', month: 'short'}) + ' · ' + rngTxt(+slot.slice(0, 2)) : 'Choose a date and time'; };
     f.querySelectorAll('.days [data-d]').forEach(b => b.onclick = () => { day = b.dataset.d; f.querySelectorAll('.days [data-d]').forEach(x => x.classList.toggle('on', x === b)); drawSlots(); });
     drawSlots();
     document.getElementById('mc').onchange = e => e.target.classList.toggle('ph', !e.target.value);
-    document.getElementById('ar').onchange = e => e.target.classList.toggle('ph', !e.target.value);
+    const ob = document.getElementById('oth');
+    if (ob) ob.onclick = () => { other = !other; ob.classList.toggle('on', other); document.getElementById('othBox').style.display = other ? '' : 'none'; if (other) { slot = ''; drawSlots(); setTimeout(() => document.getElementById('othT').focus(), 50); } label(); };
+    document.getElementById('ar').onchange = e => { e.target.classList.toggle('ph', !e.target.value); myArea = e.target.value; showNear(); };
+    function showNear() {
+      const box = document.getElementById('near'); drawSlots();
+      if (!myArea) { box.style.display = 'none'; return; }
+      const hit = days().map(iso).map(d => [d, nearSlots(d)]).find(x => x[1].length);
+      box.style.display = 'block';
+      if (!hit) { box.innerHTML = `📍 <b>${esc(myArea)}</b> – area filled in for you.`; return; }
+      const [d, ts] = hit, dl = new Date(d + 'T00:00:00').toLocaleDateString('en-GB', {weekday: 'short', day: 'numeric', month: 'short'});
+      box.innerHTML = `📍 <b>${esc(myArea)}</b> – our team is already near you on <b>${esc(dl)}</b>. Orange times are best for you.<br><button type="button" id="nearGo">Choose ${esc(dl)} · ${rngTxt(+ts[0].slice(0, 2))}</button>`;
+      document.getElementById('nearGo').onclick = () => { day = d; slot = ts[0]; document.querySelectorAll('.days [data-d]').forEach(x => x.classList.toggle('on', x.dataset.d === d)); drawSlots(); label(); document.querySelector('.days').scrollIntoView({behavior: 'smooth', block: 'center'}); };
+    }
     document.getElementById('pin').onclick = e => {
       const b = e.currentTarget;
       if (!navigator.geolocation) { b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Location not available</span>'; return; }
       b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Getting Your Location…</span>';
-      navigator.geolocation.getCurrentPosition(p => { loc = 'https://maps.google.com/?q=' + p.coords.latitude.toFixed(6) + ',' + p.coords.longitude.toFixed(6); b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>Location Added</span>'; b.classList.add('ok'); },
+      navigator.geolocation.getCurrentPosition(async p => { const lat = p.coords.latitude, lng = p.coords.longitude; loc = 'https://maps.google.com/?q=' + lat.toFixed(6) + ',' + lng.toFixed(6); b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>Location Added</span>'; b.classList.add('ok');
+        const a = await detectArea(lat, lng);
+        const sel = document.getElementById('ar');
+        if (a) { sel.value = a; sel.classList.remove('ph'); myArea = a; }
+        showNear();
+      },
         () => { b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Could not get location – tap to retry</span>'; }, {enableHighAccuracy: true, timeout: 15000});
     };
     const pf = document.getElementById('ph1');
@@ -181,14 +253,15 @@
       if (!v('ar')) return say('Please choose your area.');
       if (!v('mc')) return say('Please choose the machine.');
       if (!v('pr')) return say('Please tell us the problem.');
-      if (!slot) return say('Please choose a time.');
+      if (other && !v('othT')) return say('Please tell us when you are available.');
+      if (!slot && !other) return say('Please choose a time, or request another time.');
       er.style.display = 'none';
       const go = document.getElementById('go'); go.disabled = true; go.textContent = 'Sending…';
       const rec = {cid, status: 'new', name: v('nm'), phone: v('ph'), area: v('ar'), building: v('bd'), street: v('st'), zone: v('zn'), maps: loc,
-        machine: v('mc'), brand: v('br'), problem: v('pr'), date: day, time: slot, photo, created: Date.now()};
+        machine: v('mc'), brand: v('br'), problem: v('pr'), date: other ? '' : day, time: other ? 'Other: ' + v('othT') : slot, photo, created: Date.now()};
       fs.collection('bookings').add(rec).then(() => {
         const d = new Date(day + 'T00:00:00'), co = cfg.co || {};
-        m.innerHTML = `<div class="done"><div class="big">✓</div><h2>Request received</h2><p>${esc(d.toLocaleDateString('en-GB', {weekday: 'long', day: 'numeric', month: 'long'}))} · ${t12(+slot.slice(0, 2)).join(' ')}<br>${esc(rec.machine)} – ${esc(rec.problem)}</p>
+        m.innerHTML = `<div class="done"><div class="big">✓</div><h2>Request received</h2><p>${other ? 'Preferred time: ' + esc(v('othT')) : esc(d.toLocaleDateString('en-GB', {weekday: 'long', day: 'numeric', month: 'long'})) + ' · ' + rngTxt(+slot.slice(0, 2))}<br>${esc(rec.machine)} – ${esc(rec.problem)}</p>
           <p class="note" style="font-size:14px">We'll confirm on WhatsApp shortly.${co.phone ? `<br>Questions? Call <a href="tel:${esc(co.phone)}">${esc(co.phone)}</a>` : ''}</p></div>`;
         window.scrollTo(0, 0);
       }).catch(err => { go.disabled = false; go.textContent = 'Book visit'; say('Could not send – please check your internet and try again. (' + (err && (err.code || err.message)) + ')'); });
