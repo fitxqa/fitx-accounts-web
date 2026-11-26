@@ -176,7 +176,8 @@
   /* ---------- online booking (book.html) ---------- */
   const BOOK = {from: 9, to: 22, closed: [5]};   // 9 AM – 10 PM, Friday closed, one team
   const cloudOn = () => !!(window.FitxCloud && FitxCloud._fs && FitxCloud.cid && FitxCloud.user && FitxCloud.role !== 'technician');
-  const bookUrl = () => 'https://fitxqa.github.io/fitx-accounts-web/book.html#' + (window.FitxCloud && FitxCloud.cid || '');
+  // FitX's own page on fitx.qa; other companies use the direct link
+  const bookUrl = () => { const c = window.FitxCloud && FitxCloud.cid || ''; return c === '8EZ2NIK0OLqPiMvZft6R' ? 'https://www.fitx.qa/appointment' : 'https://fitxqa.github.io/fitx-accounts-web/book.html#' + c; };
   let lastAreas = {};
   function busyMap() {
     const out = {}, start = today(), end = addD(start, 45);
@@ -223,7 +224,7 @@
   function shareLink() {
     if (!cloudOn()) { toast('Sign in to the cloud first (Menu → Users & passwords) – the booking page needs it'); return; }
     publishSlots();
-    const url = bookUrl(), msg = `Book your gym equipment service visit with ${S().name || 'FitX'}: ${url}`;
+    const url = bookUrl(), msg = `Welcome to ${S().name || 'FitX'} 👋\nGym equipment repair, maintenance, installation, dismantling, assembly, relocation, spare parts & AMC.\n📅 Book a visit: ${url}\n\nأهلاً بكم 👋 صيانة وإصلاح وتركيب وفك ونقل الأجهزة الرياضية، توريد قطع الغيار وعقود الصيانة.\n📅 احجز موعدك: ${url}`;
     openSheet('Booking link', `<p class="hint" style="margin-top:0">Customers open this link, choose a free time (9 AM – 10 PM, Friday closed) and send the request. It arrives here as <b>Requested</b> for you to confirm.</p>
       <div class="card" style="word-break:break-all;font-weight:600">${esc(url)}</div>
       <div class="btns"><a class="btn pri" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msg)}">💬 Send on WhatsApp</a><button type="button" class="btn" id="blCopy">Copy link</button><a class="btn" target="_blank" rel="noopener" href="${esc(url)}">Open page</a></div>`, el => {
