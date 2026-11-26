@@ -265,6 +265,36 @@
     });
     return out.sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
   }
+  // every appointment, by tab, newest first for past ones
+  function listAppts(tab) {
+    tab = tab || ((db.appointments || []).some(a => a.status === 'requested') ? 'req' : 'up');
+    openSheet('All appointments', '<div id="laB"></div>', el => {
+      let q = '';
+      const draw = () => {
+        const all = db.appointments || [], t = today();
+        const st = a => { const w = apptWO(a); return a.status === 'cancelled' ? 'cx' : a.status === 'requested' ? 'req' : w ? 'wo' : a.date < t ? 'past' : 'up'; };
+        const TABS = [['up', 'Upcoming'], ['req', 'Requested'], ['past', 'Past'], ['wo', 'Work order made'], ['cx', 'Cancelled']];
+        const cnt = k => all.filter(a => st(a) === k).length;
+        let l = all.filter(a => st(a) === tab);
+        if (q) { const k = q.toLowerCase(), d = q.replace(/\D/g, ''); l = l.filter(a => [a.number, pName(a), (a.home || {}).area, cust(a.customerId).area, a.machine, a.problem].join(' ').toLowerCase().includes(k) || (d.length >= 3 && String((a.home || {}).phone || cust(a.customerId).phone || '').replace(/\D/g, '').includes(d))); }
+        l.sort((x, y) => { const c = (x.date + (x.time || '')).localeCompare(y.date + (y.time || '')); return tab === 'up' || tab === 'req' ? c : -c; });
+        el.querySelector('#laB').innerHTML = `
+          <div class="chips" style="margin-bottom:10px">${TABS.map(([k, n]) => `<button type="button" data-t="${k}" class="${tab === k ? 'on' : ''}">${n} · ${cnt(k)}</button>`).join('')}</div>
+          <input class="in" id="laQ" type="search" placeholder="Search name, mobile, area, APT no." value="${esc(q)}" style="margin-bottom:10px">
+          ${l.length ? `<div class="list">${l.map(a => { const [h, ap] = t12(a.time), w = apptWO(a), c = a.kind === 'home' ? (a.home || {}) : cust(a.customerId);
+            return `<button type="button" class="item" data-id="${a.id}" style="gap:10px"><div style="flex:0 0 54px;text-align:center"><div style="font-weight:800;font-size:15px">${new Date(a.date + 'T00:00:00').getDate()}</div><div style="font-size:11px;color:var(--muted);font-weight:600">${new Date(a.date + 'T00:00:00').toLocaleDateString('en-GB', {month: 'short'})} · ${a.time ? h + ' ' + ap : '—'}</div></div>
+              <div class="main"><div class="t">${a.kind === 'home' ? '🏠 ' : ''}${esc(pName(a))}</div><div class="s">${esc([a.number, c.area, [a.machine, a.problem].filter(Boolean).join(' – ')].filter(Boolean).join(' · '))}</div></div>
+              <span class="badge ${a.status === 'cancelled' ? 'b-red' : a.status === 'requested' ? 'b-orange' : w ? 'b-green' : 'b-purple'}">${a.status === 'cancelled' ? 'Cancelled' : a.status === 'requested' ? 'Requested' : w ? esc(w.number) : 'Booked'}</span></button>`; }).join('')}</div>`
+            : `<div class="empty">${q ? 'Nothing found.' : 'No appointments here.'}</div>`}`;
+        el.querySelectorAll('.chips [data-t]').forEach(b => b.onclick = () => { tab = b.dataset.t; draw(); });
+        const qi = el.querySelector('#laQ'); qi.oninput = () => { q = qi.value; const pos = qi.selectionStart; draw(); const n = el.querySelector('#laQ'); n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} };
+        el.querySelectorAll('.list [data-id]').forEach(b => b.onclick = () => viewAppt(b.dataset.id));
+      };
+      draw();
+      const depth = sheets.length;
+      const iv = setInterval(() => { if (!document.body.contains(el)) { clearInterval(iv); return; } if (sheets.length === depth && el.dataset.stale) { delete el.dataset.stale; draw(); } if (sheets.length > depth) el.dataset.stale = '1'; }, 500);
+    });
+  }
   let day = null, areaF = '';
   function open(d) {
     day = d || day || today(); areaF = '';
@@ -283,6 +313,7 @@
             ${l.map(v => { const [h, ap] = t12(v.time); return `<button type="button" class="sv${v.done ? ' dn' : ''}" data-k="${v.kind}" data-id="${v.id}"><div class="tm">${h}<small>${ap}</small></div><div class="bd"><b>${v.home ? '🏠 ' : ''}${esc(v.name)}</b>${v.what ? `<div class="m">${esc(v.what)}</div>` : ''}<div class="x">${esc([v.where, v.tech || (v.kind === 'wo' ? 'Not assigned' : '')].filter(Boolean).join(' · '))}</div></div><span class="badge ${v.st[1]}">${esc(v.st[0])}</span></button>`; }).join('')}</div>`; };
         el.querySelector('#scB').innerHTML = `
           <div class="btns" style="margin:0 0 12px"><button type="button" class="btn pri" id="scNew" style="flex:2">+ New appointment</button><button type="button" class="btn" id="scLink">🔗 Booking link</button></div>
+          <button type="button" class="item" id="scAll" style="width:100%;margin:0 0 12px;border:1px solid var(--line);border-radius:12px;gap:10px"><span style="font-size:20px">📋</span><div class="main"><div class="t">All appointments</div><div class="s">${(db.appointments || []).length} in total · upcoming, past, cancelled</div></div><span style="color:var(--muted)">›</span></button>
           ${(db.appointments || []).some(x => x.status === 'requested') ? `<button type="button" class="item" id="scReq" style="width:100%;margin:0 0 12px;border:1px solid #ffc89e;background:#fff4ea;border-radius:12px;gap:10px"><span style="font-size:20px">🛎️</span><div class="main"><div class="t">${(db.appointments || []).filter(x => x.status === 'requested').length} online booking request(s)</div><div class="s">Tap to confirm or decline</div></div></button>` : ''}
           <div class="sday">${strip}</div>
           <div class="row" style="gap:8px;margin:0 0 10px"><input class="in" type="date" id="scD" value="${day}" style="flex:1"><button type="button" class="btn${day === today() ? ' pri' : ''}" id="scT" style="flex:0 0 auto">Today</button></div>
@@ -297,6 +328,7 @@
         el.querySelectorAll('.sv').forEach(b => b.onclick = () => b.dataset.k === 'amc' ? FitxAMC.view(b.dataset.id) : b.dataset.k === 'apt' ? viewAppt(b.dataset.id) : FitxWO.view(b.dataset.id));
         el.querySelector('#scNew').onclick = () => editAppt(null, {date: day});
         el.querySelector('#scLink').onclick = shareLink;
+        el.querySelector('#scAll').onclick = () => listAppts();
         const rq = el.querySelector('#scReq'); if (rq) rq.onclick = () => { const r = (db.appointments || []).filter(x => x.status === 'requested').sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time))[0]; if (r) viewAppt(r.id); };
       };
       draw();
@@ -349,5 +381,5 @@
     a.insertAdjacentHTML('beforebegin', `<button type="button" class="item rcard" id="mSch"><span class="ic">📅</span><div class="main"><div class="t">Schedule</div><div class="s">Appointments by day and area, time slots, routes</div></div></button>`);
     document.getElementById('mSch').onclick = () => open();
   };
-  window.FitxSchedule = {open, areas: AREAS, visitsOn, editAppt, viewAppt, newAppt: () => editAppt(), shareLink, importBookings, publishSlots, busyMap};
+  window.FitxSchedule = {open, listAppts, areas: AREAS, visitsOn, editAppt, viewAppt, newAppt: () => editAppt(), shareLink, importBookings, publishSlots, busyMap};
 })();
