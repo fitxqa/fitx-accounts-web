@@ -155,7 +155,7 @@
     return out;
   }
   function allSlots(ds) {
-    const from = cfg.from || 9, to = cfg.to || 21, now = new Date(), out = [];
+    const from = cfg.from || 9, to = cfg.to || 22, now = new Date(), out = [];
     for (let h = from; h <= to - 1; h++) {
       const past = ds === iso(now) && h * 60 < now.getHours() * 60 + now.getMinutes() + 30;   // at least 30 minutes' notice
       out.push({h, t: pad(h) + ':00', busy: past || ((cfg.busy || {})[ds] || []).includes(pad(h) + ':00'), past});
@@ -176,7 +176,7 @@
       <div class="legend" id="legend"><span><i style="background:var(--o)"></i>Best – we're near you</span><span><i style="background:var(--ink)"></i>Good</span><span><i style="background:#fff;border:1px solid var(--ln)"></i>Free</span></div>
       <button type="button" class="othbtn" id="oth">None of these times suit me? <b>Request another time</b></button>
       <div id="othBox" style="display:none;margin-top:8px"><label for="othT">When are you available?</label><input class="in" id="othT" maxlength="80" placeholder="e.g. Friday morning, or any day after 7 pm"><p class="hint">We'll call or WhatsApp you to fix the time.</p></div>
-      <p class="hint">Sat – Thu · 9 AM – 9 PM · about 1 hour</p>` : '<div class="closed">No free times in the next two weeks. Please call or WhatsApp us.</div>'}</div>
+      <p class="hint">Sat – Thu · ${t12(cfg.from || 9).join(' ')} – ${t12(cfg.to || 22).join(' ')} · about 1 hour</p>` : '<div class="closed">No free times in the next two weeks. Please call or WhatsApp us.</div>'}</div>
     <div class="sec"><h3><i>2</i>Location</h3>
       <button type="button" class="locbtn" id="pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Share My Location</span></button>
       <p class="hint" id="near" style="display:none"></p>

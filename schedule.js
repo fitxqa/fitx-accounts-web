@@ -20,7 +20,7 @@
   const OTHER = '__other';
   const ST = {open: ['Open', ''], assigned: ['Assigned', 'b-blue'], progress: ['In progress', 'b-yellow'], parts: ['Waiting parts', 'b-yellow'], approval: ['Waiting approval', 'b-blue'], hold: ['On hold', ''], done: ['Completed', 'b-green'], cancelled: ['Cancelled', 'b-red']};
   const ACTIVE = ['open', 'assigned', 'progress', 'parts', 'approval', 'hold'];
-  const SLOT_FROM = 9, SLOT_TO = 21, STEP = 30, LEN = 60;   // 9:00 – 21:00, every 30 min, a visit takes about 1 hour
+  const SLOT_FROM = 9, SLOT_TO = 22, STEP = 30, LEN = 60;   // 9:00 – 22:00, every 30 min, a visit takes about 1 hour
   const emp = id => ((db.employees || []).find(e => e.id === id) || {}).name || '';
   const cust = id => (db.customers || []).find(c => c.id === id) || {};
   const mins = t => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? +m[1] * 60 + +m[2] : null; };
@@ -174,7 +174,7 @@
   }
 
   /* ---------- online booking (book.html) ---------- */
-  const BOOK = {from: 9, to: 21, closed: [5]};   // 9 AM – 9 PM, Friday closed, one team
+  const BOOK = {from: 9, to: 22, closed: [5]};   // 9 AM – 10 PM, Friday closed, one team
   const cloudOn = () => !!(window.FitxCloud && FitxCloud._fs && FitxCloud.cid && FitxCloud.user && FitxCloud.role !== 'technician');
   const bookUrl = () => 'https://fitxqa.github.io/fitx-accounts-web/book.html#' + (window.FitxCloud && FitxCloud.cid || '');
   let lastAreas = {};
@@ -224,7 +224,7 @@
     if (!cloudOn()) { toast('Sign in to the cloud first (Menu → Users & passwords) – the booking page needs it'); return; }
     publishSlots();
     const url = bookUrl(), msg = `Book your gym equipment service visit with ${S().name || 'FitX'}: ${url}`;
-    openSheet('Booking link', `<p class="hint" style="margin-top:0">Customers open this link, choose a free time (9 AM – 9 PM, Friday closed) and send the request. It arrives here as <b>Requested</b> for you to confirm.</p>
+    openSheet('Booking link', `<p class="hint" style="margin-top:0">Customers open this link, choose a free time (9 AM – 10 PM, Friday closed) and send the request. It arrives here as <b>Requested</b> for you to confirm.</p>
       <div class="card" style="word-break:break-all;font-weight:600">${esc(url)}</div>
       <div class="btns"><a class="btn pri" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msg)}">💬 Send on WhatsApp</a><button type="button" class="btn" id="blCopy">Copy link</button><a class="btn" target="_blank" rel="noopener" href="${esc(url)}">Open page</a></div>`, el => {
       el.querySelector('#blCopy').onclick = () => { (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => toast('Link copied')).catch(() => { prompt('Copy this link', url); }); };
