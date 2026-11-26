@@ -6,44 +6,54 @@
 <title>Book a service visit</title>
 <meta name="robots" content="noindex">
 <style>
-  :root{--o:#ff6a00;--ol:#fff1e6;--ink:#16181d;--mu:#6b7079;--ln:#e6e8ec;--red:#b3261e;--green:#1e8e4e}
-  *{box-sizing:border-box}
-  body{margin:0;background:#f3f4f6;color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
-  header{background:#000;color:#fff;padding:18px max(16px,env(safe-area-inset-left)) 16px}
-  .logo{font-weight:900;font-size:26px;letter-spacing:-.5px}.logo span{color:var(--o)}
-  header small{display:block;color:#bbb;font-size:12px;letter-spacing:.12em;text-transform:uppercase}
-  main{max-width:560px;margin:0 auto;padding:14px 16px 40px}
-  .card{background:#fff;border:1px solid var(--ln);border-radius:16px;padding:14px;margin-bottom:12px}
-  h3{margin:0 0 6px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);display:flex;gap:8px;align-items:center}
-  h3 i{font-style:normal;background:var(--o);color:#fff;border-radius:50%;width:20px;height:20px;display:grid;place-items:center;font-size:12px}
-  label{display:block;font-size:13px;font-weight:600;color:var(--mu);margin:8px 0 4px}
-  .in{width:100%;border:1px solid var(--ln);border-radius:10px;padding:11px 12px;font:inherit;background:#fff;color:var(--ink)}
-  .in:focus{outline:2px solid var(--o);border-color:transparent}
-  .row{display:flex;gap:8px}.row>*{flex:1;min-width:0}
-  .pin,.photo{display:flex;align-items:center;gap:8px;width:100%;border-radius:10px;padding:10px 12px;font:inherit;font-weight:700;margin-top:8px;cursor:pointer;text-align:left}
-  .pin{border:1px dashed var(--o);color:var(--o);background:#fff}.pin.ok{border-style:solid;background:#e3f4ea;border-color:#b8e2c8;color:var(--green)}
-  .photo{border:1px solid var(--ln);color:var(--mu);background:#fff;font-weight:600}
-  .photo img{width:44px;height:44px;object-fit:cover;border-radius:8px}
-  .days{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}.days::-webkit-scrollbar{display:none}
-  .days button{flex:0 0 auto;width:54px;border:1px solid var(--ln);background:#fff;border-radius:12px;padding:6px 0;font:inherit;font-size:11px;color:var(--mu);font-weight:600;cursor:pointer}
-  .days button b{display:block;font-size:18px;color:var(--ink)}.days button.on{background:var(--o);border-color:var(--o);color:#fff}.days button.on b{color:#fff}
-  .slots{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
-  .s{border:1px solid var(--ln);background:#fff;border-radius:10px;padding:7px 0;text-align:center;font:inherit;font-weight:700;font-size:14px;color:var(--ink);cursor:pointer}
-  .s small{display:block;font-size:10.5px;color:var(--mu);font-weight:600}
-  .s.on{background:var(--o);color:#fff;border-color:var(--o)}.s.on small{color:#fff}
-  .s:disabled{background:repeating-linear-gradient(135deg,#f1f2f4 0 6px,#e8e9ec 6px 12px);color:#a3a5ab;text-decoration:line-through;cursor:not-allowed}.s:disabled small{color:#a3a5ab;text-decoration:none}
-  .btn{display:block;width:100%;border:0;border-radius:999px;background:var(--o);color:#fff;font:inherit;font-weight:800;font-size:16px;padding:15px;cursor:pointer}
-  .btn:disabled{opacity:.5}
-  .note{font-size:12.5px;color:var(--mu);text-align:center;margin-top:10px}
-  .hint{font-size:12.5px;color:var(--mu);margin:8px 2px 0}
-  .err{color:var(--red);font-weight:600;font-size:13px;margin:8px 2px 0;display:none}
-  .done{text-align:center;padding:26px 16px}.done .big{font-size:46px}.done h2{margin:6px 0}
-  a{color:var(--o);font-weight:700}
-  .closed{text-align:center;color:var(--mu);padding:14px 4px}
+  :root{--o:#ff6a00;--od:#e05d00;--ol:#fff4ec;--ink:#111318;--mu:#6b7079;--ln:#e4e6ea;--bg:#f6f7f9;--red:#c62828;--green:#1e8e4e}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+  header{background:#000;color:#fff;padding:14px max(20px,env(safe-area-inset-left)) 14px;display:flex;align-items:center;gap:12px}
+  .logo{font-weight:900;font-size:22px;letter-spacing:-.5px}.logo span{color:var(--o)}
+  header small{color:#aaa;font-size:13px;border-left:1px solid #333;padding-left:12px}
+  main{max-width:520px;margin:0 auto;padding:20px 20px 120px}
+  .intro{margin:0 0 18px}.intro h1{font-size:22px;margin:0 0 4px;letter-spacing:-.3px}.intro p{margin:0;color:var(--mu);font-size:14px}
+  .sec{margin:0 0 22px}
+  h3{margin:0 0 10px;font-size:13px;font-weight:700;color:var(--ink);display:flex;gap:8px;align-items:center}
+  h3 i{font-style:normal;color:var(--mu);font-weight:600;font-size:12px;border:1px solid var(--ln);border-radius:50%;width:20px;height:20px;display:grid;place-items:center;background:#fff}
+  label{display:block;font-size:12.5px;font-weight:600;color:var(--mu);margin:0 0 5px}
+  .f{margin-bottom:12px}
+  .in{width:100%;height:48px;border:1px solid var(--ln);border-radius:12px;padding:0 14px;font:inherit;font-size:15px;background:#fff;color:var(--ink);appearance:none;-webkit-appearance:none}
+  select.in{background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7079' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 14px center;padding-right:36px}
+  select.in:invalid,select.in.ph{color:#9a9da4}
+  .in::placeholder{color:#a3a6ad}
+  .in:focus{outline:none;border-color:var(--o);box-shadow:0 0 0 3px rgba(255,106,0,.15)}
+  .row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .link{display:inline-flex;align-items:center;gap:6px;background:none;border:0;padding:4px 0;color:var(--o);font:inherit;font-weight:600;font-size:14px;cursor:pointer}
+  .link.ok{color:var(--green)}
+  .mach{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+  .mach button{height:44px;border:1px solid var(--ln);background:#fff;border-radius:12px;font:inherit;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mach button.on{border-color:var(--o);background:var(--ol);color:var(--od);box-shadow:inset 0 0 0 1px var(--o)}
+  .photo{display:flex;align-items:center;gap:10px;width:100%;height:48px;border:1px dashed #cfd2d8;border-radius:12px;background:#fff;color:var(--mu);font:inherit;font-size:14px;padding:0 14px;cursor:pointer}
+  .photo img{width:32px;height:32px;object-fit:cover;border-radius:6px}
+  .days{display:flex;gap:8px;overflow-x:auto;padding:2px 0 4px;scrollbar-width:none;margin:0 -20px;padding-left:20px;padding-right:20px}.days::-webkit-scrollbar{display:none}
+  .days button{flex:0 0 auto;width:56px;height:62px;border:1px solid var(--ln);background:#fff;border-radius:12px;font:inherit;font-size:11.5px;color:var(--mu);font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+  .days button b{font-size:18px;color:var(--ink);line-height:1.1}.days button.on{background:var(--ink);border-color:var(--ink);color:#bbb}.days button.on b{color:#fff}
+  .slots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}
+  .s{height:44px;border:1px solid var(--ln);background:#fff;border-radius:12px;font:inherit;font-weight:600;font-size:14px;color:var(--ink);cursor:pointer}
+  .s.on{background:var(--o);color:#fff;border-color:var(--o)}
+  .s:disabled{background:transparent;color:#c3c5ca;border-style:dashed;text-decoration:line-through;cursor:not-allowed}
+  .hint{font-size:12.5px;color:var(--mu);margin:10px 0 0}
+  .bar{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);backdrop-filter:blur(8px);border-top:1px solid var(--ln);padding:12px max(20px,env(safe-area-inset-left)) calc(12px + env(safe-area-inset-bottom))}
+  .bar>div{max-width:520px;margin:0 auto}
+  .btn{display:block;width:100%;height:52px;border:0;border-radius:14px;background:var(--o);color:#fff;font:inherit;font-weight:700;font-size:16px;cursor:pointer}
+  .btn:disabled{background:#f3b98e}
+  .sum{font-size:12.5px;color:var(--mu);text-align:center;margin:0 0 8px;min-height:1em}
+  .note{font-size:12.5px;color:var(--mu);text-align:center;margin:6px 0 0}
+  .err{color:var(--red);font-weight:600;font-size:13px;margin:0 0 8px;display:none;text-align:center}
+  .done{text-align:center;padding:40px 10px}.done .big{width:64px;height:64px;border-radius:50%;background:#e3f4ea;color:var(--green);display:grid;place-items:center;font-size:32px;margin:0 auto 14px}.done h2{margin:0 0 8px;font-size:22px}.done p{color:var(--mu);margin:0 0 6px}
+  a{color:var(--o);font-weight:600;text-decoration:none}
+  .closed{text-align:center;color:var(--mu);padding:30px 4px}
 </style>
 </head>
 <body>
-<header><div class="logo" id="lg">Fit<span>X</span></div><small id="cn">Book a service visit</small></header>
+<header><div class="logo" id="lg">Fit<span>X</span></div><small id="cn">Service booking</small></header>
 <main id="m"><div class="card closed">Loading…</div></main>
 <script src="firebase-config.js"></script>
 <script src="vendor/firebase-app-compat.js"></script>
@@ -60,7 +70,7 @@
     'Al Shamal': ['Madinat Al Shamal', 'Al Ruwais', 'Abu Dhalouf', 'Fuwairit', 'Al Zubarah'],
     'Al Shahaniya': ['Al Shahaniya', 'Dukhan', 'Al Kharsaah', 'Umm Bab', 'Zekreet', 'Al Karaana', 'Al Utouriya', 'Abu Samra']
   };
-  const MACHINES = ['Treadmill', 'Elliptical / cross trainer', 'Exercise bike', 'Spin bike', 'Recumbent bike', 'Rowing machine', 'Stepper / stair climber', 'Cable machine / multi-gym', 'Smith machine', 'Weight bench / rack', 'Massage chair', 'Vibration plate', 'Other'];
+  const MACHINES = ['Treadmill', 'Elliptical', 'Exercise bike', 'Spin bike', 'Rowing machine', 'Stepper', 'Cable machine', 'Smith machine', 'Bench / rack', 'Massage chair', 'Vibration plate', 'Other'];
   const m = document.getElementById('m');
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
   const cid = (location.hash || '').replace(/^#/, '').trim();
@@ -104,43 +114,46 @@
     if (!day || !ds.some(d => iso(d) === day)) day = ds.length ? iso(ds[0]) : '';
     m.innerHTML = `
     <form id="f" autocomplete="on" novalidate>
-    <div class="card"><h3><i>1</i>Your details</h3>
-      <div class="row"><div><label for="nm">Name</label><input class="in" id="nm" name="name" autocomplete="name" maxlength="60"></div>
-      <div><label for="ph">Mobile *</label><input class="in" id="ph" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="e.g. 5555 1234" maxlength="20"></div></div></div>
-    <div class="card"><h3><i>2</i>Where</h3>
-      <label for="ar">Area *</label><select class="in" id="ar"><option value="">Choose your area…</option>${Object.entries(AREAS).map(([g, l]) => `<optgroup label="${esc(g)}">${l.slice().sort().map(a => `<option>${esc(a)}</option>`).join('')}</optgroup>`).join('')}<option>Other</option></select>
-      <div class="row"><div><label for="bd">Building</label><input class="in" id="bd" inputmode="numeric" maxlength="10"></div><div><label for="st">Street</label><input class="in" id="st" inputmode="numeric" maxlength="10"></div><div><label for="zn">Zone</label><input class="in" id="zn" inputmode="numeric" maxlength="10"></div></div>
-      <button type="button" class="pin" id="pin">📍 Share my location</button></div>
-    <div class="card"><h3><i>3</i>Machine &amp; problem</h3>
-      <div class="row"><div><label for="mc">Machine *</label><select class="in" id="mc"><option value="">Choose…</option>${MACHINES.map(x => `<option>${esc(x)}</option>`).join('')}</select></div>
-      <div><label for="br">Brand</label><input class="in" id="br" maxlength="40" placeholder="e.g. Life Fitness"></div></div>
-      <label for="pr">Problem *</label><input class="in" id="pr" maxlength="300" placeholder="What is wrong?">
+    <div class="intro"><h1>Book a service visit</h1><p>Takes about a minute. We'll confirm on WhatsApp.</p></div>
+    <div class="sec"><h3><i>1</i>Your details</h3>
+      <div class="f"><label for="nm">Name</label><input class="in" id="nm" name="name" autocomplete="name" maxlength="60" placeholder="Your name"></div>
+      <div class="f"><label for="ph">Mobile</label><input class="in" id="ph" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="5555 1234" maxlength="20"></div></div>
+    <div class="sec"><h3><i>2</i>Address</h3>
+      <div class="f"><label for="ar">Area</label><select class="in ph" id="ar"><option value="">Select area</option>${Object.entries(AREAS).map(([g, l]) => `<optgroup label="${esc(g)}">${l.slice().sort().map(a => `<option>${esc(a)}</option>`).join('')}</optgroup>`).join('')}<option>Other</option></select></div>
+      <div class="row f"><div><label for="bd">Building</label><input class="in" id="bd" inputmode="numeric" maxlength="10"></div><div><label for="st">Street</label><input class="in" id="st" inputmode="numeric" maxlength="10"></div><div><label for="zn">Zone</label><input class="in" id="zn" inputmode="numeric" maxlength="10"></div></div>
+      <button type="button" class="link" id="pin">📍 Share my location</button></div>
+    <div class="sec"><h3><i>3</i>Machine &amp; problem</h3>
+      <div class="mach" id="mcs">${MACHINES.map(x => `<button type="button" data-m="${esc(x)}">${esc(x)}</button>`).join('')}</div>
+      <input type="hidden" id="mc">
+      <div class="f"><label for="br">Brand <span style="font-weight:400">(optional)</span></label><input class="in" id="br" maxlength="40" placeholder="e.g. Life Fitness"></div>
+      <div class="f"><label for="pr">Problem</label><input class="in" id="pr" maxlength="300" placeholder="What is wrong with the machine?"></div>
       <input type="file" id="ph1" accept="image/*" hidden>
-      <button type="button" class="photo" id="phb">📷 Add a photo (optional)</button></div>
-    <div class="card"><h3><i>4</i>Day &amp; time</h3>
+      <button type="button" class="photo" id="phb">📷 Add a photo <span style="margin-left:auto;font-size:12px">optional</span></button></div>
+    <div class="sec"><h3><i>4</i>Date &amp; time</h3>
       ${ds.length ? `<div class="days">${ds.map(d => `<button type="button" data-d="${iso(d)}" class="${iso(d) === day ? 'on' : ''}">${d.toLocaleDateString('en-GB', {weekday: 'short'})}<b>${d.getDate()}</b></button>`).join('')}</div>
       <div class="slots" id="sl"></div>
-      <p class="hint">Visits ${t12(cfg.from || 9).join(' ')} – ${t12(cfg.to || 21).join(' ')} · about 1 hour · Friday closed</p>` : '<div class="closed">No free times in the next two weeks. Please call or WhatsApp us.</div>'}</div>
-    <p class="err" id="er"></p>
-    <button type="submit" class="btn" id="go" ${ds.length ? '' : 'disabled'}>Book visit</button>
-    <p class="note">We'll confirm your booking on WhatsApp.${co.phone ? `<br>Questions? Call <a href="tel:${esc(co.phone)}">${esc(co.phone)}</a>` : ''}</p>
+      <p class="hint">Saturday – Thursday · 9 AM – 9 PM · visits take about 1 hour</p>` : '<div class="closed">No free times in the next two weeks. Please call or WhatsApp us.</div>'}</div>
+    ${co.phone ? `<p class="note">Questions? Call <a href="tel:${esc(co.phone)}">${esc(co.phone)}</a></p>` : ''}
+    <div class="bar"><div><p class="err" id="er"></p><p class="sum" id="sum"></p><button type="submit" class="btn" id="go" ${ds.length ? '' : 'disabled'}>Book visit</button></div></div>
     </form>`;
     const f = document.getElementById('f');
     const drawSlots = () => {
       const box = document.getElementById('sl'); if (!box) return;
       if (slot && !freeSlots(day).some(s => s.t === slot)) slot = '';
-      box.innerHTML = allSlots(day).map(s => { const [h, ap] = t12(s.h); return `<button type="button" class="s${s.t === slot ? ' on' : ''}" data-t="${s.t}" ${s.busy ? 'disabled' : ''}>${h}<small>${s.busy ? (s.past ? 'passed' : 'booked') : ap}</small></button>`; }).join('');
+      box.innerHTML = allSlots(day).map(s => { const [h, ap] = t12(s.h); return `<button type="button" class="s${s.t === slot ? ' on' : ''}" data-t="${s.t}" ${s.busy ? 'disabled title="' + (s.past ? 'Passed' : 'Booked') + '"' : ''}>${h.replace(':00', '')} ${ap.toLowerCase()}</button>`; }).join('');
       box.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { slot = b.dataset.t; drawSlots(); label(); });
       label();
     };
-    const label = () => { const b = document.getElementById('go'); if (!b || !day) return; const d = new Date(day + 'T00:00:00'); b.textContent = 'Book visit' + (slot ? ' · ' + d.toLocaleDateString('en-GB', {weekday: 'short', day: 'numeric', month: 'short'}) + ', ' + t12(+slot.slice(0, 2)).join(' ') : ''); };
+    const label = () => { const sm = document.getElementById('sum'); if (!sm || !day) return; const d = new Date(day + 'T00:00:00'); sm.textContent = slot ? d.toLocaleDateString('en-GB', {weekday: 'long', day: 'numeric', month: 'short'}) + ' · ' + t12(+slot.slice(0, 2)).join(' ') : 'Choose a date and time'; };
     f.querySelectorAll('.days [data-d]').forEach(b => b.onclick = () => { day = b.dataset.d; f.querySelectorAll('.days [data-d]').forEach(x => x.classList.toggle('on', x === b)); drawSlots(); });
     drawSlots();
+    f.querySelectorAll('#mcs [data-m]').forEach(b => b.onclick = () => { document.getElementById('mc').value = b.dataset.m; f.querySelectorAll('#mcs [data-m]').forEach(x => x.classList.toggle('on', x === b)); });
+    document.getElementById('ar').onchange = e => e.target.classList.toggle('ph', !e.target.value);
     document.getElementById('pin').onclick = e => {
       const b = e.currentTarget;
       if (!navigator.geolocation) { b.textContent = '📍 Location not available on this phone'; return; }
       b.textContent = '📍 Getting your location…';
-      navigator.geolocation.getCurrentPosition(p => { loc = 'https://maps.google.com/?q=' + p.coords.latitude.toFixed(6) + ',' + p.coords.longitude.toFixed(6); b.textContent = '✅ Location added'; b.classList.add('ok'); },
+      navigator.geolocation.getCurrentPosition(p => { loc = 'https://maps.google.com/?q=' + p.coords.latitude.toFixed(6) + ',' + p.coords.longitude.toFixed(6); b.textContent = '✓ Location added'; b.classList.add('ok'); },
         () => { b.textContent = '📍 Could not get location – tap to try again'; }, {enableHighAccuracy: true, timeout: 15000});
     };
     const pf = document.getElementById('ph1');
@@ -150,13 +163,13 @@
       const img = new Image(), url = URL.createObjectURL(file);
       img.onload = () => { const k = Math.min(1, 900 / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
         photo = c.toDataURL('image/jpeg', 0.6); if (photo.length > 550000) photo = c.toDataURL('image/jpeg', 0.4); URL.revokeObjectURL(url);
-        document.getElementById('phb').innerHTML = `<img src="${photo}" alt=""> Photo added – tap to change`; };
+        document.getElementById('phb').innerHTML = `<img src="${photo}" alt=""> Photo added <span style="margin-left:auto;font-size:12px">change</span>`; };
       img.src = url;
     };
     f.onsubmit = e => {
       e.preventDefault();
       const v = id => document.getElementById(id).value.trim(), er = document.getElementById('er');
-      const say = t => { er.textContent = t; er.style.display = 'block'; er.scrollIntoView({block: 'center'}); };
+      const say = t => { er.textContent = t; er.style.display = 'block'; };
       const digits = v('ph').replace(/\D/g, '');
       if (digits.length < 8) return say('Please enter your mobile number.');
       if (!v('ar')) return say('Please choose your area.');
@@ -169,10 +182,10 @@
         machine: v('mc'), brand: v('br'), problem: v('pr'), date: day, time: slot, photo, created: Date.now()};
       fs.collection('bookings').add(rec).then(() => {
         const d = new Date(day + 'T00:00:00'), co = cfg.co || {};
-        m.innerHTML = `<div class="card done"><div class="big">✅</div><h2>Request received</h2><p>${esc(d.toLocaleDateString('en-GB', {weekday: 'long', day: 'numeric', month: 'long'}))} · ${t12(+slot.slice(0, 2)).join(' ')}<br>${esc(rec.machine)} – ${esc(rec.problem)}</p>
+        m.innerHTML = `<div class="done"><div class="big">✓</div><h2>Request received</h2><p>${esc(d.toLocaleDateString('en-GB', {weekday: 'long', day: 'numeric', month: 'long'}))} · ${t12(+slot.slice(0, 2)).join(' ')}<br>${esc(rec.machine)} – ${esc(rec.problem)}</p>
           <p class="note" style="font-size:14px">We'll confirm on WhatsApp shortly.${co.phone ? `<br>Questions? Call <a href="tel:${esc(co.phone)}">${esc(co.phone)}</a>` : ''}</p></div>`;
         window.scrollTo(0, 0);
-      }).catch(err => { go.disabled = false; label(); say('Could not send – please check your internet and try again. (' + (err && (err.code || err.message)) + ')'); });
+      }).catch(err => { go.disabled = false; go.textContent = 'Book visit'; say('Could not send – please check your internet and try again. (' + (err && (err.code || err.message)) + ')'); });
     };
   }
 })();
