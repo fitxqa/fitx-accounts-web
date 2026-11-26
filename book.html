@@ -96,7 +96,7 @@
   const cid = (location.hash || '').replace(/^#/, '').trim();
   const fail = t => { m.innerHTML = '<div class="card closed">' + t + '</div>'; };
   if (!/^[A-Za-z0-9]{10,40}$/.test(cid)) { fail('This booking link is not complete. Please open the full link you received.'); return; }
-  let fs; try { firebase.initializeApp(window.FITX_FIREBASE); fs = firebase.firestore(); try { fs.settings({experimentalForceLongPolling: true}); } catch (e) {}   // works inside WhatsApp / in-app browsers and strict networks } catch (e) { fail('Booking is not available right now. Please call us.'); return; }
+  let fs; try { firebase.initializeApp(window.FITX_FIREBASE); fs = firebase.firestore(); try { fs.settings({experimentalForceLongPolling: true}); } catch (e) {} } catch (e) { fail('Booking is not available right now. Please call us.'); return; }
   const pad = n => String(n).padStart(2, '0');
   const iso = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
   const h12 = h => h % 12 || 12;
