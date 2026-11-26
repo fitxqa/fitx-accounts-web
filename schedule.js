@@ -65,10 +65,12 @@
       const day = dIn.value, tid = tech ? tech.value : '', e = ex();
       const busy = busyOn(day, tid, e.wo, e.appt), cur = mins(tIn.value);
       let html = '';
-      for (let m = SLOT_FROM * 60; m <= SLOT_TO * 60 - STEP; m += STEP) {
-        const hit = busy.find(b => Math.abs(b.m - m) < LEN), [h, ap] = t12(hhmm(m));
-        html += hit ? `<button type="button" class="qs busy" disabled title="${esc(hit.who)}"><b>${h}</b><small>${ap} · booked</small></button>`
-          : `<button type="button" class="qs${cur === m ? ' on' : ''}" data-t="${hhmm(m)}"><b>${h}</b><small>${ap}</small></button>`;
+      // one-hour slots, same as the customer booking page (9–10 am … 9–10 pm)
+      const h12 = h => h % 12 || 12;
+      for (let hr = SLOT_FROM; hr < SLOT_TO; hr++) {
+        const m = hr * 60, hit = busy.find(b => Math.abs(b.m - m) < LEN), lab = `${h12(hr)}–${h12(hr + 1)}<span>${hr + 1 < 12 ? 'am' : 'pm'}</span>`;
+        html += hit ? `<button type="button" class="qs busy" disabled title="Booked – ${esc(hit.who)}">${lab}</button>`
+          : `<button type="button" class="qs${cur != null && cur >= m && cur < m + 60 ? ' on' : ''}" data-t="${hhmm(m)}">${lab}</button>`;
       }
       box.innerHTML = `<div class="qsh"><span>Time slot</span><small>${busy.length ? busy.length + ' booked' + (tid ? ' for ' + esc(emp(tid).split(' ')[0]) : '') : 'all free'} · ${esc(dfmt(day))}</small></div><div class="qsg">${html}</div>`;
       box.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { tIn.value = b.dataset.t; tIn.dispatchEvent(new Event('input', {bubbles: true})); draw(); });
@@ -357,11 +359,11 @@
   .sv .badge{align-self:flex-start;white-space:nowrap}
   .badge.b-purple{background:#efe7fb;color:#6b3fb5}.badge.b-orange{background:#ffe9d6;color:#b04a00}
   .qslot{margin:-2px 0 12px}.qsh{display:flex;align-items:baseline;justify-content:space-between;margin:0 2px 6px;font-size:13px;font-weight:700;color:var(--muted)}.qsh small{font-weight:600}
-  .qsg{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:6px;max-height:190px;overflow-y:auto;padding:2px}
-  .qs{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:6px 2px;display:flex;flex-direction:column;align-items:center;color:var(--text);cursor:pointer}
-  .qs b{font-size:14px}.qs small{font-size:10.5px;color:var(--muted);font-weight:600}
-  .qs.on{background:var(--orange);border-color:var(--orange);color:#fff}.qs.on small{color:#fff}
-  .qs.busy{background:repeating-linear-gradient(135deg,#f1f2f4 0 6px,#e8e9ec 6px 12px);color:#9a9ca3;cursor:not-allowed;text-decoration:line-through}.qs.busy small{color:#b3261e;text-decoration:none}`;
+  .qsg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:2px}
+  .qs{height:44px;border:1px solid var(--line);background:var(--card);border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;color:var(--text);cursor:pointer;padding:0}
+  .qs span{font-size:11px;font-weight:600;opacity:.75;margin-left:2px}
+  .qs.on{background:var(--orange);border-color:var(--orange);color:#fff}
+  .qs.busy{background:transparent;color:#c3c5ca;border-style:dashed;text-decoration:line-through;cursor:not-allowed}`;
   document.head.appendChild(css);
 
   // enhance forms as they open
