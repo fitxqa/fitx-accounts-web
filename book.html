@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Book a service visit</title>
 <meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&display=swap" rel="stylesheet">
 <style>
   :root{--o:#ff6a00;--od:#e05d00;--ol:#fff4ec;--ink:#111318;--mu:#6b7079;--ln:#e4e6ea;--bg:#f6f7f9;--red:#c62828;--green:#1e8e4e}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -17,7 +19,7 @@
   .sec{margin:0 0 14px}
   h3{margin:0 0 8px;font-size:13px;font-weight:700;color:var(--ink);display:flex;gap:8px;align-items:center}
   h3 i{font-style:normal;color:var(--mu);font-weight:600;font-size:12px;border:1px solid var(--ln);border-radius:50%;width:20px;height:20px;display:grid;place-items:center;background:#fff}
-  label{display:block;font-size:12px;font-weight:600;color:var(--mu);margin:0 0 4px}
+  label{display:block;font-size:12px;font-weight:600;color:var(--mu);margin:0 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .f{margin-bottom:8px}
   .in{width:100%;height:44px;border:1px solid var(--ln);border-radius:12px;padding:0 14px;font:inherit;font-size:15px;background:#fff;color:var(--ink);appearance:none;-webkit-appearance:none}
   select.in{background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7079' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 14px center;padding-right:36px}
@@ -26,12 +28,15 @@
   .in:focus{outline:none;border-color:var(--o);box-shadow:0 0 0 3px rgba(255,106,0,.15)}
   .row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
   .row2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .locbtn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:46px;border:0;border-radius:12px;background:var(--o);color:#fff;font-family:Poppins,system-ui,sans-serif;font-weight:500;font-size:15px;letter-spacing:.2px;cursor:pointer;box-shadow:0 2px 8px rgba(255,106,0,.25)}
+  .locbtn svg{width:18px;height:18px;flex-shrink:0}
+  .locbtn.ok{background:var(--green);box-shadow:0 2px 8px rgba(30,142,78,.25)}
   .link{display:inline-flex;align-items:center;gap:6px;background:none;border:0;padding:4px 0;color:var(--o);font:inherit;font-weight:600;font-size:14px;cursor:pointer}
   .link.ok{color:var(--green)}
   .mach{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
   .mach button{height:44px;border:1px solid var(--ln);background:#fff;border-radius:12px;font:inherit;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .mach button.on{border-color:var(--o);background:var(--ol);color:var(--od);box-shadow:inset 0 0 0 1px var(--o)}
-  .photo{display:flex;align-items:center;justify-content:center;gap:6px;width:44px;flex:0 0 44px;height:44px;padding:0!important;border:1px dashed #cfd2d8;border-radius:12px;background:#fff;color:var(--mu);font:inherit;font-size:14px;padding:0 14px;cursor:pointer}
+  .photo{display:flex;align-items:center;justify-content:center;gap:6px;width:44px;flex:0 0 44px;height:44px;padding:0!important;border:1px solid var(--ln);color:var(--od)!important;border-radius:12px;background:#fff;color:var(--mu);font:inherit;font-size:14px;padding:0 14px;cursor:pointer}
   .photo img{width:40px;height:40px;object-fit:cover;border-radius:10px}
   .pp{display:flex;gap:8px}.pp .in{flex:1}
   .lab2{display:flex;justify-content:space-between;align-items:baseline}.lab2 .link{font-size:12.5px;padding:0}
@@ -122,13 +127,14 @@
       <div class="row2 f"><div><label for="nm">Name</label><input class="in" id="nm" name="name" autocomplete="name" maxlength="60" placeholder="Your name"></div>
       <div><label for="ph">Mobile</label><input class="in" id="ph" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="5555 1234" maxlength="20"></div></div></div>
     <div class="sec"><h3><i>2</i>Address</h3>
-      <div class="f"><div class="lab2"><label for="ar">Area</label><button type="button" class="link" id="pin">📍 Share location</button></div><select class="in ph" id="ar"><option value="">Select area</option>${Object.entries(AREAS).map(([g, l]) => `<optgroup label="${esc(g)}">${l.slice().sort().map(a => `<option>${esc(a)}</option>`).join('')}</optgroup>`).join('')}<option>Other</option></select></div>
+      <div class="f"><label for="ar">Area</label><select class="in ph" id="ar"><option value="">Select area</option>${Object.entries(AREAS).map(([g, l]) => `<optgroup label="${esc(g)}">${l.slice().sort().map(a => `<option>${esc(a)}</option>`).join('')}</optgroup>`).join('')}<option>Other</option></select></div>
       <div class="row f"><div><label for="bd">Building</label><input class="in" id="bd" inputmode="numeric" maxlength="10"></div><div><label for="st">Street</label><input class="in" id="st" inputmode="numeric" maxlength="10"></div><div><label for="zn">Zone</label><input class="in" id="zn" inputmode="numeric" maxlength="10"></div></div>
+      <button type="button" class="locbtn" id="pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Share My Location</span></button>
 </div>
     <div class="sec"><h3><i>3</i>Machine &amp; problem</h3>
       <div class="row2 f"><div><label for="mc">Machine</label><select class="in ph" id="mc"><option value="">Select</option>${MACHINES.map(x => `<option>${esc(x)}</option>`).join('')}</select></div>
-      <div><label for="br">Brand <span style="font-weight:400">(optional)</span></label><input class="in" id="br" maxlength="40" placeholder="e.g. Life Fitness"></div></div>
-      <label for="pr">Problem</label><div class="pp"><input class="in" id="pr" maxlength="300" placeholder="What is wrong?"><input type="file" id="ph1" accept="image/*" hidden><button type="button" class="photo" id="phb" title="Add a photo (optional)" aria-label="Add a photo">📷</button></div></div>
+      <div><label for="br">Brand</label><input class="in" id="br" maxlength="40" placeholder="Optional"></div></div>
+      <label for="pr">Problem</label><div class="pp"><input class="in" id="pr" maxlength="300" placeholder="What is wrong?"><input type="file" id="ph1" accept="image/*" hidden><button type="button" class="photo" id="phb" title="Add a photo (optional)" aria-label="Add a photo"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button></div></div>
     <div class="sec"><h3><i>4</i>Date &amp; time</h3>
       ${ds.length ? `<div class="days">${ds.map(d => `<button type="button" data-d="${iso(d)}" class="${iso(d) === day ? 'on' : ''}">${d.toLocaleDateString('en-GB', {weekday: 'short'})}<b>${d.getDate()}</b></button>`).join('')}</div>
       <div class="slots" id="sl"></div>
@@ -151,10 +157,10 @@
     document.getElementById('ar').onchange = e => e.target.classList.toggle('ph', !e.target.value);
     document.getElementById('pin').onclick = e => {
       const b = e.currentTarget;
-      if (!navigator.geolocation) { b.textContent = '📍 Location not available on this phone'; return; }
-      b.textContent = '📍 Getting your location…';
-      navigator.geolocation.getCurrentPosition(p => { loc = 'https://maps.google.com/?q=' + p.coords.latitude.toFixed(6) + ',' + p.coords.longitude.toFixed(6); b.textContent = '✓ Location added'; b.classList.add('ok'); },
-        () => { b.textContent = '📍 Could not get location – tap to try again'; }, {enableHighAccuracy: true, timeout: 15000});
+      if (!navigator.geolocation) { b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Location not available</span>'; return; }
+      b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Getting Your Location…</span>';
+      navigator.geolocation.getCurrentPosition(p => { loc = 'https://maps.google.com/?q=' + p.coords.latitude.toFixed(6) + ',' + p.coords.longitude.toFixed(6); b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>Location Added</span>'; b.classList.add('ok'); },
+        () => { b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Could not get location – tap to retry</span>'; }, {enableHighAccuracy: true, timeout: 15000});
     };
     const pf = document.getElementById('ph1');
     document.getElementById('phb').onclick = () => pf.click();
