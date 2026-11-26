@@ -156,7 +156,7 @@
   function allSlots(ds) {
     const from = cfg.from || 9, to = cfg.to || 21, now = new Date(), out = [];
     for (let h = from; h <= to - 1; h++) {
-      const past = ds === iso(now) && h <= now.getHours() + 1;   // at least ~1 hour notice
+      const past = ds === iso(now) && h * 60 < now.getHours() * 60 + now.getMinutes() + 30;   // at least 30 minutes' notice
       out.push({h, t: pad(h) + ':00', busy: past || ((cfg.busy || {})[ds] || []).includes(pad(h) + ':00'), past});
     }
     return out;
