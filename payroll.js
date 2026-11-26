@@ -182,7 +182,7 @@
     .slip td.n{text-align:right}
     .slip .eqt td{word-break:break-word}
     .slip .netbox{margin-top:12px;background:#ff6a00;color:#fff;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;font-weight:800;font-size:15px}
-    body.role-tech #side [data-tab=payroll], body.role-tech #side [data-tab=tax], body.role-tech #mPayroll, body.role-tech #mTax{display:none!important}`;
+    body.role-tech .quick .qpay, body.role-tech #side [data-tab=payroll], body.role-tech #side [data-tab=tax], body.role-tech #mPayroll, body.role-tech #mTax{display:none!important}`;
   document.head.appendChild(css);
 
   const btn = (id, label, cls) => `<button type="button" class="btn ${cls || ''}" id="${id}">${label}</button>`;
