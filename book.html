@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Book a service visit</title>
+<meta name="robots" content="noindex">
+<style>
+  :root{--o:#ff6a00;--ol:#fff1e6;--ink:#16181d;--mu:#6b7079;--ln:#e6e8ec;--red:#b3261e;--green:#1e8e4e}
+  *{box-sizing:border-box}
+  body{margin:0;background:#f3f4f6;color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+  header{background:#000;color:#fff;padding:18px max(16px,env(safe-area-inset-left)) 16px}
+  .logo{font-weight:900;font-size:26px;letter-spacing:-.5px}.logo span{color:var(--o)}
+  header small{display:block;color:#bbb;font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+  main{max-width:560px;margin:0 auto;padding:14px 16px 40px}
+  .card{background:#fff;border:1px solid var(--ln);border-radius:16px;padding:14px;margin-bottom:12px}
+  h3{margin:0 0 6px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);display:flex;gap:8px;align-items:center}
+  h3 i{font-style:normal;background:var(--o);color:#fff;border-radius:50%;width:20px;height:20px;display:grid;place-items:center;font-size:12px}
+  label{display:block;font-size:13px;font-weight:600;color:var(--mu);margin:8px 0 4px}
+  .in{width:100%;border:1px solid var(--ln);border-radius:10px;padding:11px 12px;font:inherit;background:#fff;color:var(--ink)}
+  .in:focus{outline:2px solid var(--o);border-color:transparent}
+  .row{display:flex;gap:8px}.row>*{flex:1;min-width:0}
+  .pin,.photo{display:flex;align-items:center;gap:8px;width:100%;border-radius:10px;padding:10px 12px;font:inherit;font-weight:700;margin-top:8px;cursor:pointer;text-align:left}
+  .pin{border:1px dashed var(--o);color:var(--o);background:#fff}.pin.ok{border-style:solid;background:#e3f4ea;border-color:#b8e2c8;color:var(--green)}
+  .photo{border:1px solid var(--ln);color:var(--mu);background:#fff;font-weight:600}
+  .photo img{width:44px;height:44px;object-fit:cover;border-radius:8px}
+  .days{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}.days::-webkit-scrollbar{display:none}
+  .days button{flex:0 0 auto;width:54px;border:1px solid var(--ln);background:#fff;border-radius:12px;padding:6px 0;font:inherit;font-size:11px;color:var(--mu);font-weight:600;cursor:pointer}
+  .days button b{display:block;font-size:18px;color:var(--ink)}.days button.on{background:var(--o);border-color:var(--o);color:#fff}.days button.on b{color:#fff}
+  .slots{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+  .s{border:1px solid var(--ln);background:#fff;border-radius:10px;padding:7px 0;text-align:center;font:inherit;font-weight:700;font-size:14px;color:var(--ink);cursor:pointer}
+  .s small{display:block;font-size:10.5px;color:var(--mu);font-weight:600}
+  .s.on{background:var(--o);color:#fff;border-color:var(--o)}.s.on small{color:#fff}
+  .s:disabled{background:repeating-linear-gradient(135deg,#f1f2f4 0 6px,#e8e9ec 6px 12px);color:#a3a5ab;text-decoration:line-through;cursor:not-allowed}.s:disabled small{color:#a3a5ab;text-decoration:none}
+  .btn{display:block;width:100%;border:0;border-radius:999px;background:var(--o);color:#fff;font:inherit;font-weight:800;font-size:16px;padding:15px;cursor:pointer}
+  .btn:disabled{opacity:.5}
+  .note{font-size:12.5px;color:var(--mu);text-align:center;margin-top:10px}
+  .hint{font-size:12.5px;color:var(--mu);margin:8px 2px 0}
+  .err{color:var(--red);font-weight:600;font-size:13px;margin:8px 2px 0;display:none}
+  .done{text-align:center;padding:26px 16px}.done .big{font-size:46px}.done h2{margin:6px 0}
+  a{color:var(--o);font-weight:700}
+  .closed{text-align:center;color:var(--mu);padding:14px 4px}
+</style>
+</head>
+<body>
+<header><div class="logo" id="lg">Fit<span>X</span></div><small id="cn">Book a service visit</small></header>
+<main id="m"><div class="card closed">Loading…</div></main>
+<script src="firebase-config.js"></script>
+<script src="vendor/firebase-app-compat.js"></script>
+<script src="vendor/firebase-firestore-compat.js"></script>
+<script>
+(function () {
+  const AREAS = {
+    'Doha': ['Abu Hamour', 'Ain Khaled', 'Al Asiri', 'Al Bidda', 'Al Dafna', 'Al Doha Al Jadeeda', 'Al Egla', 'Al Ghanim', 'Al Hilal', 'Al Hitmi', 'Al Jasra', 'Al Khulaifat', 'Al Maamoura', 'Al Mansoura', 'Al Markhiya', 'Al Mirqab', 'Al Messila', 'Al Muntazah', 'Al Najada', 'Al Nasr', 'Al Rumailah', 'Al Sadd', 'Al Souq', 'Al Tarfa', 'Al Thumama', 'Al Waab', 'Barwa Commercial Avenue', 'Corniche', 'Doha Port', 'Duhail', 'Fereej Abdel Aziz', 'Fereej Bin Durham', 'Fereej Bin Mahmoud', 'Fereej Bin Omran', 'Fereej Kulaib', 'Gewan Island', 'Hazm Al Markhiya', 'Industrial Area', 'Jelaiah', 'Jeryan Nejaima', 'Katara', 'Leqtaifiya', 'Madinat Khalifa North', 'Madinat Khalifa South', 'Msheireb', 'Mushayrib', 'Najma', 'Nuaija', 'Old Airport', 'Onaiza', 'Qetaifan Island', 'Ras Abu Aboud', 'Rawdat Al Khail', 'The Pearl', 'Umm Ghuwailina', 'Umm Lekhba', 'Wadi Al Sail', 'West Bay', 'West Bay Lagoon'],
+    'Al Rayyan': ['Abu Nakhla', 'Al Aziziya', 'Al Gharrafa', 'Al Luqta', 'Al Rayyan Al Jadeed', 'Al Rayyan Al Qadeem', 'Al Sailiya', 'Al Shagub', 'Al Soudan', 'Al Wajba', 'Aspire Zone', 'Baaya', 'Bani Hajer', 'Education City', 'Fereej Al Murra', 'Gharrafat Al Rayyan', 'Izghawa', 'Mebaireek', 'Mehairja', 'Muaither', 'Murraikh', 'New Al Rayyan', 'Old Al Rayyan', 'Umm Al Seneem', 'Wadi Al Banat'],
+    'Al Daayen': ['Al Kharaitiyat', 'Jeryan Jenaihat', 'Leabaib', 'Lusail', 'Rawdat Al Hamama', 'Simaisma', 'Umm Qarn', 'Wadi Lusail'],
+    'Umm Salal': ['Al Kheesa', 'Al Ebb', 'Bu Fasseela', 'Umm Salal Ali', 'Umm Salal Mohammed', 'Umm Al Amad'],
+    'Al Wakrah': ['Al Wakrah', 'Al Wukair', 'Al Mashaf', 'Barwa City', 'Barwa Village', 'Birkat Al Awamer', 'Ezdan Village', 'Mesaieed', 'Sealine', 'Umm Besher'],
+    'Al Khor & Al Thakhira': ['Al Khor', 'Al Thakhira', 'Ras Laffan', 'Simsima', 'Al Ghuwariyah', 'Umm Birka'],
+    'Al Shamal': ['Madinat Al Shamal', 'Al Ruwais', 'Abu Dhalouf', 'Fuwairit', 'Al Zubarah'],
+    'Al Shahaniya': ['Al Shahaniya', 'Dukhan', 'Al Kharsaah', 'Umm Bab', 'Zekreet', 'Al Karaana', 'Al Utouriya', 'Abu Samra']
+  };
+  const MACHINES = ['Treadmill', 'Elliptical / cross trainer', 'Exercise bike', 'Spin bike', 'Recumbent bike', 'Rowing machine', 'Stepper / stair climber', 'Cable machine / multi-gym', 'Smith machine', 'Weight bench / rack', 'Massage chair', 'Vibration plate', 'Other'];
+  const m = document.getElementById('m');
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  const cid = (location.hash || '').replace(/^#/, '').trim();
+  const fail = t => { m.innerHTML = '<div class="card closed">' + t + '</div>'; };
+  if (!/^[A-Za-z0-9]{10,40}$/.test(cid)) { fail('This booking link is not complete. Please open the full link you received.'); return; }
+  let fs; try { firebase.initializeApp(window.FITX_FIREBASE); fs = firebase.firestore(); } catch (e) { fail('Booking is not available right now. Please call us.'); return; }
+  const pad = n => String(n).padStart(2, '0');
+  const iso = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  const t12 = h => { const ap = h >= 12 ? 'PM' : 'AM'; return [(h % 12 || 12) + ':00', ap]; };
+  let cfg, day = '', slot = '', loc = '', photo = '';
+
+  fs.collection('slots').doc(cid).get().then(snap => {
+    if (!snap.exists) { fail('Online booking is not open yet. Please call or WhatsApp us.'); return; }
+    cfg = snap.data();
+    const co = cfg.co || {};
+    if (co.name) { document.title = 'Book a visit · ' + co.name; if (!/fitx/i.test(co.name)) document.getElementById('lg').textContent = co.name; }
+    draw();
+  }).catch(e => fail('Booking is not available right now. Please call or WhatsApp us.<br><small style="color:#aaa">(' + esc(e && (e.code || e.message)) + ')</small>'));
+
+  function days() {
+    const out = [], now = new Date(), closed = cfg.closed || [5];
+    for (let i = 0; out.length < 14 && i < 30; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+      if (closed.includes(d.getDay())) continue;
+      if (freeSlots(iso(d)).length) out.push(d);
+    }
+    return out;
+  }
+  function allSlots(ds) {
+    const from = cfg.from || 9, to = cfg.to || 21, now = new Date(), out = [];
+    for (let h = from; h <= to - 1; h++) {
+      const past = ds === iso(now) && h <= now.getHours() + 1;   // at least ~1 hour notice
+      out.push({h, t: pad(h) + ':00', busy: past || ((cfg.busy || {})[ds] || []).includes(pad(h) + ':00'), past});
+    }
+    return out;
+  }
+  const freeSlots = ds => allSlots(ds).filter(s => !s.busy);
+
+  function draw() {
+    const co = cfg.co || {}, ds = days();
+    if (!day || !ds.some(d => iso(d) === day)) day = ds.length ? iso(ds[0]) : '';
+    m.innerHTML = `
+    <form id="f" autocomplete="on" novalidate>
+    <div class="card"><h3><i>1</i>Your details</h3>
+      <div class="row"><div><label for="nm">Name</label><input class="in" id="nm" name="name" autocomplete="name" maxlength="60"></div>
+      <div><label for="ph">Mobile *</label><input class="in" id="ph" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="e.g. 5555 1234" maxlength="20"></div></div></div>
+    <div class="card"><h3><i>2</i>Where</h3>
+      <label for="ar">Area *</label><select class="in" id="ar"><option value="">Choose your area…</option>${Object.entries(AREAS).map(([g, l]) => `<optgroup label="${esc(g)}">${l.slice().sort().map(a => `<option>${esc(a)}</option>`).join('')}</optgroup>`).join('')}<option>Other</option></select>
+      <div class="row"><div><label for="bd">Building</label><input class="in" id="bd" inputmode="numeric" maxlength="10"></div><div><label for="st">Street</label><input class="in" id="st" inputmode="numeric" maxlength="10"></div><div><label for="zn">Zone</label><input class="in" id="zn" inputmode="numeric" maxlength="10"></div></div>
+      <button type="button" class="pin" id="pin">📍 Share my location</button></div>
+    <div class="card"><h3><i>3</i>Machine &amp; problem</h3>
+      <div class="row"><div><label for="mc">Machine *</label><select class="in" id="mc"><option value="">Choose…</option>${MACHINES.map(x => `<option>${esc(x)}</option>`).join('')}</select></div>
+      <div><label for="br">Brand</label><input class="in" id="br" maxlength="40" placeholder="e.g. Life Fitness"></div></div>
+      <label for="pr">Problem *</label><input class="in" id="pr" maxlength="300" placeholder="What is wrong?">
+      <input type="file" id="ph1" accept="image/*" hidden>
+      <button type="button" class="photo" id="phb">📷 Add a photo (optional)</button></div>
+    <div class="card"><h3><i>4</i>Day &amp; time</h3>
+      ${ds.length ? `<div class="days">${ds.map(d => `<button type="button" data-d="${iso(d)}" class="${iso(d) === day ? 'on' : ''}">${d.toLocaleDateString('en-GB', {weekday: 'short'})}<b>${d.getDate()}</b></button>`).join('')}</div>
+      <div class="slots" id="sl"></div>
+      <p class="hint">Visits ${t12(cfg.from || 9).join(' ')} – ${t12(cfg.to || 21).join(' ')} · about 1 hour · Friday closed</p>` : '<div class="closed">No free times in the next two weeks. Please call or WhatsApp us.</div>'}</div>
+    <p class="err" id="er"></p>
+    <button type="submit" class="btn" id="go" ${ds.length ? '' : 'disabled'}>Book visit</button>
+    <p class="note">We'll confirm your booking on WhatsApp.${co.phone ? `<br>Questions? Call <a href="tel:${esc(co.phone)}">${esc(co.phone)}</a>` : ''}</p>
+    </form>`;
+    const f = document.getElementById('f');
+    const drawSlots = () => {
+      const box = document.getElementById('sl'); if (!box) return;
+      if (slot && !freeSlots(day).some(s => s.t === slot)) slot = '';
+      box.innerHTML = allSlots(day).map(s => { const [h, ap] = t12(s.h); return `<button type="button" class="s${s.t === slot ? ' on' : ''}" data-t="${s.t}" ${s.busy ? 'disabled' : ''}>${h}<small>${s.busy ? (s.past ? 'passed' : 'booked') : ap}</small></button>`; }).join('');
+      box.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { slot = b.dataset.t; drawSlots(); label(); });
+      label();
+    };
+    const label = () => { const b = document.getElementById('go'); if (!b || !day) return; const d = new Date(day + 'T00:00:00'); b.textContent = 'Book visit' + (slot ? ' · ' + d.toLocaleDateString('en-GB', {weekday: 'short', day: 'numeric', month: 'short'}) + ', ' + t12(+slot.slice(0, 2)).join(' ') : ''); };
+    f.querySelectorAll('.days [data-d]').forEach(b => b.onclick = () => { day = b.dataset.d; f.querySelectorAll('.days [data-d]').forEach(x => x.classList.toggle('on', x === b)); drawSlots(); });
+    drawSlots();
+    document.getElementById('pin').onclick = e => {
+      const b = e.currentTarget;
+      if (!navigator.geolocation) { b.textContent = '📍 Location not available on this phone'; return; }
+      b.textContent = '📍 Getting your location…';
+      navigator.geolocation.getCurrentPosition(p => { loc = 'https://maps.google.com/?q=' + p.coords.latitude.toFixed(6) + ',' + p.coords.longitude.toFixed(6); b.textContent = '✅ Location added'; b.classList.add('ok'); },
+        () => { b.textContent = '📍 Could not get location – tap to try again'; }, {enableHighAccuracy: true, timeout: 15000});
+    };
+    const pf = document.getElementById('ph1');
+    document.getElementById('phb').onclick = () => pf.click();
+    pf.onchange = () => {
+      const file = pf.files && pf.files[0]; if (!file) return;
+      const img = new Image(), url = URL.createObjectURL(file);
+      img.onload = () => { const k = Math.min(1, 900 / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        photo = c.toDataURL('image/jpeg', 0.6); if (photo.length > 550000) photo = c.toDataURL('image/jpeg', 0.4); URL.revokeObjectURL(url);
+        document.getElementById('phb').innerHTML = `<img src="${photo}" alt=""> Photo added – tap to change`; };
+      img.src = url;
+    };
+    f.onsubmit = e => {
+      e.preventDefault();
+      const v = id => document.getElementById(id).value.trim(), er = document.getElementById('er');
+      const say = t => { er.textContent = t; er.style.display = 'block'; er.scrollIntoView({block: 'center'}); };
+      const digits = v('ph').replace(/\D/g, '');
+      if (digits.length < 8) return say('Please enter your mobile number.');
+      if (!v('ar')) return say('Please choose your area.');
+      if (!v('mc')) return say('Please choose the machine.');
+      if (!v('pr')) return say('Please tell us the problem.');
+      if (!slot) return say('Please choose a time.');
+      er.style.display = 'none';
+      const go = document.getElementById('go'); go.disabled = true; go.textContent = 'Sending…';
+      const rec = {cid, status: 'new', name: v('nm'), phone: v('ph'), area: v('ar'), building: v('bd'), street: v('st'), zone: v('zn'), maps: loc,
+        machine: v('mc'), brand: v('br'), problem: v('pr'), date: day, time: slot, photo, created: Date.now()};
+      fs.collection('bookings').add(rec).then(() => {
+        const d = new Date(day + 'T00:00:00'), co = cfg.co || {};
+        m.innerHTML = `<div class="card done"><div class="big">✅</div><h2>Request received</h2><p>${esc(d.toLocaleDateString('en-GB', {weekday: 'long', day: 'numeric', month: 'long'}))} · ${t12(+slot.slice(0, 2)).join(' ')}<br>${esc(rec.machine)} – ${esc(rec.problem)}</p>
+          <p class="note" style="font-size:14px">We'll confirm on WhatsApp shortly.${co.phone ? `<br>Questions? Call <a href="tel:${esc(co.phone)}">${esc(co.phone)}</a>` : ''}</p></div>`;
+        window.scrollTo(0, 0);
+      }).catch(err => { go.disabled = false; label(); say('Could not send – please check your internet and try again. (' + (err && (err.code || err.message)) + ')'); });
+    };
+  }
+})();
+</script>
+</body>
+</html>

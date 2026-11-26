@@ -20,7 +20,7 @@
   const OTHER = '__other';
   const ST = {open: ['Open', ''], assigned: ['Assigned', 'b-blue'], progress: ['In progress', 'b-yellow'], parts: ['Waiting parts', 'b-yellow'], approval: ['Waiting approval', 'b-blue'], hold: ['On hold', ''], done: ['Completed', 'b-green'], cancelled: ['Cancelled', 'b-red']};
   const ACTIVE = ['open', 'assigned', 'progress', 'parts', 'approval', 'hold'];
-  const SLOT_FROM = 7, SLOT_TO = 21, STEP = 30, LEN = 60;   // 7:00 – 21:00, every 30 min, a visit takes about 1 hour
+  const SLOT_FROM = 9, SLOT_TO = 21, STEP = 30, LEN = 60;   // 9:00 – 21:00, every 30 min, a visit takes about 1 hour
   const emp = id => ((db.employees || []).find(e => e.id === id) || {}).name || '';
   const cust = id => (db.customers || []).find(c => c.id === id) || {};
   const mins = t => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? +m[1] * 60 + +m[2] : null; };
@@ -144,7 +144,7 @@
     const addr = [c.building && 'Building ' + c.building, c.street && 'Street ' + c.street, c.zone && 'Zone ' + c.zone, c.area].filter(Boolean).join(', ');
     openSheet(a.number, `
       <div class="card" style="margin-top:0"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div><div class="hint" style="margin:0">${a.kind === 'home' ? '🏠 Home visit' : '🏢 Customer'}</div><div style="font-size:19px;font-weight:800">${esc(pName(a))}</div></div>
-        <span class="badge ${a.status === 'cancelled' ? 'b-red' : w ? (ST[w.status] || ST.open)[1] : 'b-blue'}">${a.status === 'cancelled' ? 'Cancelled' : w ? 'Work order ' + esc(w.number) : 'Booked'}</span></div>
+        <span class="badge ${a.status === 'cancelled' ? 'b-red' : w ? (ST[w.status] || ST.open)[1] : a.status === 'requested' ? 'b-orange' : 'b-blue'}">${a.status === 'cancelled' ? 'Cancelled' : w ? 'Work order ' + esc(w.number) : a.status === 'requested' ? 'Requested online' : 'Booked'}</span></div>
         <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin-top:10px">
           <span class="hint" style="margin:0">When</span><b>${esc(dfmt(a.date))}${a.time ? ' · ' + h + ' ' + ap : ''}</b>
           ${a.machine || a.problem ? `<span class="hint" style="margin:0">Job</span><b>${esc([a.machine, a.problem].filter(Boolean).join(' – '))}</b>` : ''}
@@ -152,13 +152,19 @@
           ${phone ? `<span class="hint" style="margin:0">Mobile</span><b>${esc(phone)}</b>` : ''}
           <span class="hint" style="margin:0">Technician</span><b>${esc(emp(a.techId) || 'Not assigned')}</b>
           ${a.notes ? `<span class="hint" style="margin:0">Notes</span><span>${esc(a.notes)}</span>` : ''}</div></div>
-      ${a.status !== 'cancelled' ? (w ? `<button type="button" class="btn pri" id="avWO" style="width:100%">🔧 Open work order ${esc(w.number)}</button>` : `<button type="button" class="btn pri" id="avMake" style="width:100%">🔧 Create work order</button>`) : ''}
+      ${a.photo ? `<img src="${esc(a.photo)}" alt="Photo from the customer" style="width:100%;max-height:260px;object-fit:contain;border-radius:12px;background:#000;margin-bottom:10px">` : ''}
+      ${a.status === 'requested' ? `<div class="btns" style="margin-bottom:10px"><button type="button" class="btn pri" id="avOk" style="flex:2">✅ Confirm & WhatsApp</button><button type="button" class="btn" id="avNo" style="color:var(--red)">Decline</button></div><p class="hint" style="margin:-4px 2px 10px">To change the time: tap Edit, choose a new slot, then Confirm.</p>` : ''}
+      ${a.status !== 'cancelled' && a.status !== 'requested' ? (w ? `<button type="button" class="btn pri" id="avWO" style="width:100%">🔧 Open work order ${esc(w.number)}</button>` : `<button type="button" class="btn pri" id="avMake" style="width:100%">🔧 Create work order</button>`) : ''}
       <div class="btns" style="margin-top:10px;flex-wrap:wrap">
         ${phone ? `<a class="btn" href="tel:${esc(phone)}">📞 Call</a><a class="btn" target="_blank" rel="noopener" href="https://wa.me/${wa.length === 8 ? '974' + wa : wa}?text=${encodeURIComponent('Hello' + (c.name ? ' ' + c.name : '') + ', this is ' + (S().company && S().company.name || 'FitX') + '. Your appointment is on ' + dfmt(a.date) + (a.time ? ' at ' + h + ' ' + ap : '') + '.')}">💬 WhatsApp</a>` : ''}
         ${c.maps ? `<a class="btn" target="_blank" rel="noopener" href="${esc(c.maps)}">📍 Map</a>` : ''}
-        ${!w && a.status !== 'cancelled' ? '<button type="button" class="btn" id="avEd">Edit</button><button type="button" class="btn" id="avCx">Cancel appointment</button>' : ''}
+        ${!w && a.status !== 'cancelled' ? '<button type="button" class="btn" id="avEd">Edit</button>' + (a.status === 'requested' ? '' : '<button type="button" class="btn" id="avCx">Cancel appointment</button>') : ''}
         ${!w ? '<button type="button" class="btn" id="avDel" style="color:var(--red)">Delete</button>' : ''}</div>`, el => {
       const b = s2 => el.querySelector(s2);
+      const waTo = txt => { const n = String(phone).replace(/\D/g, ''); window.open('https://wa.me/' + (n.length === 8 ? '974' + n : n) + '?text=' + encodeURIComponent(txt), '_blank'); };
+      const coName = (S().name || (S().company && S().company.name) || 'FitX');
+      if (b('#avOk')) b('#avOk').onclick = () => { a.status = 'booked'; a.updated = Date.now(); save(); waTo(`Hello${c.name ? ' ' + c.name : ''}, this is ${coName}. Your service visit is confirmed for ${dfmt(a.date)}${a.time ? ' at ' + h + ' ' + ap : ''}${a.machine ? ' (' + a.machine + ')' : ''}. Our technician will call before arriving. Thank you!`); closeSheet(() => { toast('Appointment confirmed'); viewAppt(a.id); }); };
+      if (b('#avNo')) b('#avNo').onclick = () => { if (!confirm('Decline this booking? The time becomes free again.')) return; a.status = 'cancelled'; a.updated = Date.now(); save(); waTo(`Hello${c.name ? ' ' + c.name : ''}, this is ${coName}. Sorry, we can't come on ${dfmt(a.date)}${a.time ? ' at ' + h + ' ' + ap : ''}. Please choose another time or reply here and we'll find a slot for you.`); closeSheet(() => toast('Booking declined')); };
       if (b('#avMake')) b('#avMake').onclick = () => { closeSheet(() => toWO(a)); };
       if (b('#avWO')) b('#avWO').onclick = () => FitxWO.view(w.id);
       if (b('#avEd')) b('#avEd').onclick = () => closeSheet(() => editAppt(a.id));
@@ -166,6 +172,64 @@
       if (b('#avDel')) b('#avDel').onclick = () => { if (!confirm('Delete ' + a.number + '?')) return; db.appointments = db.appointments.filter(x => x.id !== a.id); save(); closeSheet(() => toast('Deleted')); };
     });
   }
+
+  /* ---------- online booking (book.html) ---------- */
+  const BOOK = {from: 9, to: 21, closed: [5]};   // 9 AM – 9 PM, Friday closed, one team
+  const cloudOn = () => !!(window.FitxCloud && FitxCloud._fs && FitxCloud.cid && FitxCloud.user && FitxCloud.role !== 'technician');
+  const bookUrl = () => 'https://fitxqa.github.io/fitx-accounts-web/book.html#' + (window.FitxCloud && FitxCloud.cid || '');
+  function busyMap() {
+    const out = {}, start = today(), end = addD(start, 45);
+    const jobs = [];
+    (db.workorders || []).forEach(w => { if (w.date >= start && w.date <= end && !['cancelled', 'done'].includes(w.status) && mins(w.time) != null) jobs.push([w.date, mins(w.time)]); });
+    (db.appointments || []).forEach(a => { if (a.date >= start && a.date <= end && a.status !== 'cancelled' && !apptWO(a) && mins(a.time) != null) jobs.push([a.date, mins(a.time)]); });
+    jobs.forEach(([d, m]) => { for (let h = BOOK.from; h < BOOK.to; h++) if (Math.abs(h * 60 - m) < LEN) { (out[d] = out[d] || []); const t = String(h).padStart(2, '0') + ':00'; if (!out[d].includes(t)) out[d].push(t); } });
+    return out;
+  }
+  let pubTimer = null, lastPub = '';
+  function publishSlots() {
+    if (!cloudOn()) return;
+    clearTimeout(pubTimer);
+    pubTimer = setTimeout(() => {
+      const st = S(), rec = {cid: FitxCloud.cid, co: {name: st.name || '', phone: st.phone || ''}, from: BOOK.from, to: BOOK.to, closed: BOOK.closed, busy: busyMap()};
+      const key = JSON.stringify(rec); if (key === lastPub) return; lastPub = key;
+      try { FitxCloud._fs.collection('slots').doc(FitxCloud.cid).set(Object.assign(rec, {updated: Date.now()})).catch(e => { lastPub = ''; console.warn('slots', e && e.message); }); } catch (e) {}
+    }, 2500);
+  }
+  let importing = false;
+  function importBookings() {
+    if (!cloudOn() || importing) return;
+    importing = true;
+    FitxCloud._fs.collection('bookings').where('cid', '==', FitxCloud.cid).get().then(q => {
+      let n = 0;
+      db.appointments = db.appointments || [];
+      q.forEach(doc => {
+        const b = doc.data();
+        if (!db.appointments.some(a => a.bookingId === doc.id)) {
+          db.appointments.push({id: uid(), number: nextAp(), status: 'requested', source: 'online', bookingId: doc.id, created: String(b.created || Date.now()), kind: 'home', customerId: '',
+            home: {phone: String(b.phone || '').slice(0, 20), name: String(b.name || '').slice(0, 60), area: String(b.area || '').slice(0, 40), building: String(b.building || '').slice(0, 10), street: String(b.street || '').slice(0, 10), zone: String(b.zone || '').slice(0, 10), maps: String(b.maps || '').slice(0, 200)},
+            date: String(b.date || ''), time: String(b.time || ''), techId: '', machine: [b.machine, b.brand].filter(Boolean).join(' · ').slice(0, 80), problem: String(b.problem || '').slice(0, 300), notes: 'Booked online', photo: typeof b.photo === 'string' && b.photo.startsWith('data:image/') ? b.photo : ''});
+          n++;
+        }
+        doc.ref.delete().catch(() => {});
+      });
+      if (n) { save(); toast(`🛎️ ${n} new online booking${n > 1 ? 's' : ''} – open Schedule to confirm`); }
+    }).catch(e => console.warn('bookings', e && e.message)).finally(() => { importing = false; });
+  }
+  function shareLink() {
+    if (!cloudOn()) { toast('Sign in to the cloud first (Menu → Users & passwords) – the booking page needs it'); return; }
+    publishSlots();
+    const url = bookUrl(), msg = `Book your gym equipment service visit with ${S().name || 'FitX'}: ${url}`;
+    openSheet('Booking link', `<p class="hint" style="margin-top:0">Customers open this link, choose a free time (9 AM – 9 PM, Friday closed) and send the request. It arrives here as <b>Requested</b> for you to confirm.</p>
+      <div class="card" style="word-break:break-all;font-weight:600">${esc(url)}</div>
+      <div class="btns"><a class="btn pri" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msg)}">💬 Send on WhatsApp</a><button type="button" class="btn" id="blCopy">Copy link</button><a class="btn" target="_blank" rel="noopener" href="${esc(url)}">Open page</a></div>`, el => {
+      el.querySelector('#blCopy').onclick = () => { (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => toast('Link copied')).catch(() => { prompt('Copy this link', url); }); };
+    });
+  }
+  const origSave2 = window.save;
+  if (origSave2) window.save = function () { const r = origSave2.apply(this, arguments); publishSlots(); return r; };
+  (window.FITX_AFTER_SYNC = window.FITX_AFTER_SYNC || []).push(() => { publishSlots(); importBookings(); });
+  setInterval(importBookings, 120000);
+  setTimeout(() => { publishSlots(); importBookings(); }, 4000);
 
   /* ---------- schedule page ---------- */
   const latlng = url => { const m = /@(-?\d+\.\d+),(-?\d+\.\d+)/.exec(url || '') || /[?&](?:q|ll|query|destination)=(-?\d+\.\d+),(-?\d+\.\d+)/.exec(url || ''); return m ? m[1] + ',' + m[2] : ''; };
@@ -175,7 +239,7 @@
       const c = a.kind === 'home' ? (a.home || {}) : cust(a.customerId);
       out.push({kind: 'apt', id: a.id, time: a.time || '', home: a.kind === 'home', name: pName(a) || 'Appointment', area: String(c.area || '').trim() || 'No area',
         what: [a.machine, a.problem].filter(Boolean).join(' – '), where: [c.zone && 'Zone ' + c.zone, c.street && 'St ' + c.street, c.building && 'Bldg ' + c.building].filter(Boolean).join(' · '),
-        tech: emp(a.techId), st: ['Appointment', 'b-purple'], loc: latlng(c.maps || ''), number: a.number});
+        tech: emp(a.techId), st: a.status === 'requested' ? ['Requested · online', 'b-orange'] : ['Appointment', 'b-purple'], loc: latlng(c.maps || ''), number: a.number});
     });
     (db.workorders || []).filter(w => w.date === day && w.status !== 'cancelled').forEach(w => {
       const home = w.kind === 'home', c = home ? (w.home || {}) : cust(w.customerId);
@@ -212,7 +276,8 @@
           return `<div class="sgrp"><div class="sgh">📍<b>${esc(a)}</b><small>${l.length} visit${l.length > 1 ? 's' : ''}</small>${route ? `<a href="${route}" target="_blank" rel="noopener">Route ›</a>` : ''}</div>
             ${l.map(v => { const [h, ap] = t12(v.time); return `<button type="button" class="sv${v.done ? ' dn' : ''}" data-k="${v.kind}" data-id="${v.id}"><div class="tm">${h}<small>${ap}</small></div><div class="bd"><b>${v.home ? '🏠 ' : ''}${esc(v.name)}</b>${v.what ? `<div class="m">${esc(v.what)}</div>` : ''}<div class="x">${esc([v.where, v.tech || (v.kind === 'wo' ? 'Not assigned' : '')].filter(Boolean).join(' · '))}</div></div><span class="badge ${v.st[1]}">${esc(v.st[0])}</span></button>`; }).join('')}</div>`; };
         el.querySelector('#scB').innerHTML = `
-          <button type="button" class="btn pri" id="scNew" style="width:100%;margin-bottom:12px">+ New appointment</button>
+          <div class="btns" style="margin:0 0 12px"><button type="button" class="btn pri" id="scNew" style="flex:2">+ New appointment</button><button type="button" class="btn" id="scLink">🔗 Booking link</button></div>
+          ${(db.appointments || []).some(x => x.status === 'requested') ? `<button type="button" class="item" id="scReq" style="width:100%;margin:0 0 12px;border:1px solid #ffc89e;background:#fff4ea;border-radius:12px;gap:10px"><span style="font-size:20px">🛎️</span><div class="main"><div class="t">${(db.appointments || []).filter(x => x.status === 'requested').length} online booking request(s)</div><div class="s">Tap to confirm or decline</div></div></button>` : ''}
           <div class="sday">${strip}</div>
           <div class="row" style="gap:8px;margin:0 0 10px"><input class="in" type="date" id="scD" value="${day}" style="flex:1"><button type="button" class="btn" id="scT" style="flex:0 0 auto">Today</button></div>
           <div class="ssum"><div><b>${vs.length}</b>visit${vs.length === 1 ? '' : 's'} · ${esc(dfmt(day))}</div><div><b>${areas.length}</b>area${areas.length === 1 ? '' : 's'}</div><div><b>${techs}</b>technician${techs === 1 ? '' : 's'}</div></div>
@@ -225,6 +290,8 @@
         el.querySelectorAll('.sarea [data-a]').forEach(b => b.onclick = () => { areaF = b.dataset.a; draw(); });
         el.querySelectorAll('.sv').forEach(b => b.onclick = () => b.dataset.k === 'amc' ? FitxAMC.view(b.dataset.id) : b.dataset.k === 'apt' ? viewAppt(b.dataset.id) : FitxWO.view(b.dataset.id));
         el.querySelector('#scNew').onclick = () => editAppt(null, {date: day});
+        el.querySelector('#scLink').onclick = shareLink;
+        const rq = el.querySelector('#scReq'); if (rq) rq.onclick = () => { const r = (db.appointments || []).filter(x => x.status === 'requested').sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time))[0]; if (r) viewAppt(r.id); };
       };
       draw();
       // come back to an up-to-date list after a job is saved / closed
@@ -250,7 +317,7 @@
   .sv .tm{flex:0 0 50px;font-weight:800;font-size:14px;color:var(--orange-d)}.sv .tm small{display:block;font-weight:600;font-size:11px;color:var(--muted)}
   .sv .bd{flex:1;min-width:0}.sv .bd b{font-size:14.5px}.sv .bd .m{font-size:13px;margin-top:1px}.sv .bd .x{font-size:12px;color:var(--muted);margin-top:2px}
   .sv .badge{align-self:flex-start;white-space:nowrap}
-  .badge.b-purple{background:#efe7fb;color:#6b3fb5}
+  .badge.b-purple{background:#efe7fb;color:#6b3fb5}.badge.b-orange{background:#ffe9d6;color:#b04a00}
   .qslot{margin:-2px 0 12px}.qsh{display:flex;align-items:baseline;justify-content:space-between;margin:0 2px 6px;font-size:13px;font-weight:700;color:var(--muted)}.qsh small{font-weight:600}
   .qsg{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:6px;max-height:190px;overflow-y:auto;padding:2px}
   .qs{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:6px 2px;display:flex;flex-direction:column;align-items:center;color:var(--text);cursor:pointer}
@@ -276,5 +343,5 @@
     a.insertAdjacentHTML('beforebegin', `<button type="button" class="item rcard" id="mSch"><span class="ic">📅</span><div class="main"><div class="t">Schedule</div><div class="s">Appointments by day and area, time slots, routes</div></div></button>`);
     document.getElementById('mSch').onclick = () => open();
   };
-  window.FitxSchedule = {open, areas: AREAS, visitsOn, editAppt, viewAppt, newAppt: () => editAppt()};
+  window.FitxSchedule = {open, areas: AREAS, visitsOn, editAppt, viewAppt, newAppt: () => editAppt(), shareLink, importBookings, publishSlots, busyMap};
 })();
