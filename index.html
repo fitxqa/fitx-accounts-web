@@ -225,9 +225,10 @@ button.item:active{background:#f6f7f9}
 
 /* shortcuts row (dashboard) */
 .quick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
-.quick button{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:6px 8px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:7px;font-size:12.5px;font-weight:600;line-height:1.15;text-align:left;min-height:50px;box-shadow:var(--sh);min-width:0}
-.quick .qi{width:30px;height:30px;flex-shrink:0;border-radius:50%;background:var(--orange-l);color:var(--orange-d);display:flex;align-items:center;justify-content:center}
-.quick svg{width:17px;height:17px}
+.quick button{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:6px 5px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:5px;font-size:11.5px;font-weight:600;line-height:1.15;letter-spacing:-.1px;text-align:left;min-height:48px;box-shadow:var(--sh);min-width:0;white-space:nowrap;overflow:hidden}
+.quick .qi{width:26px;height:26px;flex-shrink:0;border-radius:50%;background:var(--orange-l);color:var(--orange-d);display:flex;align-items:center;justify-content:center}
+.quick .ql{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.quick svg{width:15px;height:15px}
 @media (min-width:600px){.quick{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}}
 
 /* dashboard widgets */
@@ -1289,15 +1290,15 @@ function viewHome() {
     </div>
     ${needBackup ? `<div class="card" style="border-left:4px solid var(--orange);display:flex;align-items:center;gap:12px"><div style="flex:1"><b>Back up your data</b><div class="hint">${lb ? 'Last backup ' + dfmt(lb) : 'No backup yet'} — save a copy to Google Drive.</div></div><button type="button" class="btn pri" id="qBak">Backup</button></div>` : ''}
     <div class="quick">
-      <button type="button" data-q="inv"><span class="qi">${ICON.inv}</span>Invoice</button>
-      <button type="button" data-q="rcv"><span class="qi">${ICON.pay}</span>Payment In</button>
-      <button type="button" data-q="quo"><span class="qi">${ICON.quo}</span>Quotation</button>
-      <button type="button" data-q="exp"><span class="qi">${ICON.exp}</span>Expense</button>
-      <button type="button" data-q="bill"><span class="qi">${ICON.box}</span>Bill</button>
-      <button type="button" data-q="cus"><span class="qi">${ICON.user}</span>Customer</button>
-      ${window.FitxWO ? `<button type="button" data-q="wo"><span class="qi">${ICON.wrench}</span>Work order</button>` : ''}
-      ${window.FitxAMC ? `<button type="button" data-q="amc"><span class="qi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m9 16 2 2 4-4"/></svg></span>AMC</button>` : ''}
-      ${window.FITX_VIEWS && FITX_VIEWS.payroll ? `<button type="button" data-q="pay" class="qpay"><span class="qi">${ICON.cash}</span>Payroll</button>` : ''}
+      <button type="button" data-q="inv"><span class="qi">${ICON.inv}</span><span class="ql">Invoice</span></button>
+      <button type="button" data-q="rcv"><span class="qi">${ICON.pay}</span><span class="ql">Payment In</span></button>
+      <button type="button" data-q="quo"><span class="qi">${ICON.quo}</span><span class="ql">Quotation</span></button>
+      <button type="button" data-q="exp"><span class="qi">${ICON.exp}</span><span class="ql">Expense</span></button>
+      <button type="button" data-q="bill"><span class="qi">${ICON.box}</span><span class="ql">Bill</span></button>
+      <button type="button" data-q="cus"><span class="qi">${ICON.user}</span><span class="ql">Customer</span></button>
+      ${window.FitxWO ? `<button type="button" data-q="wo"><span class="qi">${ICON.wrench}</span><span class="ql">Work order</span></button>` : ''}
+      ${window.FitxAMC ? `<button type="button" data-q="amc"><span class="qi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m9 16 2 2 4-4"/></svg></span><span class="ql">AMC</span></button>` : ''}
+      ${window.FITX_VIEWS && FITX_VIEWS.payroll ? `<button type="button" data-q="pay" class="qpay"><span class="qi">${ICON.cash}</span><span class="ql">Payroll</span></button>` : ''}
     </div>
     <div class="dash">
       <div class="w"><div class="wh"><b>Profit & loss</b><span>${esc(pName)}</span></div>
