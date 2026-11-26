@@ -225,11 +225,13 @@ button.item:active{background:#f6f7f9}
 
 /* shortcuts row (dashboard) */
 .quick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
-.quick button{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:6px 5px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:5px;font-size:11.5px;font-weight:600;line-height:1.15;letter-spacing:-.1px;text-align:left;min-height:48px;box-shadow:var(--sh);min-width:0;white-space:nowrap;overflow:hidden}
+.quick button{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:6px 5px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:5px;font-size:11.5px;font-weight:600;line-height:1.15;letter-spacing:-.1px;text-align:left;min-height:48px;box-shadow:var(--sh);min-width:0;white-space:nowrap;overflow:visible}
 .quick .qi{width:26px;height:26px;flex-shrink:0;border-radius:50%;background:var(--orange-l);color:var(--orange-d);display:flex;align-items:center;justify-content:center}
 .quick .ql{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .quick [data-q=apt] .ql{font-size:.86em;letter-spacing:-.25px}
-.quick button[data-q=apt]{background:#111;color:#fff;border-color:#111;padding-right:4px;gap:4px}.quick [data-q=apt] .qi{background:rgba(255,106,0,.2);color:#ff8a33}
+.quick button[data-q=apt]{background:#111;color:#fff;border-color:#111;padding-right:4px;gap:4px}
+.quick button[data-q=apt].req{background:var(--orange);border-color:var(--orange)}.quick button[data-q=apt].req .qi{background:rgba(255,255,255,.25);color:#fff}
+.quick button{position:relative}.quick .qn{position:absolute;top:-6px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#111;color:#fff;font-size:11px;font-weight:800;line-height:20px;text-align:center;box-shadow:0 0 0 2px var(--bg,#f3f4f6)}.quick [data-q=apt] .qi{background:rgba(255,106,0,.2);color:#ff8a33}
 .quick svg{width:15px;height:15px}
 @media (min-width:600px){.quick{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}}
 
@@ -1300,7 +1302,7 @@ function viewHome() {
       <button type="button" data-q="cus"><span class="qi">${ICON.user}</span><span class="ql">Customer</span></button>
       <button type="button" data-q="wo"><span class="qi">${ICON.wrench}</span><span class="ql">Work order</span></button>
       <button type="button" data-q="amc"><span class="qi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m9 16 2 2 4-4"/></svg></span><span class="ql">AMC</span></button>
-      <button type="button" data-q="apt"><span class="qi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><circle cx="12" cy="16" r="2.5"/></svg></span><span class="ql">Appointment</span></button>
+      <button type="button" data-q="apt" class="${(db.appointments || []).some(a => a.status === 'requested') ? 'req' : ''}"><span class="qi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><circle cx="12" cy="16" r="2.5"/></svg></span><span class="ql">Appointment</span>${(db.appointments || []).filter(a => a.status === 'requested').length ? `<span class="qn">${(db.appointments || []).filter(a => a.status === 'requested').length}</span>` : ''}</button>
     </div>
     <div class="dash">
       <div class="w"><div class="wh"><b>Profit & loss</b><span>${esc(pName)}</span></div>

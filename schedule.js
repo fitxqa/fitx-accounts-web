@@ -217,7 +217,7 @@
         }
         doc.ref.delete().catch(() => {});
       });
-      if (n) { save(); toast(`🛎️ ${n} new online booking${n > 1 ? 's' : ''} – open Schedule to confirm`); }
+      if (n) { save(); toast(`🛎️ ${n} new online booking${n > 1 ? 's' : ''} – open Schedule to confirm`); if (typeof state !== 'undefined' && state.tab === 'home' && !(typeof sheets !== 'undefined' && sheets.length)) render(); }
     }).catch(e => console.warn('bookings', e && e.message)).finally(() => { importing = false; });
   }
   function shareLink() {
