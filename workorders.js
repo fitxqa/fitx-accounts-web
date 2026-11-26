@@ -236,7 +236,7 @@
           equipment: w.equipment.filter(x => x.desc || x.brand || x.model || x.problem), parts: w.parts.filter(p => p.itemId && num(p.qty) > 0)};
         let rec;
         if (ex) { Object.assign(ex, data, {updated: Date.now()}); if (ex.status === 'open' && ex.techId) ex.status = 'assigned'; if (ex.status === 'assigned' && !ex.techId) ex.status = 'open'; rec = ex; }
-        else { rec = Object.assign({id: uid(), number: nextNo('nextWO', S().woPrefix || 'WO'), status: data.techId ? 'assigned' : 'open', photos: [], created: String(Date.now()), amcId: w.amcId || '', visitNo: w.visitNo || ''}, data); rec.log = [{s: rec.status, at: Date.now()}]; db.workorders.push(rec); }
+        else { rec = Object.assign({id: uid(), number: nextNo('nextWO', S().woPrefix || 'WO'), status: data.techId ? 'assigned' : 'open', photos: [], created: String(Date.now()), amcId: w.amcId || '', visitNo: w.visitNo || '', apptId: w.apptId || ''}, data); rec.log = [{s: rec.status, at: Date.now()}]; db.workorders.push(rec); }
         save(); pushTrack(rec); closeSheet(() => { toast(rec.number + ' saved'); viewWO(rec.id); render(); });
       };
     });

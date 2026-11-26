@@ -29,25 +29,41 @@
     if (!act.length) { const last = list.filter(w => w.status === 'done').sort((a, b) => String(b.doneDate || b.date).localeCompare(String(a.doneDate || a.date)))[0]; if (last) out.push(`Last job ${last.number} · completed ${dfmt(last.doneDate || last.date)}`); }
     return {lines: out, open: act[0]};
   }
+  // upcoming appointments (booked, no work order yet)
+  const t12 = t => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); if (!m) return ''; let h = +m[1]; const ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return ' ' + h + ':' + m[2] + ' ' + ap; };
+  const apFirst = match => { const l = (db.appointments || []).filter(a => a.status !== 'cancelled' && a.date >= today() && !(db.workorders || []).some(w => w.apptId === a.id && w.status !== 'cancelled') && match(a)).sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || ''))); return l[0]; };
+  function apLines(match) {
+    const wos = db.workorders || [];
+    return (db.appointments || []).filter(a => a.status !== 'cancelled' && a.date >= today() && !wos.some(w => w.apptId === a.id && w.status !== 'cancelled') && match(a))
+      .sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || ''))).slice(0, 2)
+      .reduce((out, a) => { out.push(`📅 ${a.number} · ${a.date === today() ? 'today' : dfmt(a.date)}${t12(a.time)}${emp(a.techId) ? ' · ' + emp(a.techId).split(' ')[0] : ''}`);
+        const j = [a.machine, a.problem].map(x => String(x || '').trim()).filter(Boolean).join(' – '); if (j) out.push('   ' + j); return out; }, []);
+  }
   function build() {
     const idx = {}, wos = db.workorders || [];
     const put = (phone, rec) => { const k = key(phone); if (k.length >= 7 && !idx[k]) idx[k] = rec; };
     db.customers.forEach(c => {
       if (c.homeVisits || !c.phone) return;
       const w = woLines(wos.filter(x => x.kind !== 'home' && x.customerId === c.id));
-      const lines = w.lines.slice();
+      const lines = w.lines.concat(apLines(a => a.kind !== 'home' && a.customerId === c.id));
       const bal = custBalance(c.id); if (bal > 0.004) lines.push(`Balance due QAR ${fmt(bal)}`);
       const amc = (db.amcs || []).find(a => a.customerId === c.id && !a.cancelled && a.end >= today()); if (amc) lines.push(`AMC ${amc.number} until ${dfmt(amc.end)}`);
       if (!lines.length) lines.push('No open work orders');
-      const rec = {n: c.name, k: 'Customer', l: lines, o: w.open ? 'wo:' + w.open.id : 'cust:' + c.id};
+      const rec = {n: c.name, k: 'Customer', l: lines, o: w.open ? 'wo:' + w.open.id : (apFirst(a => a.kind !== 'home' && a.customerId === c.id) ? 'apt:' + apFirst(a => a.kind !== 'home' && a.customerId === c.id).id : 'cust:' + c.id)};
       String(c.phone).split(/[\/,;]| or /).forEach(ph => put(ph, rec));
     });
     (db.homeclients || []).forEach(h => {
       const w = woLines(wos.filter(x => x.kind === 'home' && key((x.home || {}).phone) === key(h.phone)));
-      const lines = w.lines.slice();
+      const lines = w.lines.concat(apLines(a => a.kind === 'home' && key((a.home || {}).phone) === key(h.phone)));
       if (String(h.area || '').trim()) lines.push('📍 ' + String(h.area).trim());   // area only – the full address is on the work order
       if (!lines.length) lines.push('Home visit client');
-      put(h.phone, {n: h.name || h.phone, k: 'Home visit client', l: lines, o: w.open ? 'wo:' + w.open.id : 'newwo:' + h.phone});
+      put(h.phone, {n: h.name || h.phone, k: 'Home visit client', l: lines, o: w.open ? 'wo:' + w.open.id : (apFirst(a => a.kind === 'home' && key((a.home || {}).phone) === key(h.phone)) ? 'apt:' + apFirst(a => a.kind === 'home' && key((a.home || {}).phone) === key(h.phone)).id : 'newwo:' + h.phone)});
+    });
+    (db.appointments || []).filter(a => a.kind === 'home' && a.status !== 'cancelled' && (a.home || {}).phone).forEach(a => {
+      const h = a.home, lines = apLines(x => x.kind === 'home' && key((x.home || {}).phone) === key(h.phone));
+      if (!lines.length) return;
+      if (String(h.area || '').trim()) lines.push('📍 ' + String(h.area).trim());
+      put(h.phone, {n: h.name || h.phone, k: 'Home visit client', l: lines, o: 'apt:' + a.id});
     });
     db.suppliers.forEach(s => { if (s.phone) put(s.phone, {n: s.name, k: 'Supplier', l: [supBalance(s.id) > 0.004 ? `You owe QAR ${fmt(supBalance(s.id))}` : 'Supplier'], o: 'sup:' + s.id}); });
     (db.employees || []).forEach(e => { if (e.phone && (!e.left || e.left >= today())) put(e.phone, {n: e.name, k: 'Staff', l: [e.job || 'Employee'].concat(wos.filter(w => w.techId === e.id && ACTIVE.includes(w.status)).length ? [`${wos.filter(w => w.techId === e.id && ACTIVE.includes(w.status)).length} open work orders`] : []), o: ''}); });
@@ -68,6 +84,7 @@
     if (t === 'wo' && window.FitxWO) { clear(); FitxWO.view(id); return; }
     if (t === 'cust' && window.viewCustomer) { clear(); viewCustomer(id); return; }
     if (t === 'sup' && window.viewSupplier) { clear(); viewSupplier(id); return; }
+    if (t === 'apt' && window.FitxSchedule) { clear(); FitxSchedule.viewAppt(id); return; }
     if (t === 'newwo' && window.FitxWO) { clear(); const h = (db.homeclients || []).find(x => key(x.phone) === key(id)) || {phone: id}; FitxWO.edit(null, {kind: 'home', home: Object.assign({}, h)}); return; }
     if (origOpen) origOpen(what);
   };
