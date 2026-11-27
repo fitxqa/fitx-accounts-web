@@ -32,6 +32,7 @@
     quo: '<path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h8M9 17h8"/>',
     set: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
+    mkt: '<path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 9a3 3 0 0 1 0 6M18 6a7 7 0 0 1 0 12"/>',
     cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h2M14 14h2M8 18h2"/>'
   };
   const svg = (k, s) => `<svg viewBox="0 0 24 24" width="${s || 19}" height="${s || 19}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[k]}</svg>`;
@@ -44,6 +45,7 @@
       ['Suppliers', 'suppliers', tab('suppliers'), () => editSupplier()],
       ['Employees', 'payroll', tab('payroll'), window.FitxPayroll && FitxPayroll.editEmployee ? () => FitxPayroll.editEmployee() : null]]],
     ['wrench', 'Work orders', {key: '', open: call(() => window.FitxWO && FitxWO.list()), add: () => window.FitxWO && FitxWO.edit()}],
+    ['mkt', 'Marketing', {key: '', open: call(() => window.FitxMkt && FitxMkt.open()), add: () => window.FitxMkt && FitxMkt.editLead()}],
     ['cal', 'Schedule', {key: '', open: call(() => window.FitxSchedule && FitxSchedule.open()), add: () => window.FitxSchedule && FitxSchedule.newAppt()}],
     ['quo', 'AMC contracts', {key: '', open: call(() => window.FitxAMC && FitxAMC.list()), add: () => window.FitxAMC && FitxAMC.edit()}],
     ['items', 'Products & services', {key: 'stock', open: tab('stock'), add: () => editItem()}],

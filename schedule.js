@@ -213,8 +213,8 @@
       q.forEach(doc => {
         const b = doc.data();
         if (!db.appointments.some(a => a.bookingId === doc.id)) {
-          db.appointments.push({id: uid(), number: nextAp(), status: 'requested', source: 'online', bookingId: doc.id, created: String(b.created || Date.now()), kind: 'home', customerId: '',
-            home: {phone: String(b.phone || '').slice(0, 20), name: String(b.name || '').slice(0, 60), area: String(b.area || '').slice(0, 40), building: String(b.building || '').slice(0, 10), street: String(b.street || '').slice(0, 10), zone: String(b.zone || '').slice(0, 10), maps: String(b.maps || '').slice(0, 200)},
+          db.appointments.push({id: uid(), number: nextAp(), status: 'requested', source: 'online', src: ((String(b.maps || '').match(/^src=([a-z0-9]+)/i) || [])[1] || ''), bookingId: doc.id, created: String(b.created || Date.now()), kind: 'home', customerId: '',
+            home: {phone: String(b.phone || '').slice(0, 20), name: String(b.name || '').slice(0, 60), area: String(b.area || '').slice(0, 40), building: String(b.building || '').slice(0, 10), street: String(b.street || '').slice(0, 10), zone: String(b.zone || '').slice(0, 10), maps: String(b.maps || '').replace(/^src=\S+\s*/, '').slice(0, 200)},
             date: String(b.date || today()), time: /^\d\d:\d\d$/.test(String(b.time || '')) ? b.time : '', techId: '', machine: [b.machine, b.brand].filter(Boolean).join(' · ').slice(0, 80), problem: String(b.problem || '').slice(0, 300), notes: 'Booked online' + (/^\d\d:\d\d$/.test(String(b.time || '')) ? '' : ' · Customer wants another time: ' + String(b.time || '').replace(/^Other:\s*/, '').slice(0, 80)), wantsOther: !/^\d\d:\d\d$/.test(String(b.time || '')), photo: typeof b.photo === 'string' && b.photo.startsWith('data:image/') ? b.photo : ''});
           n++;
         }

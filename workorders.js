@@ -275,6 +275,7 @@
         ${next ? `<button type="button" class="btn pri" id="woNext">${next[1]}</button>` : ''}
         ${w.status === 'done' && !inv ? `<button type="button" class="btn pri" id="woInv">${ICON.inv}Make invoice</button>` : ''}
         ${inv ? `<button type="button" class="btn" id="woOpenInv">${ICON.inv}Open ${esc(inv.number)}</button>` : ''}
+        ${w.status === 'done' && window.FitxMkt ? `<button type="button" class="btn" id="woReview">⭐ Ask for review</button>` : ''}
         <button type="button" class="btn" id="woEdit">${ICON.edit}Edit</button>
         ${w.status === 'done' ? '<button type="button" class="btn" id="woReopen">Reopen</button>' : (w.status !== 'cancelled' ? '<button type="button" class="btn danger" id="woCancel">Cancel job</button>' : '<button type="button" class="btn" id="woReopen">Reopen</button>')}</div>
       <div class="sec"><h2>Equipment &amp; work</h2></div>
@@ -292,6 +293,7 @@
       const b = s => el.querySelector(s);
       if (b('#woNext')) b('#woNext').onclick = () => { setStatus(w, next[0]); reopen(); toast(next[1] === 'Mark completed' ? 'Job completed' : 'Job started'); };
       el.querySelectorAll('#woSt [data-st]').forEach(x => x.onclick = () => { if (x.dataset.st === 'cancelled' && !confirm('Cancel this job?')) return; setStatus(w, x.dataset.st); reopen(); toast('Status: ' + ST[x.dataset.st][0]); });
+      if (b('#woReview')) b('#woReview').onclick = () => { const pp = party(w); FitxMkt.askReview(pp.name, pp.phone); if (S().mkt && S().mkt.reviewUrl) { w.reviewAsked = today(); save(); } };
       b('#woTrack').onclick = () => {
         if (!cloudOn()) { openSheet('Live tracking', `<p>Live tracking works when this company is signed in to the <b>cloud</b> (Menu → Users &amp; passwords → sign in), because the customer's page reads the status from the cloud.</p><p class="hint">Your work orders on this phone are not changed.</p>`); return; }
         if (!w.track) { w.track = (uid() + uid()).replace(/[^a-z0-9]/gi, '').slice(0, 22); save(); }

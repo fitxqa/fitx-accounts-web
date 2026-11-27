@@ -258,7 +258,8 @@
       if (!slot && !other) return say('Please choose a time, or request another time.');
       er.style.display = 'none';
       const go = document.getElementById('go'); go.disabled = true; go.textContent = 'Sending…';
-      const rec = {cid, status: 'new', name: v('nm'), phone: v('ph'), area: v('ar'), building: v('bd'), street: v('st'), zone: v('zn'), maps: loc,
+      const SRC = (new URLSearchParams(location.search).get('src') || '').replace(/[^a-z0-9]/gi, '').slice(0, 12);
+      const rec = {cid, status: 'new', name: v('nm'), phone: v('ph'), area: v('ar'), building: v('bd'), street: v('st'), zone: v('zn'), maps: (SRC ? 'src=' + SRC + ' ' : '') + loc,
         machine: v('mc'), brand: v('br'), problem: v('pr'), date: other ? '' : day, time: other ? 'Other: ' + v('othT') : slot, photo, created: Date.now()};
       fs.collection('bookings').add(rec).then(() => {
         const d = new Date(day + 'T00:00:00'), co = cfg.co || {};
