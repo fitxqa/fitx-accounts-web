@@ -99,6 +99,8 @@
   .mk-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.mk-tools button{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;font:inherit;font-weight:700;font-size:13.5px;color:var(--text);cursor:pointer;text-align:left}
   .mk-tools button span{font-size:20px}.mk-tools button small{display:block;font-weight:500;color:var(--muted);font-size:11.5px}
   .mk-tools .ai{background:linear-gradient(135deg,#111,#2a2a2a);color:#fff;border-color:#111}.mk-tools .ai small{color:#bbb}
+  .mk-ai2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.mk-ai2 .btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:50px;font-size:13.5px;white-space:nowrap;padding:8px 10px}
+  .mk-aic{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;color:#fff;font-size:13px;font-weight:800;flex-shrink:0}
   .mk-empty{padding:16px;text-align:center;color:var(--muted);font-size:13px}
   .mk-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}.mk-chips button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:7px 12px;font:inherit;font-size:13px;font-weight:600;color:var(--text);cursor:pointer}
   .mk-chips button.on{background:var(--orange);border-color:var(--orange);color:#fff}
@@ -127,7 +129,7 @@
           <div class="mk-cd">${fu.length ? fu.slice(0, 5).map(fuRow).join('') : '<div class="mk-empty">🎉 Nothing to follow up today.</div>'}</div>
           <h2>Tools</h2>
           <div class="mk-tools">
-            <button type="button" class="ai" id="mkAI"><span>✨</span><div>Write ad with AI<small>Claude writes EN + AR</small></div></button>
+            <button type="button" class="ai" id="mkAI"><span>✨</span><div>Write ad with AI<small>Claude or ChatGPT · EN + AR</small></div></button>
             <button type="button" id="mkCamp"><span>📣</span><div>WhatsApp campaign<small>Send an offer to a group</small></div></button>
             <button type="button" id="mkRev"><span>⭐</span><div>Google reviews<small>${M().reviewUrl ? 'Review link set' : 'Set your review link'}</small></div></button>
             <button type="button" id="mkRep"><span>📈</span><div>Reports<small>Sales, areas, win rate</small></div></button></div>
@@ -270,13 +272,16 @@
       <label class="f"><span>What are you offering?</span><input class="in" name="offer" placeholder="e.g. Treadmill service at home, QAR 250, this week only" required></label>
       <div class="row"><label class="f"><span>Area / audience</span><input class="in" name="aud" placeholder="e.g. Doha home gyms, hotel gyms"></label><label class="f"><span>Language</span><select class="in" name="lang"><option>English + Arabic</option><option>English</option><option>Arabic</option></select></label></div>
       <label class="f"><span>Tone</span><div class="mk-chips" id="aiT">${['Professional', 'Friendly', 'Urgent offer', 'Premium'].map((t, i) => `<button type="button" data-k="${t}" class="${i === 0 ? 'on' : ''}">${t}</button>`).join('')}</div></label>
-      <button type="submit" class="btn pri" style="width:100%">✨ Write with Claude</button>
-      <p class="hint">Opens Claude with everything filled in – it writes the headline, text, hashtags and call to action. Copy the result into your ad.</p></form></div>`, el => {
+      <div class="mk-ai2"><button type="submit" class="btn pri" data-ai="claude"><span class="mk-aic" style="background:#d97757">✳</span>Write with Claude</button>
+        <button type="submit" class="btn" data-ai="chatgpt" style="background:#111;color:#fff;border-color:#111"><span class="mk-aic" style="background:#10a37f">◎</span>Write with ChatGPT</button></div>
+      <p class="hint">Opens Claude or ChatGPT with everything filled in – it writes the headline, text, hashtags and call to action. Try both and pick the one you like. The request is also copied, in case you need to paste it.</p></form></div>`, el => {
       let p = plat || 'instagram', tone = 'Professional';
       el.querySelectorAll('#aiP [data-k]').forEach(b => b.onclick = () => { p = b.dataset.k; el.querySelectorAll('#aiP [data-k]').forEach(x => x.classList.toggle('on', x === b)); });
       el.querySelectorAll('#aiT [data-k]').forEach(b => b.onclick = () => { tone = b.dataset.k; el.querySelectorAll('#aiT [data-k]').forEach(x => x.classList.toggle('on', x === b)); });
+      let eng = 'claude';
+      el.querySelectorAll('[data-ai]').forEach(b => b.addEventListener('click', () => { eng = b.dataset.ai; }));
       el.querySelector('#aiF').onsubmit = e => {
-        e.preventDefault(); const v = Object.fromEntries(new FormData(e.target));
+        e.preventDefault(); if (e.submitter && e.submitter.dataset.ai) eng = e.submitter.dataset.ai; const v = Object.fromEntries(new FormData(e.target));
         const prompt = `Write a ${P2[p]} for ${coName()}, a gym equipment service company in Qatar (repair, maintenance, installation, dismantling & relocation, spare parts, AMC for gyms, hotels and home gyms).
 Offer: ${v.offer}
 Audience: ${v.aud || 'gym owners and home gym users in Qatar'}
@@ -284,9 +289,9 @@ Tone: ${tone}
 Language: ${v.lang}
 Booking link: ${bookLink()}  ·  Phone/WhatsApp: ${S().phone || ''}
 Give: a short headline, the main text${p === 'google' ? ' (3 headlines up to 30 characters and 2 descriptions up to 90 characters)' : ''}${p === 'tiktok' ? ' as a 15–30 second video script with scenes' : ''}, a call to action${p === 'instagram' || p === 'tiktok' ? ' and 8–12 hashtags for Qatar' : ''}. Keep it honest – no prices or claims I did not give.`;
-        window.open('https://claude.ai/new?q=' + encodeURIComponent(prompt), '_blank');
-        try { navigator.clipboard && navigator.clipboard.writeText(prompt); } catch (er) {}
-        toast('Opening Claude – the request is also copied');
+        window.open(eng === 'chatgpt' ? 'https://chatgpt.com/?q=' + encodeURIComponent(prompt) : 'https://claude.ai/new?q=' + encodeURIComponent(prompt), '_blank');
+        try { navigator.clipboard && navigator.clipboard.writeText(prompt).catch(() => {}); } catch (er) {}
+        toast(`Opening ${eng === 'chatgpt' ? 'ChatGPT' : 'Claude'} – the request is also copied`);
       };
     });
   }
