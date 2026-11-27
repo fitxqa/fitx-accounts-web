@@ -34,7 +34,9 @@
         stage: a.status === 'cancelled' ? 'lost' : w ? 'won' : 'new'};
     });
   }
-  const srcLabel = code => { if (!code) return ''; const c = (db.adcamps || []).find(x => x.code === code); return c ? PLAT[c.platform][3] : ''; };
+  // a campaign made in FitX, or a fixed code from an ad link: go… = Google, ig… = Instagram, fb…/me… = Meta, tt… = TikTok
+  const srcLabel = code => { if (!code) return ''; const c = (db.adcamps || []).find(x => x.code === code); if (c) return PLAT[c.platform][3];
+    const p = String(code).toLowerCase().slice(0, 2); return {go: 'Google', ig: 'Instagram', in: 'Instagram', fb: 'Meta / Facebook', me: 'Meta / Facebook', tt: 'TikTok', ti: 'TikTok'}[p] || ''; };
   const allLeads = () => L().concat(onlineLeads());
   function stats(from) {
     const l = allLeads().filter(x => !from || x.date >= from);
