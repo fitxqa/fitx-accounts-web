@@ -139,13 +139,26 @@
     const depth = sheets.length;
     const iv = setInterval(() => { if (sheets.length < depth || !sheets.length) { clearInterval(iv); pendingAppt = ''; } }, 600);
   }
+  /* ---------- WhatsApp booking bot (fitx.qa/wabot) ---------- */
+  // Bookings made in the bot arrive with src 'wabot'. Confirm / Decline / Cancel then ask the bot to message the customer
+  // in the same WhatsApp chat. If WhatsApp's 24-hour window has closed (or the bot can't be reached) we fall back to opening WhatsApp.
+  // no secret here: the bot checks the signed-in user's Firebase token is a member of this company
+  const WABOT = {url: 'https://fitx-wa-relay.fitxqa.workers.dev/notify'};
+  const isBot = a => a && a.src === 'wabot' && !!a.bookingId;
+  const botRef = a => (String(a && a.problem || '').match(/\[(FX-\d+)\]/) || [])[1] || '';
+  function botSend(a, text, action) {
+    const u = window.FitxCloud && FitxCloud._auth && FitxCloud._auth.currentUser;
+    if (!u) return Promise.resolve({ok: false, reason: 'signin'});
+    return u.getIdToken().then(idToken => fetch(WABOT.url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({idToken, cid: FitxCloud.cid, bookingId: a.bookingId, action, text})}))
+      .then(r => r.json()).catch(() => ({ok: false, reason: 'offline'}));
+  }
   function viewAppt(id) {
     const a = apById(id); if (!a) return;
     const w = apptWO(a), c = a.kind === 'home' ? (a.home || {}) : cust(a.customerId), phone = c.phone || '';
     const [h, ap] = t12(a.time), wa = String(phone).replace(/\D/g, '');
     const addr = [c.building && 'Building ' + c.building, c.street && 'Street ' + c.street, c.zone && 'Zone ' + c.zone, c.area].filter(Boolean).join(', ');
     openSheet(a.number, `
-      <div class="card" style="margin-top:0"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div><div class="hint" style="margin:0">${a.kind === 'home' ? '🏠 Home visit' : '🏢 Customer'}</div><div style="font-size:19px;font-weight:800">${esc(pName(a))}</div></div>
+      <div class="card" style="margin-top:0"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div><div class="hint" style="margin:0">${a.kind === 'home' ? '🏠 Home visit' : '🏢 Customer'}</div><div style="font-size:19px;font-weight:800">${esc(pName(a))}</div>${isBot(a) ? `<span class="badge" style="background:#e7f8ee;color:#137a3d;margin-top:4px;display:inline-block">💬 WhatsApp bot${botRef(a) ? ' · ' + esc(botRef(a)) : ''}</span>` : ''}${a.src === 'webbot' ? '<span class="badge" style="background:#fdeedd;color:#9a4a0c;margin-top:4px;display:inline-block">🌐 Website assistant</span>' : ''}</div>
         <span class="badge ${a.status === 'cancelled' ? 'b-red' : w ? (ST[w.status] || ST.open)[1] : a.status === 'requested' ? 'b-orange' : 'b-blue'}">${a.status === 'cancelled' ? 'Cancelled' : w ? 'Work order ' + esc(w.number) : a.status === 'requested' ? 'Requested online' : 'Booked'}</span></div>
         <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin-top:10px">
           <span class="hint" style="margin:0">When</span><b>${esc(dfmt(a.date))}${a.time ? ' · ' + h + ' ' + ap : ''}</b>
@@ -155,7 +168,7 @@
           <span class="hint" style="margin:0">Technician</span><b>${esc(emp(a.techId) || 'Not assigned')}</b>
           ${a.notes ? `<span class="hint" style="margin:0">Notes</span><span>${esc(a.notes)}</span>` : ''}</div></div>
       ${a.photo ? `<img src="${esc(a.photo)}" alt="Photo from the customer" style="width:100%;max-height:260px;object-fit:contain;border-radius:12px;background:#000;margin-bottom:10px">` : ''}
-      ${a.status === 'requested' ? `<div class="btns" style="margin-bottom:10px"><button type="button" class="btn pri" id="avOk" style="flex:2">✅ Confirm & WhatsApp</button><button type="button" class="btn" id="avNo" style="color:var(--red)">Decline</button></div><p class="hint" style="margin:-4px 2px 10px">To change the time: tap Edit, choose a new slot, then Confirm.</p>` : ''}
+      ${a.status === 'requested' ? `<div class="btns" style="margin-bottom:10px"><button type="button" class="btn pri" id="avOk" style="flex:2">${isBot(a) ? '✅ Confirm – bot sends WhatsApp' : '✅ Confirm & WhatsApp'}</button><button type="button" class="btn" id="avNo" style="color:var(--red)">Decline</button></div><p class="hint" style="margin:-4px 2px 10px">To change the time: tap Edit, choose a new slot, then Confirm.</p>` : ''}
       ${a.status !== 'cancelled' && a.status !== 'requested' ? (w ? `<button type="button" class="btn pri" id="avWO" style="width:100%">🔧 Open work order ${esc(w.number)}</button>` : `<button type="button" class="btn pri" id="avMake" style="width:100%">🔧 Create work order</button>`) : ''}
       <div class="btns" style="margin-top:10px;flex-wrap:wrap">
         ${phone ? `<a class="btn" href="tel:${esc(phone)}">📞 Call</a><a class="btn" target="_blank" rel="noopener" href="https://wa.me/${wa.length === 8 ? '974' + wa : wa}?text=${encodeURIComponent('Hello' + (c.name ? ' ' + c.name : '') + ', this is ' + (S().company && S().company.name || 'FitX') + '. Your appointment is on ' + dfmt(a.date) + (a.time ? ' at ' + h + ' ' + ap : '') + '.')}">💬 WhatsApp</a>` : ''}
@@ -165,12 +178,20 @@
       const b = s2 => el.querySelector(s2);
       const waTo = txt => { const n = String(phone).replace(/\D/g, ''); window.open('https://wa.me/' + (n.length === 8 ? '974' + n : n) + '?text=' + encodeURIComponent(txt), '_blank'); };
       const coName = (S().name || (S().company && S().company.name) || 'FitX');
-      if (b('#avOk')) b('#avOk').onclick = () => { a.status = 'booked'; a.updated = Date.now(); save(); waTo(`Hello${c.name ? ' ' + c.name : ''}, this is ${coName}. Your service visit is confirmed for ${dfmt(a.date)}${a.time ? ' at ' + h + ' ' + ap : ''}${a.machine ? ' (' + a.machine + ')' : ''}. Our technician will call before arriving. Thank you!`); closeSheet(() => { toast('Appointment confirmed'); viewAppt(a.id); }); };
-      if (b('#avNo')) b('#avNo').onclick = () => { if (!confirm('Decline this booking? The time becomes free again.')) return; a.status = 'cancelled'; a.updated = Date.now(); save(); waTo(`Hello${c.name ? ' ' + c.name : ''}, this is ${coName}. Sorry, we can't come on ${dfmt(a.date)}${a.time ? ' at ' + h + ' ' + ap : ''}. Please choose another time or reply here and we'll find a slot for you.`); closeSheet(() => toast('Booking declined')); };
+      const notify = (txt, action) => {
+        if (!isBot(a)) { waTo(txt); return; }
+        botSend(a, txt, action).then(r => {
+          if (r && r.ok) { toast('💬 Sent to the customer by the WhatsApp bot'); return; }
+          toast(r && r.reason === 'window' ? 'Over 24 h since the customer wrote – opening WhatsApp to send it yourself' : 'Bot could not send – opening WhatsApp');
+          waTo(txt);
+        });
+      };
+      if (b('#avOk')) b('#avOk').onclick = () => { a.status = 'booked'; a.updated = Date.now(); save(); notify(`Hello${c.name ? ' ' + c.name : ''}, this is ${coName}. Your service visit is confirmed for ${dfmt(a.date)}${a.time ? ' at ' + h + ' ' + ap : ''}${a.machine ? ' (' + a.machine + ')' : ''}. Our technician will call before arriving. Thank you!`, 'confirm'); closeSheet(() => { toast('Appointment confirmed'); viewAppt(a.id); }); };
+      if (b('#avNo')) b('#avNo').onclick = () => { if (!confirm('Decline this booking? The time becomes free again.')) return; a.status = 'cancelled'; a.updated = Date.now(); save(); notify(`Hello${c.name ? ' ' + c.name : ''}, this is ${coName}. Sorry, we can't come on ${dfmt(a.date)}${a.time ? ' at ' + h + ' ' + ap : ''}. Please choose another time or reply here and we'll find a slot for you.`, 'decline'); closeSheet(() => toast('Booking declined')); };
       if (b('#avMake')) b('#avMake').onclick = () => { closeSheet(() => toWO(a)); };
       if (b('#avWO')) b('#avWO').onclick = () => FitxWO.view(w.id);
       if (b('#avEd')) b('#avEd').onclick = () => closeSheet(() => editAppt(a.id));
-      if (b('#avCx')) b('#avCx').onclick = () => { if (!confirm('Cancel ' + a.number + '? The time slot becomes free.')) return; a.status = 'cancelled'; a.updated = Date.now(); save(); closeSheet(() => { toast('Appointment cancelled'); viewAppt(a.id); }); };
+      if (b('#avCx')) b('#avCx').onclick = () => { if (!confirm('Cancel ' + a.number + '? The time slot becomes free.')) return; a.status = 'cancelled'; a.updated = Date.now(); save(); if (isBot(a)) notify(`Hello${c.name ? ' ' + c.name : ''}, this is ${coName}. Your visit on ${dfmt(a.date)}${a.time ? ' at ' + h + ' ' + ap : ''} has been cancelled. Reply here anytime to book a new time.`, 'cancel'); closeSheet(() => { toast('Appointment cancelled'); viewAppt(a.id); }); };
       if (b('#avDel')) b('#avDel').onclick = () => { if (!confirm('Delete ' + a.number + '?')) return; db.appointments = db.appointments.filter(x => x.id !== a.id); save(); closeSheet(() => toast('Deleted')); };
     });
   }
@@ -215,7 +236,7 @@
         if (!db.appointments.some(a => a.bookingId === doc.id)) {
           db.appointments.push({id: uid(), number: nextAp(), status: 'requested', source: 'online', src: ((String(b.maps || '').match(/^src=([a-z0-9]+)/i) || [])[1] || ''), bookingId: doc.id, created: String(b.created || Date.now()), kind: 'home', customerId: '',
             home: {phone: String(b.phone || '').slice(0, 20), name: String(b.name || '').slice(0, 60), area: String(b.area || '').slice(0, 40), building: String(b.building || '').slice(0, 10), street: String(b.street || '').slice(0, 10), zone: String(b.zone || '').slice(0, 10), maps: String(b.maps || '').replace(/^src=\S+\s*/, '').slice(0, 200)},
-            date: String(b.date || today()), time: /^\d\d:\d\d$/.test(String(b.time || '')) ? b.time : '', techId: '', machine: [b.machine, b.brand].filter(Boolean).join(' · ').slice(0, 80), problem: String(b.problem || '').slice(0, 300), notes: 'Booked online' + (/^\d\d:\d\d$/.test(String(b.time || '')) ? '' : ' · Customer wants another time: ' + String(b.time || '').replace(/^Other:\s*/, '').slice(0, 80)), wantsOther: !/^\d\d:\d\d$/.test(String(b.time || '')), photo: typeof b.photo === 'string' && b.photo.startsWith('data:image/') ? b.photo : ''});
+            date: String(b.date || today()), time: /^\d\d:\d\d$/.test(String(b.time || '')) ? b.time : '', techId: '', machine: [b.machine, b.brand].filter(Boolean).join(' · ').slice(0, 80), problem: String(b.problem || '').slice(0, 300), notes: (/^src=wabot\b/i.test(String(b.maps || '')) ? 'Booked via WhatsApp bot' : /^src=webbot\b/i.test(String(b.maps || '')) ? 'Booked via website assistant' : 'Booked online') + (/^\d\d:\d\d$/.test(String(b.time || '')) ? '' : ' · Customer wants another time: ' + String(b.time || '').replace(/^Other:\s*/, '').slice(0, 80)), wantsOther: !/^\d\d:\d\d$/.test(String(b.time || '')), photo: typeof b.photo === 'string' && b.photo.startsWith('data:image/') ? b.photo : ''});
           n++;
         }
         doc.ref.delete().catch(() => {});
@@ -247,7 +268,7 @@
       const c = a.kind === 'home' ? (a.home || {}) : cust(a.customerId);
       out.push({kind: 'apt', id: a.id, time: a.time || '', home: a.kind === 'home', name: pName(a) || 'Appointment', area: String(c.area || '').trim() || 'No area',
         what: [a.machine, a.problem].filter(Boolean).join(' – '), where: [c.zone && 'Zone ' + c.zone, c.street && 'St ' + c.street, c.building && 'Bldg ' + c.building].filter(Boolean).join(' · '),
-        tech: emp(a.techId), st: a.status === 'requested' ? ['Requested · online', 'b-orange'] : ['Appointment', 'b-purple'], loc: latlng(c.maps || ''), number: a.number});
+        tech: emp(a.techId), st: a.status === 'requested' ? [a.src === 'wabot' ? 'Requested · WhatsApp bot' : a.src === 'webbot' ? 'Requested · website' : 'Requested · online', 'b-orange'] : ['Appointment', 'b-purple'], loc: latlng(c.maps || ''), number: a.number});
     });
     (db.workorders || []).filter(w => w.date === day && w.status !== 'cancelled').forEach(w => {
       const home = w.kind === 'home', c = home ? (w.home || {}) : cust(w.customerId);

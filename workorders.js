@@ -35,7 +35,8 @@
     const area = String(party(w).area || '').trim();
     const e = (w.equipment || []).find(x => String(x.problem || '').trim()) || (w.equipment || []).find(x => x.desc);
     const m = e ? [e.desc, String(e.problem || '').trim()].map(x => String(x || '').trim()).filter(Boolean).join(' – ') : '';
-    return (area ? ' · <span style="white-space:nowrap">📍 ' + esc(area) + '</span>' : '') + (m ? ' · <b style="font-weight:600;color:var(--text)">' + esc(m.length > 70 ? m.slice(0, 68) + '…' : m) + '</b>' : '');
+    const wait = (w.status === 'parts' || w.needSt === 'approved') && (w.need || []).filter(n => n.order).length ? ' · <b style="font-weight:600;color:#c77700">⏳ ' + esc(w.need.filter(n => n.order).map(n => n.desc).join(', ').slice(0, 60)) + '</b>' : '';
+    return wait + (area ? ' · <span style="white-space:nowrap">📍 ' + esc(area) + '</span>' : '') + (m ? ' · <b style="font-weight:600;color:var(--text)">' + esc(m.length > 70 ? m.slice(0, 68) + '…' : m) + '</b>' : '');
   };
   const pMap = c => c.maps || (pAddr(c) ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(pAddr(c) + ', Qatar') : '');
   // the single customers-list account home-visit invoices are booked to (the person's details stay on the invoice)
@@ -115,6 +116,14 @@
     .wo-sig{width:100%;height:150px;border:1px solid var(--line2);border-radius:10px;background:#fff;touch-action:none;display:block}
     .wo-hc svg,#woHomeCard svg{width:22px;height:22px}
     .wo-av{width:36px;height:36px;border-radius:50%;background:var(--orange);color:#fff;display:grid;place-items:center;font-weight:700;flex:0 0 auto}
+    .pn-steps{display:flex;margin:4px 0 10px}.pn-steps div{flex:1;text-align:center;font-size:10.5px;font-weight:600;color:var(--muted,#999);position:relative;padding-top:24px}
+    .pn-steps div:before{content:'';position:absolute;top:6px;left:50%;transform:translateX(-50%);width:14px;height:14px;border-radius:50%;background:var(--line2,#ddd);z-index:1;box-sizing:border-box}
+    .pn-steps div:after{content:'';position:absolute;top:12px;left:-50%;width:100%;height:3px;background:var(--line2,#ddd)}.pn-steps div:first-child:after{display:none}
+    .pn-steps .ok{color:var(--text,#111)}.pn-steps .ok:before,.pn-steps .ok:after,.pn-steps .now:after{background:var(--orange)}.pn-steps .now{color:var(--orange)}.pn-steps .now:before{background:var(--card,#fff);border:3px solid var(--orange)}
+    .pn-steps.no .now{color:var(--red,#c0392b)}.pn-steps.no .now:before{border-color:var(--red,#c0392b)}
+    .pn-m{font-size:11px;background:var(--line,#f1f2f4);border-radius:6px;padding:1px 7px;margin-left:6px;color:var(--muted,#555);font-weight:600;white-space:nowrap}
+    .pn-tot{display:flex;justify-content:space-between;padding:10px 14px;font-weight:800}
+    .pn-b{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}.pn-b .btn{white-space:nowrap}
     .wo-eq{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;background:var(--card,#fff)}
     .paper .wo-photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}.paper .wo-photos img{width:100%;height:150px;object-fit:cover;border-radius:6px;border:1px solid #ebebef}
     .paper .wo-sigimg{height:70px;display:block}.paper .wo-box{border:1px solid #ebebef;border-radius:10px;padding:10px 12px;margin:8px 0;font-size:11.5px;white-space:pre-wrap}`;
@@ -242,10 +251,103 @@
     });
   }
 
+  /* ---------- parts needed after inspection → quotation → approval → parts arrive → fitted ----------
+     w.need = [{desc, itemId, eq (machine index or -1), qty, price, note, order (true = to order)}], w.needSt: '' | approved | declined | arrived | fitted */
+  const needQuo = w => db.docs.find(d => d.woId === w.id && d.type === 'QUO' && !d.cancelled);
+  const needTot = w => (w.need || []).reduce((t, n) => t + num(n.qty) * num(n.price), 0);
+  const needOpen = w => (w.need || []).length && w.needSt !== 'fitted' && w.needSt !== 'declined';
+  function needHTML(w) {
+    const need = w.need || [], quo = needQuo(w), st = w.needSt || '';
+    if (!need.length && ['done', 'cancelled'].includes(w.status)) return '';
+    const step = st === 'fitted' ? 5 : st === 'arrived' ? 3 : st === 'approved' || st === 'declined' ? 2 : quo ? 1 : 0;
+    const names = ['Inspected', 'Quote sent', st === 'declined' ? 'Not approved' : 'Approved', 'Parts arrived', 'Fitted'];
+    const locked = st === 'fitted';
+    const rows = need.map((n, i) => `<button type="button" class="item" data-nd="${i}" ${locked ? 'disabled style="cursor:default"' : ''}><div class="main"><div class="t">${esc(n.desc)}${n.eq >= 0 && (w.equipment || [])[n.eq] ? `<span class="pn-m">M${n.eq + 1}</span>` : ''}</div><div class="s">${fq(n.qty)} × ${fmt(n.price)} · ${locked ? '<b style="color:var(--green,#1a8f4c)">fitted</b>' : n.order ? '<b style="color:#c77700">to order</b>' : '<b style="color:var(--green,#1a8f4c)">in stock</b>'}${n.note ? ' · ' + esc(n.note) : ''}</div></div><div class="amt">${fmt(num(n.qty) * num(n.price))}</div></button>`).join('');
+    let act = '';
+    if (need.length && !locked) {
+      if (!quo && !st) act = `<button type="button" class="btn pri full" id="pnQuo" style="margin-top:8px">📄 Make quotation from parts</button>`;
+      if ((quo || st === 'declined') && !st) act = `<div class="pn-b"><button type="button" class="btn pri" id="pnOk">✔ Approved</button><button type="button" class="btn danger" id="pnNo">✕ Not approved</button></div>`;
+      if (!quo && !st) act += `<div class="pn-b" style="margin-top:0"><button type="button" class="btn" id="pnOk">✔ Approved (no quote)</button><button type="button" class="btn danger" id="pnNo">✕ Not approved</button></div>`;
+      if (st === 'declined') act = `<button type="button" class="btn full" id="pnRe" style="margin-top:8px">↺ Customer changed mind – approved</button>`;
+      if (st === 'approved') act = `<button type="button" class="btn pri full" id="pnArr" style="margin-top:8px">📦 Parts arrived</button>`;
+      if (st === 'arrived') act = `<button type="button" class="btn pri full" id="pnFit" style="margin-top:8px">✔ Parts fitted</button>`;
+    }
+    return `<div class="sec"><h2>🔧 Parts needed</h2><span class="hint">after inspection</span></div>
+      ${need.length ? `<div class="pn-steps${st === 'declined' ? ' no' : ''}">${names.map((x, i) => `<div class="${i < step ? 'ok' : i === step ? 'now' : ''}">${x}</div>`).join('')}</div>
+      <div class="list">${rows}<div class="pn-tot"><span>Parts total</span><span>${fmt(needTot(w))}</span></div></div>` : '<p class="hint" style="margin-top:0">After the inspection, add the spare parts this job needs. Then make the quotation from them in one tap.</p>'}
+      ${locked ? '' : `<button type="button" class="btn full" id="pnAdd" style="margin-top:8px">＋ Add part needed</button>`}
+      ${quo ? `<div class="card" style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;gap:8px"><div><b>${esc(quo.number || 'Quotation')}</b> · ${dfmt(quo.date)}<div class="hint">Quotation linked to this work order · ${fmt(docTotal(quo))}</div></div><button type="button" class="btn" id="pnOpenQ" style="flex:0 0 auto;min-height:36px">Open</button></div>` : ''}
+      ${act}
+      ${st === 'approved' ? '<p class="hint">Waiting for parts. Tap <b>Parts arrived</b> when they come in.</p>' : st === 'arrived' ? '<p class="hint">After fitting, tap <b>Parts fitted</b> – the parts go on the work report and the invoice, and stock items come out of stock when the job is completed.</p>' : ''}`;
+  }
+  function editNeed(w, i, after) {
+    const ex = i != null ? w.need[i] : null;
+    const n = ex ? Object.assign({}, ex) : {desc: '', itemId: '', eq: (w.equipment || []).filter(e => e.desc).length === 1 ? 0 : -1, qty: 1, price: '', note: '', order: true};
+    const eqs = (w.equipment || []).map((e, k) => [k, e]).filter(([, e]) => e.desc || e.brand || e.model);
+    const items = db.items.filter(x => !x.service).sort((a, b) => a.name.localeCompare(b.name));
+    openSheet(ex ? 'Edit part needed' : 'Add part needed', `<form id="pnF">
+      <label class="f"><span>Part</span><input class="in" name="desc" list="pnDl" required value="${esc(n.desc)}" placeholder="Type or pick from stock" autocomplete="off"></label>
+      <datalist id="pnDl">${items.map(x => `<option value="${esc(x.name)}">stock ${fq(stockQty(x.id))}</option>`).join('')}</datalist>
+      ${eqs.length ? `<label class="f"><span>For machine</span><select class="in" name="eq"><option value="-1">— General / all machines —</option>${eqs.map(([k, e]) => `<option value="${k}" ${n.eq === k ? 'selected' : ''}>${k + 1}. ${esc([e.desc, e.brand, e.model].filter(Boolean).join(' · '))}</option>`).join('')}</select></label>` : ''}
+      <div class="row"><label class="f"><span>Qty</span><input class="in" name="qty" type="number" step="any" min="0" inputmode="decimal" required value="${esc(n.qty)}"></label><label class="f"><span>Price each (QAR)</span><input class="in" name="price" type="number" step="0.01" min="0" inputmode="decimal" value="${esc(n.price)}"></label></div>
+      <label class="f"><span>Part no. / note (optional)</span><input class="in" name="note" value="${esc(n.note || '')}" placeholder="e.g. OEM part no., size"></label>
+      <div class="chips" id="pnOrd"><button type="button" data-o="1" class="${n.order ? 'on' : ''}">To order</button><button type="button" data-o="0" class="${n.order ? '' : 'on'}">In stock</button></div>
+      <div class="hint" id="pnStk" style="margin-top:6px"></div>
+      <div class="btns" style="margin-top:14px"><button type="submit" class="btn pri">Save part</button>${ex ? '<button type="button" class="btn danger" id="pnDel">Delete</button>' : ''}</div></form>`, el => {
+      const f = el.querySelector('#pnF'), stk = el.querySelector('#pnStk');
+      const setOrd = o => { n.order = o; el.querySelectorAll('#pnOrd button').forEach(b => b.classList.toggle('on', (b.dataset.o === '1') === o)); };
+      el.querySelectorAll('#pnOrd button').forEach(b => b.onclick = () => setOrd(b.dataset.o === '1'));
+      const match = () => { const it = items.find(x => x.name.toLowerCase() === f.desc.value.trim().toLowerCase()); n.itemId = it ? it.id : '';
+        if (it) { const q = stockQty(it.id); stk.textContent = 'From your stock list · ' + fq(q) + ' in stock'; if (!num(f.price.value)) f.price.value = num(it.price) ? num(it.price).toFixed(2) : ''; setOrd(!(q >= num(f.qty.value || 1))); } else stk.textContent = ''; };
+      f.desc.onchange = match; if (n.itemId) match();
+      if (el.querySelector('#pnDel')) el.querySelector('#pnDel').onclick = () => { if (!confirm('Delete this part?')) return; w.need.splice(i, 1); save(); closeSheet(after); };
+      f.onsubmit = e => { e.preventDefault(); match();
+        const rec = {desc: f.desc.value.trim(), itemId: n.itemId, eq: f.eq ? +f.eq.value : -1, qty: num(f.qty.value), price: num(f.price.value), note: f.note.value.trim(), order: n.order};
+        if (!rec.desc || !(rec.qty > 0)) { toast('Enter the part and quantity'); return; }
+        w.need = w.need || []; if (ex) w.need[i] = rec; else w.need.push(rec); save(); closeSheet(after); };
+    });
+  }
+  function needQuote(w, after) {
+    const lines = [], eqs = w.equipment || [], need = w.need || [];
+    const used = [...new Set(need.map(n => n.eq))].sort((a, b) => a - b);
+    const pl = n => { const it = n.itemId ? itemById(n.itemId) || {} : {}; return {kind: 'part', itemId: n.itemId || '', desc: n.desc, qty: num(n.qty), price: num(n.price), cost: num(it.cost), note: n.note || ''}; };
+    const svc = used.some(k => k >= 0 && eqs[k]);
+    used.forEach(k => { const e = eqs[k];
+      if (k >= 0 && e) lines.push({kind: 'equip', desc: e.desc || 'Machine', brand: e.brand || '', model: e.model || '', sn: e.sn || '', qty: 1, price: 0, note: e.problem || ''});
+      need.filter(n => n.eq === k).forEach(n => lines.push(pl(n))); });
+    const hc = w.kind === 'home' ? homeAccount() : null;
+    const draft = {type: 'QUO', customerId: hc ? hc.id : w.customerId, date: today(), lines, discount: 0, notes: '', subject: 'Spare parts · ' + w.number, jobType: 'Spare parts', svc, woId: w.id};
+    if (hc) { const h = w.home || {}; draft.walkin = {name: h.name || '', phone: h.phone || '', building: h.building || '', street: h.street || '', zone: h.zone || '', area: h.area || '', maps: h.maps || ''}; }
+    const depth = sheets.length;
+    editDoc('QUO', null, draft);
+    let n = 0; const iv = setInterval(() => { const q = needQuo(w);
+      if (q) { clearInterval(iv); if (!['parts', 'done', 'cancelled'].includes(w.status)) setStatus(w, 'approval'); setTimeout(() => toast('Quotation linked – status: Waiting for approval'), 900); return; }
+      if (sheets.length <= depth || ++n > 9000) { clearInterval(iv); if (after && sheets.length <= depth) after(); } }, 400);
+  }
+  function bindNeed(el, w, reopen) {
+    const b = s => el.querySelector(s);
+    if (b('#pnAdd')) b('#pnAdd').onclick = () => editNeed(w, null, reopen);
+    el.querySelectorAll('[data-nd]').forEach(x => x.onclick = () => { if (w.needSt !== 'fitted') editNeed(w, +x.dataset.nd, reopen); });
+    if (b('#pnQuo')) b('#pnQuo').onclick = () => closeSheet(() => needQuote(w, () => viewWO(w.id)));
+    if (b('#pnOpenQ')) b('#pnOpenQ').onclick = () => { const q = needQuo(w); if (q) closeSheet(() => viewDoc(q.id)); };
+    const approve = () => { const toOrder = (w.need || []).some(n => n.order); w.needSt = toOrder ? 'approved' : 'arrived'; save(); setStatus(w, toOrder ? 'parts' : (w.techId ? 'progress' : 'open')); reopen(); toast(toOrder ? 'Approved – waiting for parts' : 'Approved – parts in stock, ready to fit'); };
+    if (b('#pnOk')) b('#pnOk').onclick = approve;
+    if (b('#pnRe')) b('#pnRe').onclick = approve;
+    if (b('#pnNo')) b('#pnNo').onclick = () => { if (!confirm('Customer did not approve the parts?')) return; w.needSt = 'declined'; save(); setStatus(w, 'hold'); reopen(); toast('Marked not approved – job on hold'); };
+    if (b('#pnArr')) b('#pnArr').onclick = () => { w.needSt = 'arrived'; w.needArr = today(); save(); setStatus(w, w.techId ? 'progress' : 'open'); reopen(); toast('Parts arrived – job ready to resume'); };
+    if (b('#pnFit')) b('#pnFit').onclick = () => {
+      w.parts = w.parts || [];
+      (w.need || []).forEach(n => { if (n.itemId && isStock(n.itemId)) { w.parts.push({itemId: n.itemId, desc: n.desc, qty: num(n.qty), price: num(n.price)}); n.moved = true; } });
+      w.needSt = 'fitted'; save(); if (!['progress', 'done'].includes(w.status)) setStatus(w, 'progress'); reopen(); toast('Parts fitted – added to the job');
+    };
+  }
+  // parts from "Parts needed" that are fitted but not stock items (stock items were moved to w.parts)
+  const needFitted = w => w.needSt === 'fitted' ? (w.need || []).filter(n => !n.moved) : [];
+
   function woHTML(w) {
     const c = party(w), inv = woInvoice(w), amc = w.amcId ? amcById(w.amcId) : null;
     const eqRows = (w.equipment || []).map((e, i) => `<tr><td>${i + 1}</td><td><b>${esc(e.desc || '')}</b>${[e.brand, e.model].filter(Boolean).length ? '<div class="xd">' + esc([e.brand, e.model].filter(Boolean).join(' · ')) + '</div>' : ''}</td><td>${esc(e.sn || '')}</td><td>${esc(e.problem || '')}</td></tr>`).join('');
-    const pRows = (w.parts || []).map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.desc || (itemById(p.itemId) || {}).name || '')}</td><td class="n">${fq(p.qty)}</td></tr>`).join('');
+    const pRows = [...(w.parts || []), ...needFitted(w)].map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.desc || (itemById(p.itemId) || {}).name || '')}</td><td class="n">${fq(p.qty)}</td></tr>`).join('');
     return `<div class="paper lay-pro stmt">${brandHead('WORK REPORT', 'تقرير إنجاز العمل', w.number, `<div class="xdue"><small>STATUS</small><b>${esc(woStatus(w)[0].toUpperCase())}</b></div>`)}
       <div class="xmeta two"><div><span class="xl">${c.homeVisit ? 'Home visit' : 'Customer'} <span dir="rtl" lang="ar">· العميل</span></span>${custBlock(c)}${c.homeVisit && c.maps ? '<br>Location: ' + esc(c.maps) : ''}</div>
         <div class="xdg"><span>Date</span><span>${dfmt(w.date)}${w.time ? ' · ' + esc(w.time) : ''}</span><span>Job type</span><span>${esc(w.jobType || '')}</span><span>Technician</span><span>${esc(empName(w.techId) || '—')}</span>${w.doneDate ? `<span>Completed</span><span>${dfmt(w.doneDate)}</span>` : ''}${amc ? `<span>Contract</span><span>${esc(amc.number)}${w.visitNo ? ' · visit ' + w.visitNo : ''}</span>` : ''}${inv ? `<span>Invoice</span><span>${esc(inv.number)}</span>` : ''}</div></div>
@@ -281,6 +383,7 @@
       <div class="sec"><h2>Equipment &amp; work</h2></div>
       ${(w.equipment || []).map((e, i) => `<div class="wo-eq"><b>${i + 1}. ${esc([e.desc, e.brand, e.model].filter(Boolean).join(' · ') || 'Machine')}</b><div class="hint">${esc([e.sn && 'SN ' + e.sn, e.problem].filter(Boolean).join(' · '))}</div></div>`).join('') || '<p class="hint">No machines added.</p>'}
       ${w.work ? `<div class="card" style="white-space:pre-wrap">${esc(w.work)}</div>` : ''}
+      ${needHTML(w)}
       ${(w.parts || []).length ? `<div class="sec"><h2>Parts used</h2><span class="hint">${inv ? 'on the invoice' : w.status === 'done' ? 'taken from stock' : 'taken from stock when completed'}</span></div><div class="list">${w.parts.map(p => `<div class="item"><div class="main"><div class="t">${esc(p.desc || (itemById(p.itemId) || {}).name || '')}</div><div class="s">${fq(p.qty)} × ${fmt(p.price)}</div></div><div class="amt">${fmt(num(p.qty) * num(p.price))}</div></div>`).join('')}</div>` : ''}
       <div class="sec"><h2>Photos</h2><span class="hint">up to 6</span></div>
       <div class="wo-ph" id="woPh">${(w.photos || []).map((p, i) => `<div class="ph"><img src="${p}" alt="Job photo ${i + 1}"><button type="button" data-rm="${i}" aria-label="Remove photo">✕</button></div>`).join('')}${(w.photos || []).length < 6 ? '<label class="add" aria-label="Add photo">+<input type="file" accept="image/*" multiple id="woPhIn" hidden></label>' : ''}</div>
@@ -308,6 +411,7 @@
           e2.querySelector('#trCopy').onclick = () => { try { navigator.clipboard.writeText(url).then(() => toast('Link copied'), () => toast('Select the link and copy it')); } catch (er) { toast('Select the link and copy it'); } };
         });
       };
+      bindNeed(el, w, reopen);
       if (b('#woInv')) b('#woInv').onclick = () => closeSheet(() => makeInvoice(w));
       if (b('#woOpenInv')) b('#woOpenInv').onclick = () => closeSheet(() => viewDoc(inv.id));
       b('#woEdit').onclick = () => closeSheet(() => editWO(id));
@@ -344,8 +448,9 @@
     const lines = [];
     const eqs = (w.equipment || []).filter(e => e.desc);
     eqs.forEach(e => lines.push({kind: 'equip', desc: e.desc, brand: e.brand || '', model: e.model || '', sn: e.sn || '', qty: 1, price: 0}));
-    if (num(w.labour) || !(w.parts || []).length) lines.push({kind: 'service', itemId: '', desc: (w.jobType || 'Service') + (w.work ? ' – ' + w.work.split('\n')[0].slice(0, 80) : ''), qty: 1, price: num(w.labour)});
+    if (num(w.labour) || !((w.parts || []).length + needFitted(w).length)) lines.push({kind: 'service', itemId: '', desc: (w.jobType || 'Service') + (w.work ? ' – ' + w.work.split('\n')[0].slice(0, 80) : ''), qty: 1, price: num(w.labour)});
     (w.parts || []).forEach(p => { const it = itemById(p.itemId) || {}; lines.push({kind: 'part', itemId: p.itemId, desc: p.desc || it.name || '', qty: num(p.qty), price: num(p.price), cost: num(it.cost)}); });
+    needFitted(w).forEach(n => lines.push({kind: 'part', itemId: n.itemId || '', desc: n.desc, qty: num(n.qty), price: num(n.price), note: n.note || ''}));
     if (amc && amc.billing === 'visit' && num(amc.perVisit)) lines.unshift({kind: 'service', desc: `AMC ${amc.number} – service visit ${w.visitNo || ''}`.trim(), qty: 1, price: num(amc.perVisit)});
     const hc = w.kind === 'home' ? homeAccount() : null;
     const draft = {type: 'INV', customerId: hc ? hc.id : w.customerId, date: today(), lines, discount: 0, notes: '', subject: (w.jobType || 'Service') + ' · ' + w.number, jobType: w.jobType, svc: eqs.length > 0, woId: w.id};
